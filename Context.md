@@ -243,6 +243,10 @@ python3 -m PyInstaller "KO Trimmer.spec" --onefile --windowed
 ## Recent Updates
 
 ### Latest Features (July 2024)
+- ✅ **Phase 3.1 Complete**: Welcome dialog and favorites system implemented
+- ✅ **Functional Favorites**: Clicking a favorite populates the file list with all audio files
+- ✅ **Smart Display Names**: Favorites show parent/name for easy identification
+- ✅ **Persistent Settings**: All preferences and favorites saved automatically
 - ✅ **20ms Padding**: Reduced default padding for tighter trimming
 - ✅ **Stereo Preservation**: Checkbox to preserve stereo or convert to mono
 - ✅ **Filename Suffix**: All files get "_trimmed" suffix before extension
@@ -262,5 +266,5 @@ python3 -m PyInstaller "KO Trimmer.spec" --onefile --windowed
 1. **Cross-Platform Fun**: Test on Windows and Linux to see what breaks! 🎮
 2. **Embedded Preview**: Move audio preview from popup to main window (less clicking!)
 3. **UI Cleanup**: Make it look less like a spreadsheet and more like a music app 🎵
-4. **Welcome Page**: Add a friendly "Welcome to KO Trimmer!" screen with favorites
-5. **Favorites System**: Quick access to your favorite sample folders on the left side 
+4. **Phase 3.2**: Enhanced file management features
+5. **Phase 3.3**: Advanced batch operations 

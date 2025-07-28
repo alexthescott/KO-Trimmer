@@ -35,6 +35,11 @@ class AudioProcessor:
             bool: True if processing was successful
         """
         try:
+            # Check if file is already processed
+            if self.is_already_processed(file_path, settings):
+                print(f"Skipping already processed file: {file_path}")
+                return True
+                
             # Validate file
             if not self.file_handler.is_valid_audio_file(file_path):
                 print(f"Invalid audio file: {file_path}")
@@ -280,7 +285,47 @@ class AudioProcessor:
             return None
             
         except Exception:
-            return None
+                            return None
+    
+    def is_already_processed(self, file_path: str, settings: Dict[str, Any]) -> bool:
+        """
+        Check if a file has already been processed with the current settings
+        
+        Args:
+            file_path: Path to the input file
+            settings: Current processing settings
+            
+        Returns:
+            bool: True if file is already processed
+        """
+        try:
+            # Check if the input file itself is already a processed file
+            file_path_obj = Path(file_path)
+            filename = file_path_obj.name.lower()
+            
+            # Check for common processed file indicators
+            if any(indicator in filename for indicator in ['_trimmed', '_processed', '_optimized']):
+                return True
+            
+            # Check if the output file already exists
+            output_path = self.get_output_path(file_path, settings)
+            if Path(output_path).exists():
+                return True
+            
+            # Check if the file is in a directory that looks like it's already processed
+            parent_dir = file_path_obj.parent.name.lower()
+            if any(indicator in parent_dir for indicator in ['_trimmed', '_processed', '_optimized']):
+                return True
+            
+            # Check if the file is in a subdirectory of a processed directory
+            for parent in file_path_obj.parents:
+                if any(indicator in parent.name.lower() for indicator in ['_trimmed', '_processed', '_optimized']):
+                    return True
+            
+            return False
+            
+        except Exception:
+            return False
             
     def save_audio(self, audio_data: np.ndarray, sample_rate: int, output_path: str) -> bool:
         """

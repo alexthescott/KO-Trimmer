@@ -3,6 +3,7 @@ Main window for KO Trimmer application
 """
 
 import os
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -10,7 +11,8 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QProgressBar, QListWidget,
     QListWidgetItem, QMessageBox, QFileDialog, QGroupBox,
-    QSpinBox, QDoubleSpinBox, QCheckBox, QSplitter, QMenu
+    QSpinBox, QDoubleSpinBox, QCheckBox, QSplitter, QMenu,
+    QProgressDialog
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon
@@ -19,6 +21,9 @@ from audio.processor import AudioProcessor
 from ui.drag_drop import DragDropWidget
 from ui.progress import ProcessingProgressWidget
 from ui.audio_preview import AudioPreviewDialog
+from ui.favorites_sidebar import FavoritesSidebar
+from ui.welcome_dialog import WelcomeDialog
+from utils.settings_manager import SettingsManager
 
 
 class MainWindow(QMainWindow):
@@ -28,7 +33,12 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.audio_processor = AudioProcessor()
         self.processing_thread = None
+        self.directory_scan_thread = None
+        self.settings_manager = SettingsManager()
+        self.favorites = []
         self.init_ui()
+        self.load_settings()
+        self.show_welcome_if_needed()
         
     def init_ui(self):
         """Initialize the user interface"""
@@ -58,16 +68,22 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(splitter)
         
-        # Left panel - File management
-        left_panel = self.create_file_panel()
-        splitter.addWidget(left_panel)
+        # Left panel - Favorites sidebar
+        self.favorites_sidebar = FavoritesSidebar()
+        self.favorites_sidebar.favorite_selected.connect(self.on_favorite_selected)
+        self.favorites_sidebar.favorites_changed.connect(self.on_favorites_changed)
+        splitter.addWidget(self.favorites_sidebar)
+        
+        # Center panel - File management
+        center_panel = self.create_file_panel()
+        splitter.addWidget(center_panel)
         
         # Right panel - Settings and controls
         right_panel = self.create_control_panel()
         splitter.addWidget(right_panel)
         
         # Set splitter proportions
-        splitter.setSizes([500, 300])
+        splitter.setSizes([200, 400, 300])
         
     def create_file_panel(self) -> QWidget:
         """Create the file management panel"""
@@ -483,6 +499,207 @@ class MainWindow(QMainWindow):
             "Processing Error",
             f"An error occurred during processing:\n{error_message}"
         )
+        
+    def on_favorite_selected(self, directory: str):
+        """Handle favorite directory selection"""
+        # Clear existing files
+        self.clear_files()
+        
+        # Create progress dialog
+        self.scan_progress = QProgressDialog(
+            f"Scanning directory for audio files...\n{directory}",
+            "Cancel",
+            0,
+            100,
+            self
+        )
+        self.scan_progress.setWindowTitle("Scanning Directory")
+        self.scan_progress.setModal(True)
+        self.scan_progress.setAutoClose(False)
+        self.scan_progress.setAutoReset(False)
+        
+        # Store start time for minimum display duration
+        self.scan_start_time = time.time()
+        
+        # Create and start directory scan thread
+        self.directory_scan_thread = DirectoryScanThread(directory)
+        self.directory_scan_thread.progress_updated.connect(self.scan_progress.setValue)
+        self.directory_scan_thread.scan_finished.connect(self.on_scan_finished)
+        self.directory_scan_thread.error_occurred.connect(self.on_scan_error)
+        
+        # Connect cancel button
+        self.scan_progress.canceled.connect(self.directory_scan_thread.stop)
+        
+        # Start scanning
+        self.directory_scan_thread.start()
+        self.scan_progress.show()
+        
+    def on_scan_finished(self, audio_files: List[str]):
+        """Handle directory scan completion"""
+        # Ensure minimum display time (1 second)
+        if hasattr(self, 'scan_start_time'):
+            elapsed_time = time.time() - self.scan_start_time
+            if elapsed_time < 1.0:
+                # Use QTimer to delay closing
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(int((1.0 - elapsed_time) * 1000), lambda: self._close_scan_progress(audio_files))
+                return
+        
+        self._close_scan_progress(audio_files)
+    
+    def _close_scan_progress(self, audio_files: List[str] = None):
+        """Close scan progress dialog and handle results"""
+        # Close progress dialog
+        if hasattr(self, 'scan_progress'):
+            self.scan_progress.close()
+            self.scan_progress = None
+        
+        # Clean up thread
+        if self.directory_scan_thread:
+            self.directory_scan_thread.quit()
+            self.directory_scan_thread.wait()
+            self.directory_scan_thread = None
+        
+        # Add files to list if provided
+        if audio_files is not None:
+            if audio_files:
+                self.add_files_to_list(audio_files)
+                QMessageBox.information(
+                    self, 
+                    "Files Added", 
+                    f"Added {len(audio_files)} audio files from the selected directory."
+                )
+            else:
+                QMessageBox.information(
+                    self, 
+                    "No Audio Files", 
+                    "No audio files found in the selected directory."
+                )
+    
+    def on_scan_error(self, error_message: str):
+        """Handle directory scan error"""
+        # Close progress dialog
+        if hasattr(self, 'scan_progress'):
+            self.scan_progress.close()
+            self.scan_progress = None
+        
+        # Clean up thread
+        if self.directory_scan_thread:
+            self.directory_scan_thread.quit()
+            self.directory_scan_thread.wait()
+            self.directory_scan_thread = None
+        
+        # Show error message
+        QMessageBox.warning(
+            self, 
+            "Scan Error", 
+            f"Error scanning directory:\n{error_message}"
+        )
+        
+    def on_favorites_changed(self, favorites: List[str]):
+        """Handle favorites list changes"""
+        self.favorites = favorites
+        self.settings_manager.save_favorites(favorites)
+        
+    def load_settings(self):
+        """Load application settings"""
+        # Load window geometry and state
+        geometry = self.settings_manager.load_window_geometry()
+        if geometry:
+            self.restoreGeometry(geometry)
+            
+        state = self.settings_manager.load_window_state()
+        if state:
+            self.restoreState(state)
+            
+        # Load favorites
+        self.favorites = self.settings_manager.load_favorites()
+        self.favorites_sidebar.set_favorites(self.favorites)
+        
+    def save_settings(self):
+        """Save application settings"""
+        self.settings_manager.save_window_geometry(self.saveGeometry())
+        self.settings_manager.save_window_state(self.saveState())
+        
+    def show_welcome_if_needed(self):
+        """Show welcome dialog if needed"""
+        if self.settings_manager.load_show_welcome():
+            welcome_dialog = WelcomeDialog(self)
+            if welcome_dialog.exec() == WelcomeDialog.DialogCode.Accepted:
+                # Update favorites from welcome dialog
+                self.favorites = welcome_dialog.get_favorites()
+                self.favorites_sidebar.set_favorites(self.favorites)
+                
+                # Save show welcome preference
+                self.settings_manager.save_show_welcome(welcome_dialog.should_show_welcome())
+        
+    def closeEvent(self, event):
+        """Handle window close event"""
+        self.save_settings()
+        super().closeEvent(event)
+
+
+class DirectoryScanThread(QThread):
+    """Thread for scanning directories for audio files"""
+    
+    progress_updated = pyqtSignal(int)
+    scan_finished = pyqtSignal(list)  # list of audio file paths
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, directory: str):
+        super().__init__()
+        self.directory = directory
+        self._stop_flag = False
+        
+    def run(self):
+        """Run the directory scanning thread"""
+        try:
+            audio_extensions = {'.wav', '.mp3', '.flac', '.aiff', '.m4a', '.ogg'}
+            audio_files = []
+            
+            # First, count total files for progress
+            total_files = 0
+            for _ in Path(self.directory).rglob("*"):
+                if self._stop_flag:
+                    return
+                total_files += 1
+            
+            # Now scan for audio files
+            scanned_files = 0
+            last_progress = -1
+            
+            for file_path in Path(self.directory).rglob("*"):
+                if self._stop_flag:
+                    return
+                    
+                scanned_files += 1
+                if file_path.is_file() and file_path.suffix.lower() in audio_extensions:
+                    audio_files.append(str(file_path))
+                
+                # Update progress more granularly (every 5% or every 10 files)
+                progress = int((scanned_files / total_files) * 100) if total_files > 0 else 0
+                if progress != last_progress or scanned_files % 10 == 0:
+                    self.progress_updated.emit(progress)
+                    last_progress = progress
+                    
+                    # Small delay to make progress visible
+                    if scanned_files % 50 == 0:
+                        self.msleep(10)  # 10ms delay every 50 files
+            
+            # Ensure we show 100% at the end
+            self.progress_updated.emit(100)
+            
+            # Small delay before finishing to show completion
+            self.msleep(200)
+            
+            self.scan_finished.emit(audio_files)
+            
+        except Exception as e:
+            self.error_occurred.emit(str(e))
+            
+    def stop(self):
+        """Stop the scanning thread"""
+        self._stop_flag = True
 
 
 class ProcessingThread(QThread):
