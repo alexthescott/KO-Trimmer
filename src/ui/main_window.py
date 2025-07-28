@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QProgressBar, QListWidget,
     QListWidgetItem, QMessageBox, QFileDialog, QGroupBox,
-    QSpinBox, QDoubleSpinBox, QCheckBox, QSplitter
+    QSpinBox, QDoubleSpinBox, QCheckBox, QSplitter, QMenu
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon
@@ -18,6 +18,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon
 from audio.processor import AudioProcessor
 from ui.drag_drop import DragDropWidget
 from ui.progress import ProcessingProgressWidget
+from ui.audio_preview import AudioPreviewDialog
 
 
 class MainWindow(QMainWindow):
@@ -84,6 +85,8 @@ class MainWindow(QMainWindow):
         
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.file_list.customContextMenuRequested.connect(self.show_context_menu)
         file_layout.addWidget(self.file_list)
         
         # File list buttons
@@ -100,6 +103,10 @@ class MainWindow(QMainWindow):
         self.clear_btn = QPushButton("Clear All")
         self.clear_btn.clicked.connect(self.clear_files)
         file_buttons_layout.addWidget(self.clear_btn)
+        
+        self.preview_btn = QPushButton("Preview Selected")
+        self.preview_btn.clicked.connect(self.preview_selected)
+        file_buttons_layout.addWidget(self.preview_btn)
         
         file_layout.addLayout(file_buttons_layout)
         layout.addWidget(file_group)
@@ -149,6 +156,11 @@ class MainWindow(QMainWindow):
         self.overwrite_check = QCheckBox("Overwrite original files")
         self.overwrite_check.setChecked(False)
         settings_layout.addWidget(self.overwrite_check)
+        
+        # Stereo preservation option
+        self.preserve_stereo_check = QCheckBox("Preserve stereo channels (convert to mono if unchecked)")
+        self.preserve_stereo_check.setChecked(True)  # Default to preserving stereo
+        settings_layout.addWidget(self.preserve_stereo_check)
         
         layout.addWidget(settings_group)
         
@@ -256,7 +268,8 @@ class MainWindow(QMainWindow):
             'threshold': self.threshold_spin.value(),
             'min_duration': self.duration_spin.value(),
             'padding': self.padding_spin.value(),
-            'overwrite': self.overwrite_check.isChecked()
+            'overwrite': self.overwrite_check.isChecked(),
+            'preserve_stereo': self.preserve_stereo_check.isChecked()
         }
         
         # Start processing in a separate thread
@@ -332,7 +345,8 @@ class MainWindow(QMainWindow):
                 'threshold': self.threshold_spin.value(),
                 'min_duration': self.duration_spin.value(),
                 'padding': self.padding_spin.value(),
-                'overwrite': self.overwrite_check.isChecked()
+                'overwrite': self.overwrite_check.isChecked(),
+                'preserve_stereo': self.preserve_stereo_check.isChecked()
             }
             
             # Find the root directory that was originally dragged in
@@ -355,6 +369,89 @@ class MainWindow(QMainWindow):
             
         return None
         
+    def preview_selected(self):
+        """Preview the selected file"""
+        selected_items = self.file_list.selectedItems()
+        
+        if not selected_items:
+            QMessageBox.information(
+                self,
+                "No File Selected",
+                "Please select a file to preview."
+            )
+            return
+            
+        if len(selected_items) > 1:
+            QMessageBox.information(
+                self,
+                "Multiple Files Selected",
+                "Please select only one file to preview."
+            )
+            return
+            
+        # Get the selected file
+        original_file = selected_items[0].text()
+        
+        # Check if the file has been processed
+        settings = {
+            'threshold': self.threshold_spin.value(),
+            'min_duration': self.duration_spin.value(),
+            'padding': self.padding_spin.value(),
+            'overwrite': self.overwrite_check.isChecked()
+        }
+        
+        # Get the output path
+        output_path = self.audio_processor.get_output_path(original_file, settings)
+        
+        # Check if trimmed file exists
+        if not os.path.exists(output_path):
+            QMessageBox.information(
+                self,
+                "No Trimmed File",
+                "This file hasn't been processed yet. Please process it first to preview the comparison."
+            )
+            return
+            
+        # Show the preview dialog
+        try:
+            # Create a new dialog instance each time to ensure fresh state
+            preview_dialog = AudioPreviewDialog(original_file, output_path, self)
+            preview_dialog.exec()
+            # Clean up the dialog after it's closed
+            preview_dialog.deleteLater()
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Preview Error",
+                f"Error opening preview dialog:\n{str(e)}"
+            )
+            
+    def show_context_menu(self, position):
+        """Show context menu for file list"""
+        menu = QMenu()
+        
+        # Get the item at the clicked position
+        item = self.file_list.itemAt(position)
+        if item:
+            # Add preview action
+            preview_action = menu.addAction("Preview")
+            preview_action.triggered.connect(self.preview_selected)
+            
+            # Add separator
+            menu.addSeparator()
+            
+            # Add remove action
+            remove_action = menu.addAction("Remove from List")
+            remove_action.triggered.connect(lambda: self.remove_selected_file(item))
+            
+        menu.exec(self.file_list.mapToGlobal(position))
+        
+    def remove_selected_file(self, item):
+        """Remove a file from the list"""
+        row = self.file_list.row(item)
+        self.file_list.takeItem(row)
+        self.update_process_button()
+            
     def on_processing_error(self, error_message: str):
         """Handle processing errors"""
         self.process_btn.setEnabled(True)

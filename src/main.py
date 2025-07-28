@@ -37,20 +37,15 @@ from ui.main_window import MainWindow
 
 def main():
     """Main application entry point"""
-    # Set application properties before creating QApplication
     import sys
+    import os
+    
     if sys.platform == "darwin":  # macOS
+        # Try to set process name
         try:
-            import os
-            os.environ['QT_MAC_WANTS_LAYER'] = '1'
-            os.environ['QT_MAC_DISABLE_ZOOM_BUTTON'] = '1'
-            # Try to set process name
-            try:
-                import setproctitle
-                setproctitle.setproctitle("KO Trimmer")
-            except ImportError:
-                pass
-        except:
+            import setproctitle
+            setproctitle.setproctitle("KO Trimmer")
+        except ImportError:
             pass
     
     # Create the Qt application

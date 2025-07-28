@@ -52,7 +52,7 @@ class SilenceDetector:
         Calculate energy envelope of audio data
         
         Args:
-            audio_data: Audio data as numpy array
+            audio_data: Audio data as numpy array (mono or stereo)
             
         Returns:
             Energy envelope as numpy array
@@ -61,15 +61,32 @@ class SilenceDetector:
         frame_length = 2048
         hop_length = 512
         
-        # Calculate RMS energy
-        rms = librosa.feature.rms(
-            y=audio_data, 
-            frame_length=frame_length, 
-            hop_length=hop_length
-        )[0]
+        # Handle stereo audio by calculating RMS across both channels
+        if len(audio_data.shape) == 2:
+            # Stereo audio - calculate RMS across both channels
+            rms = librosa.feature.rms(
+                y=audio_data, 
+                frame_length=frame_length, 
+                hop_length=hop_length
+            )
+            # Take the maximum RMS across channels for more sensitive detection
+            rms = np.max(rms, axis=0).flatten()
+        else:
+            # Mono audio
+            rms = librosa.feature.rms(
+                y=audio_data, 
+                frame_length=frame_length, 
+                hop_length=hop_length
+            )[0]
         
         # Interpolate to match original audio length
-        original_length = len(audio_data)
+        if len(audio_data.shape) == 2:
+            # Stereo audio - use the number of samples (second dimension)
+            original_length = audio_data.shape[1]
+        else:
+            # Mono audio
+            original_length = len(audio_data)
+            
         rms_length = len(rms)
         
         # Create time points for interpolation
@@ -164,16 +181,32 @@ class SilenceDetector:
             Dictionary with audio characteristics
         """
         # Calculate basic statistics
-        rms = np.sqrt(np.mean(audio_data**2))
-        peak = np.max(np.abs(audio_data))
-        
-        # Calculate spectral centroid (brightness)
-        spectral_centroid = librosa.feature.spectral_centroid(y=audio_data, sr=sample_rate)[0]
-        avg_spectral_centroid = np.mean(spectral_centroid)
+        if len(audio_data.shape) == 2:
+            # Stereo audio - use mean across channels
+            rms = np.sqrt(np.mean(audio_data**2))
+            peak = np.max(np.abs(audio_data))
+            
+            # Calculate spectral centroid (brightness) for stereo
+            spectral_centroid = librosa.feature.spectral_centroid(y=audio_data, sr=sample_rate)[0]
+            avg_spectral_centroid = np.mean(spectral_centroid)
+        else:
+            # Mono audio
+            rms = np.sqrt(np.mean(audio_data**2))
+            peak = np.max(np.abs(audio_data))
+            
+            # Calculate spectral centroid (brightness)
+            spectral_centroid = librosa.feature.spectral_centroid(y=audio_data, sr=sample_rate)[0]
+            avg_spectral_centroid = np.mean(spectral_centroid)
         
         # Calculate zero crossing rate
-        zero_crossing_rate = librosa.feature.zero_crossing_rate(audio_data)[0]
-        avg_zero_crossing_rate = np.mean(zero_crossing_rate)
+        if len(audio_data.shape) == 2:
+            # For stereo, calculate zero crossing rate for each channel and take mean
+            zero_crossing_rate = librosa.feature.zero_crossing_rate(audio_data)[0]
+            avg_zero_crossing_rate = np.mean(zero_crossing_rate)
+        else:
+            # For mono
+            zero_crossing_rate = librosa.feature.zero_crossing_rate(audio_data)[0]
+            avg_zero_crossing_rate = np.mean(zero_crossing_rate)
         
         return {
             'rms': rms,

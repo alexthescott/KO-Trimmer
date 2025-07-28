@@ -41,7 +41,8 @@ class AudioProcessor:
                 return False
                 
             # Load audio file
-            audio_data, sample_rate = self.load_audio(file_path)
+            preserve_stereo = settings.get('preserve_stereo', True)
+            audio_data, sample_rate = self.load_audio(file_path, preserve_stereo)
             
             if audio_data is None:
                 print(f"Failed to load audio file: {file_path}")
@@ -55,7 +56,7 @@ class AudioProcessor:
             )
             
             # Trim audio based on silence detection
-            trimmed_audio = self.trim_audio(audio_data, silence_regions, settings)
+            trimmed_audio = self.trim_audio(audio_data, silence_regions, settings, sample_rate)
             
             # Save the trimmed audio
             output_path = self.get_output_path(file_path, settings)
@@ -72,19 +73,22 @@ class AudioProcessor:
             print(f"Error processing {file_path}: {e}")
             return False
             
-    def load_audio(self, file_path: str) -> Tuple[Optional[np.ndarray], int]:
+    def load_audio(self, file_path: str, preserve_stereo: bool = True) -> Tuple[Optional[np.ndarray], int]:
         """
         Load audio file using appropriate method
         
         Args:
             file_path: Path to the audio file
+            preserve_stereo: Whether to preserve stereo channels (True) or convert to mono (False)
             
         Returns:
             Tuple of (audio_data, sample_rate) or (None, 0) if failed
         """
         try:
             # Try librosa first (handles most formats)
-            audio_data, sample_rate = librosa.load(file_path, sr=None)
+            # Load with mono=False to preserve stereo channels, or mono=True to convert to mono
+            audio_data, sample_rate = librosa.load(file_path, sr=None, mono=not preserve_stereo)
+            
             return audio_data, sample_rate
         except Exception as e:
             print(f"librosa failed to load {file_path}: {e}")
@@ -98,8 +102,30 @@ class AudioProcessor:
                 
                 sample_rate = audio_segment.frame_rate
                 
-                # Convert to numpy array
+                # Convert to numpy array, preserving stereo channels
                 samples = np.array(audio_segment.get_array_of_samples())
+                
+                # Reshape for stereo if needed
+                if audio_segment.channels == 2 and preserve_stereo:
+                    # For stereo, reshape to (samples, channels)
+                    try:
+                        samples = samples.reshape(-1, 2)
+                    except ValueError as reshape_error:
+                        print(f"Failed to reshape stereo audio for {file_path}: {reshape_error}")
+                        print(f"Sample count: {len(samples)}, channels: {audio_segment.channels}")
+                        # Fall back to mono conversion if reshape fails
+                        samples = samples.reshape(-1, 1)
+                elif audio_segment.channels == 2 and not preserve_stereo:
+                    # Convert stereo to mono by taking the mean of both channels
+                    samples = samples.reshape(-1, 2)
+                    samples = np.mean(samples, axis=1)
+                elif audio_segment.channels == 1:
+                    # For mono, keep as 1D array
+                    pass
+                else:
+                    # For other channel counts, keep as is
+                    print(f"Warning: Unexpected channel count {audio_segment.channels} for {file_path}")
+                    pass
                 
                 # Convert to float32 and normalize
                 if audio_segment.sample_width == 1:
@@ -115,7 +141,7 @@ class AudioProcessor:
                 print(f"pydub also failed to load {file_path}: {e2}")
                 return None, 0
                 
-    def trim_audio(self, audio_data: np.ndarray, silence_regions: list, settings: Dict[str, Any]) -> np.ndarray:
+    def trim_audio(self, audio_data: np.ndarray, silence_regions: list, settings: Dict[str, Any], sample_rate: int) -> np.ndarray:
         """
         Trim audio based on silence detection
         
@@ -143,14 +169,20 @@ class AudioProcessor:
             end_sample = silence_regions[0]['start']
         
         # Add padding
-        padding_samples = int(settings.get('padding', 50) * 0.001 * 22050)  # Convert ms to samples
+        padding_samples = int(settings.get('padding', 50) * 0.001 * sample_rate)  # Convert ms to samples
         start_sample = max(0, start_sample - padding_samples)
         end_sample = min(len(audio_data), end_sample + padding_samples)
         
         if start_sample >= end_sample:
             return audio_data
             
-        return audio_data[start_sample:end_sample]
+        # Handle stereo audio properly
+        if len(audio_data.shape) == 2:
+            # Stereo audio - trim both channels
+            return audio_data[start_sample:end_sample, :]
+        else:
+            # Mono audio
+            return audio_data[start_sample:end_sample]
         
     def get_output_path(self, input_path: str, settings: Dict[str, Any]) -> str:
         """
@@ -174,16 +206,27 @@ class AudioProcessor:
             root_dir = self._find_root_directory(input_path)
             
             if root_dir:
-                # Create the new root directory name
+                # Create the new root directory name with stereo/mono suffix
                 root_name = root_dir.name
-                new_root_name = f"{root_name}_trimmed"
+                preserve_stereo = settings.get('preserve_stereo', True)
+                if preserve_stereo:
+                    new_root_name = f"{root_name}_trimmed_stereo"
+                else:
+                    new_root_name = f"{root_name}_trimmed_mono"
                 new_root_path = root_dir.parent / new_root_name
                 
                 # Create the relative path from the root
                 relative_path = input_path_obj.relative_to(root_dir)
                 
                 # Create the new output path maintaining folder structure
-                output_path = new_root_path / relative_path
+                # Add "trimmed" prefix to the filename
+                filename = relative_path.name
+                stem = relative_path.stem
+                suffix = relative_path.suffix
+                new_filename = f"{stem}{suffix}_trimmed"
+                new_relative_path = relative_path.parent / new_filename
+                
+                output_path = new_root_path / new_relative_path
                 
                 # Ensure the output directory exists
                 output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -191,9 +234,13 @@ class AudioProcessor:
                 return str(output_path)
             else:
                 # Fallback to original behavior if we can't determine root
-                output_dir = input_path_obj.parent / "trimmed"
+                preserve_stereo = settings.get('preserve_stereo', True)
+                if preserve_stereo:
+                    output_dir = input_path_obj.parent / "trimmed_stereo"
+                else:
+                    output_dir = input_path_obj.parent / "trimmed_mono"
                 output_dir.mkdir(exist_ok=True)
-                output_name = f"{input_path_obj.stem}_trimmed{input_path_obj.suffix}"
+                output_name = f"{input_path_obj.stem}{input_path_obj.suffix}_trimmed"
                 return str(output_dir / output_name)
                 
     def _find_root_directory(self, file_path: str) -> Optional[Path]:
@@ -253,6 +300,16 @@ class AudioProcessor:
             output_path_obj.parent.mkdir(parents=True, exist_ok=True)
             
             # Save using soundfile (handles most formats)
+            # Ensure the output directory exists
+            output_dir = Path(output_path).parent
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # soundfile expects (samples, channels) format
+            if len(audio_data.shape) == 2:
+                # Transpose from (channels, samples) to (samples, channels)
+                audio_data = audio_data.T
+            
+            # Save the audio file
             sf.write(output_path, audio_data, sample_rate)
             return True
             
@@ -284,7 +341,8 @@ class AudioProcessor:
                 'sample_rate': sample_rate,
                 'channels': 1 if len(audio_data.shape) == 1 else audio_data.shape[1],
                 'file_size': file_size,
-                'format': Path(file_path).suffix.lower()
+                'format': Path(file_path).suffix.lower(),
+                'is_stereo': len(audio_data.shape) == 2
             }
             
         except Exception as e:

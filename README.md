@@ -11,6 +11,10 @@ A cross-platform desktop application designed to help users optimize audio files
 - **Export Options**: Overwrite original files or save to new directory
 - **Audio Format Support**: WAV, MP3, FLAC, AIFF, M4A, OGG, and more
 - **Customizable Settings**: Adjust silence detection thresholds and parameters
+- **Stereo Preservation**: Choose to preserve stereo channels or convert to mono
+- **Smart Directory Naming**: Output directories include stereo/mono information
+- **Audio Preview**: Compare original and trimmed audio files side-by-side
+- **Preview Controls**: Play, pause, stop, and progress tracking for both versions
 
 ## Installation
 
@@ -73,22 +77,39 @@ python src/main.py
    - **Min Silence Duration**: Minimum duration of silence to detect (100-10000 ms)
    - **Padding**: Additional padding around detected audio (0-1000 ms)
 3. **Process Files**: Click "Process Files" to start trimming
-4. **Export Options**: Choose to overwrite original files or save to a new "trimmed" directory
+4. **Preview Results**: Select a processed file and click "Preview Selected" to compare original vs trimmed audio
+5. **Export Options**: Choose to overwrite original files or save to a new "trimmed" directory
+6. **Output Files**: All processed files are saved with "_trimmed" suffix (e.g., "kick01.wav_trimmed")
+7. **Directory Naming**: Output directories include stereo/mono information (e.g., "drumkit_trimmed_stereo" or "drumkit_trimmed_mono")
 
 ### Settings Explained
 
 - **Silence Threshold**: Lower values (-50 to -60 dB) are more sensitive to quiet sounds
 - **Min Silence Duration**: Longer durations (1000+ ms) only detect longer silence periods
 - **Padding**: Adds extra time around detected audio to preserve natural sound
+- **Preserve Stereo Channels**: When checked, maintains original stereo/mono configuration; when unchecked, converts stereo to mono
+
+### Audio Preview
+
+The audio preview feature allows you to compare original and trimmed audio files:
+
+- **Side-by-Side Comparison**: Play both original and trimmed versions simultaneously
+- **Progress Tracking**: Real-time progress bars show playback position
+- **Duration Display**: Shows current time and total duration for both files
+- **File Information**: Displays file sizes and reduction statistics
+- **Auto-Replay**: Automatically resets to beginning when playback ends
+- **Restart Buttons**: Dedicated "🔄 Restart" buttons for instant replay
+- **Context Menu**: Right-click on files in the list for quick preview access
 
 ## Audio Processing
 
 KO Trimmer uses advanced audio processing techniques:
 
-- **librosa**: For audio analysis and feature extraction
-- **pydub**: For high-level audio manipulation
+- **librosa**: For audio analysis and feature extraction (preserves stereo channels)
+- **pydub**: For high-level audio manipulation (preserves stereo channels)
 - **soundfile**: For efficient audio file I/O
 - **numpy/scipy**: For numerical computing and signal processing
+- **Stereo Preservation**: Maintains original stereo channels throughout processing (stereo stays stereo, mono stays mono)
 
 ### Supported Formats
 
