@@ -106,7 +106,10 @@ KO Trimmer/
 │   ├── ui/                  # Qt UI components
 │   │   ├── main_window.py   # Main application window
 │   │   ├── drag_drop.py     # Drag & drop functionality
-│   │   └── progress.py      # Progress indicators
+│   │   ├── progress.py      # Progress indicators
+│   │   └── images/          # Application assets
+│   │       ├── Knockout.png # Application icon
+│   │       └── Knockout.svg # Vector icon source
 │   ├── audio/               # Audio processing modules
 │   │   ├── processor.py     # Main audio processing logic
 │   │   ├── silence_detector.py  # Silence detection algorithms
@@ -129,8 +132,11 @@ pytest tests/
 # Install PyInstaller
 pip install pyinstaller
 
-# Build executable
-pyinstaller --onefile --windowed src/main.py --name KO-Trimmer
+# Build macOS app (recommended for proper app name and icon)
+python3 -m PyInstaller --onefile --windowed --name="KO Trimmer" --icon=src/ui/images/Knockout.png --add-data=src/ui/images:ui/images --hidden-import=src.ui.main_window --hidden-import=src.ui.drag_drop --hidden-import=src.ui.progress --hidden-import=src.ui.dialogs --hidden-import=src.audio.processor --hidden-import=src.audio.silence_detector --hidden-import=src.audio.file_handler --collect-all=src src/main.py
+
+# Or use the build script
+python3 build_app.py
 ```
 
 ## Technology Stack

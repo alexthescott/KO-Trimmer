@@ -34,6 +34,7 @@ class DragDropWidget(QFrame):
         self.label = QLabel("Drop audio files or folders here")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        self.label.setStyleSheet("color: #333333;")  # Dark gray text
         
         # Create subtitle
         subtitle = QLabel("or click 'Add Files' / 'Add Folder' buttons")
@@ -58,6 +59,7 @@ class DragDropWidget(QFrame):
                 }
             """)
             self.label.setText("Drop files here to add them")
+            self.label.setStyleSheet("color: #333333;")  # Dark gray text
         else:
             self.setStyleSheet("""
                 QFrame {
@@ -71,6 +73,7 @@ class DragDropWidget(QFrame):
                 }
             """)
             self.label.setText("Drop audio files or folders here")
+            self.label.setStyleSheet("color: #333333;")  # Dark gray text
             
     def dragEnterEvent(self, event: QDragEnterEvent):
         """Handle drag enter events"""

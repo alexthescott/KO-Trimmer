@@ -35,6 +35,12 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 600)
         self.setWindowIconText("KO Trimmer")
         
+        # Set window properties for better macOS integration
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowTitleHint)
+        
+        # Set window name for task switcher
+        self.setObjectName("KO Trimmer")
+        
         # Set window icon
         icon_path = Path(__file__).parent / "images" / "Knockout.png"
         if icon_path.exists():

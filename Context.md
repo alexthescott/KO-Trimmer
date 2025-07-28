@@ -194,7 +194,10 @@ KO Trimmer/
 │   │   ├── main_window.py   # Main application window
 │   │   ├── drag_drop.py     # Drag & drop functionality
 │   │   ├── progress.py      # Progress indicators
-│   │   └── dialogs.py       # File dialogs and settings
+│   │   ├── dialogs.py       # File dialogs and settings
+│   │   └── images/          # Application assets
+│   │       ├── Knockout.png # Application icon
+│   │       └── Knockout.svg # Vector icon source
 │   ├── audio/               # Audio processing modules
 │   │   ├── processor.py     # Main audio processing logic
 │   │   ├── silence_detector.py  # Silence detection algorithms
@@ -253,14 +256,14 @@ KO Trimmer/
 
 ## Current State
 
-**Status**: ✅ **PRODUCTION READY** - Full Qt + Python application with working audio processing
-**Last Updated**: December 2024
-**Next Milestone**: Distribution packaging and advanced features
+**Status**: ✅ **PRODUCTION READY** - Full Qt + Python application with working audio processing and proper macOS app bundle
+**Last Updated**: July 2024
+**Next Milestone**: Advanced features and cross-platform distribution
 
 ### ✅ Completed Features:
 - **Core Application**: Qt + Python cross-platform desktop app
 - **Main Window**: Splitter layout with file management and settings panels
-- **Drag & Drop**: Intuitive file/folder import with visual feedback
+- **Drag & Drop**: Intuitive file/folder import with visual feedback and readable text
 - **File Management**: Add files, add folders, clear list, file validation
 - **Settings Panel**: Customizable silence detection parameters
 - **Progress Tracking**: Real-time progress bars and processing log
@@ -271,6 +274,10 @@ KO Trimmer/
 - **Batch Processing**: Multi-threaded processing with progress updates
 - **Export Options**: Save to new root folder with "_trimmed" suffix, maintaining folder structure
 - **Processing Summary**: File size reduction statistics displayed in completion dialog
+- **macOS App Bundle**: Proper native macOS application with correct app name and icon
+- **Application Identity**: Shows "KO Trimmer" in dock, task switcher, and system UI
+- **Custom Icon**: Boxing glove icon displays correctly throughout the system
+- **UI Improvements**: Fixed text visibility issues in drag-and-drop area
 
 ### 🎯 **PROVEN RESULTS**:
 - **File Size Reduction**: 90% reduction (287K → 30K for drum samples)
@@ -285,6 +292,8 @@ KO Trimmer/
 - **Threading**: QThread for non-blocking UI during processing
 - **File Formats**: WAV, MP3, FLAC, AIFF, M4A, OGG support
 - **Error Handling**: Comprehensive validation and graceful failures
+- **Distribution**: PyInstaller for creating native app bundles
+- **macOS Integration**: Proper app bundle with Info.plist and code signing
 
 ### 📋 **Next Steps** (Future Enhancements):
 - [ ] Audio preview functionality
@@ -293,8 +302,9 @@ KO Trimmer/
 - [ ] Export format selection
 - [ ] Metadata preservation
 - [ ] KO II specific optimization settings
-- [ ] Distribution packaging (PyInstaller)
+- [ ] Cross-platform distribution packaging (Windows, Linux)
 - [ ] Performance optimization for large files
+- [ ] Advanced UI themes and customization
 
 ## Key Features Roadmap
 
@@ -412,6 +422,7 @@ src/
 - **Silence Threshold**: -50 dB (more forgiving for cymbals, reverb, natural decay)
 - **Min Silence Duration**: 1000 ms (prevents cutting natural decay tails)
 - **Padding**: 100 ms (preserves natural sound and room ambience)
+- **UI Text Color**: Dark gray (#333333) for readability against light backgrounds
 
 ## 🔧 **Troubleshooting & Debugging**
 
@@ -439,11 +450,23 @@ AttributeError: AA_EnableHighDpiScaling
 ```
 **Solution**: PyQt6 handles DPI scaling automatically - removed deprecated attributes
 
+#### **Application Name Shows "Python"**:
+```
+Application appears as "Python" in dock/taskbar
+```
+**Solution**: Built proper macOS app bundle with PyInstaller using `--onefile --windowed` flags and proper app metadata
+
 #### **File Validation Fails**:
 - Check file exists and is readable
 - Verify file extension is supported
 - Ensure file size > 0 bytes
 - MIME type validation is lenient (warns but doesn't fail)
+
+#### **Text Not Readable in UI**:
+```
+White text on white background in drag-drop area
+```
+**Solution**: Set explicit text color to dark gray (#333333) for proper contrast
 
 #### **Silence Detection Issues**:
 - **Too aggressive**: Increase threshold (-40 dB instead of -50 dB)
@@ -458,6 +481,7 @@ AttributeError: AA_EnableHighDpiScaling
 - `tests/test_cymbal.py` - Test cymbal processing with new settings
 - `tests/test_completion_dialog.py` - Test completion dialog with summary
 - `tests/test_output_directory.py` - Test output directory path generation
+- `build_app.py` - Automated build script for macOS app bundle
 
 ### **Performance Notes**:
 - **Memory Usage**: ~100-200MB during processing
@@ -473,6 +497,8 @@ AttributeError: AA_EnableHighDpiScaling
 3. **RMS Energy Analysis**: Simple but effective silence detection
 4. **End-trimming Logic**: Optimized for drum samples (trim silence from end)
 5. **Threading**: QThread prevents UI freezing during processing
+6. **macOS App Bundle**: PyInstaller for native macOS application with proper identity
+7. **UI Accessibility**: Explicit text colors for readability across themes
 
 ### **Audio Processing Algorithm**:
 1. **Load Audio**: librosa.load() → numpy array
@@ -501,6 +527,9 @@ AttributeError: AA_EnableHighDpiScaling
 - **Format Conversion**: Output format selection
 - **KO II Integration**: Direct sampler optimization settings
 - **Batch Queue**: Advanced queue management for large collections
+- **Cross-Platform Distribution**: Windows and Linux app bundles
+- **Advanced UI Themes**: Dark mode and customizable themes
+- **Performance Optimization**: Faster processing for large file collections
 
 ### **Testing Strategy**:
 - **Unit Tests**: Individual component testing
@@ -521,16 +550,22 @@ AttributeError: AA_EnableHighDpiScaling
 - [x] Progress tracking
 - [x] Batch processing
 - [x] Export functionality
+- [x] macOS app bundle with proper identity
+- [x] Custom application icon
+- [x] UI text visibility improvements
+- [x] Processing summary in completion dialog
 
 ### 🔄 **In Progress**:
-- [ ] Distribution packaging
-- [ ] Performance optimization
-- [ ] Advanced features
+- [ ] Cross-platform distribution packaging (Windows, Linux)
+- [ ] Performance optimization for large file collections
+- [ ] Advanced UI features and themes
 
 ### 📋 **Future**:
-- [ ] Audio preview
+- [ ] Audio preview functionality
 - [ ] Waveform visualization
-- [ ] Advanced silence detection
-- [ ] Format conversion
+- [ ] Advanced silence detection algorithms
+- [ ] Format conversion options
 - [ ] Metadata preservation
-- [ ] KO II specific features 
+- [ ] KO II specific optimization features
+- [ ] Dark mode and theme customization
+- [ ] Advanced batch processing features 
