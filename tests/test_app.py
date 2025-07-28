@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple test script to verify TrimVibe application startup
+Simple test script to verify KO Trimmer application startup
 """
 
 import sys
@@ -59,7 +59,7 @@ def test_app_startup():
         
         # Create application (without showing window)
         app = QApplication(sys.argv)
-        app.setApplicationName("TrimVibe Test")
+        app.setApplicationName("KO Trimmer Test")
         
         # Create main window
         window = MainWindow()
@@ -93,7 +93,7 @@ def check_ffmpeg():
         return False
 
 if __name__ == "__main__":
-    print("TrimVibe Application Test")
+    print("KO Trimmer Application Test")
     print("=" * 40)
     
     # Test imports

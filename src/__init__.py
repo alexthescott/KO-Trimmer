@@ -1,1 +1,1 @@
-# TrimVibe - Audio Silence Trimmer for KO II Sampler 
+# KO Trimmer - Audio Silence Trimmer for KO II Sampler 

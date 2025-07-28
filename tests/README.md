@@ -1,6 +1,6 @@
-# TrimVibe Tests
+# KO Trimmer Tests
 
-This directory contains test files for the TrimVibe application.
+This directory contains test files for the KO Trimmer application.
 
 ## Test Files
 

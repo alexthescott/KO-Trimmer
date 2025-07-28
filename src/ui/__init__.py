@@ -1,1 +1,1 @@
-# UI components for TrimVibe 
+# UI components for KO Trimmer 

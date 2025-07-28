@@ -1,8 +1,8 @@
-# TrimVibe - Audio Silence Trimmer for KO II Sampler
+# KO Trimmer - Audio Silence Trimmer for KO II Sampler
 
 ## Project Overview
 
-TrimVibe is a cross-platform desktop application designed to help users optimize audio files for the Teenage Engineering KO II sampler by automatically trimming silence from audio samples. This maximizes the limited 64MB memory capacity of the KO II by removing unnecessary silent portions.
+KO Trimmer is a cross-platform desktop application designed to help users optimize audio files for the Teenage Engineering KO II sampler by automatically trimming silence from audio samples. This maximizes the limited 64MB memory capacity of the KO II by removing unnecessary silent portions.
 
 ## Goals
 
@@ -163,7 +163,7 @@ TrimVibe is a cross-platform desktop application designed to help users optimize
 
 ## Recommended Technology Choice
 
-### For TrimVibe: **Qt + Python** (Selected)
+### For KO Trimmer: **Qt + Python** (Selected)
 
 **Why Qt + Python is ideal for this project:**
 
@@ -187,7 +187,7 @@ TrimVibe is a cross-platform desktop application designed to help users optimize
 ## Project Structure (Updated for Qt + Python)
 
 ```
-TrimVibe/
+KO Trimmer/
 ├── src/
 │   ├── main.py              # Application entry point
 │   ├── ui/                  # Qt UI components
@@ -372,7 +372,7 @@ TrimVibe/
 ### **Quick Start** (for returning to project):
 ```bash
 # Navigate to project
-cd /path/to/TrimVibe
+cd /path/to/ko-trimmer
 
 # Install dependencies (if needed)
 pip3 install -r requirements.txt

@@ -1,1 +1,1 @@
-# Audio processing modules for TrimVibe 
+# Audio processing modules for KO Trimmer 

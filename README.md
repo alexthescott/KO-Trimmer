@@ -1,4 +1,4 @@
-# TrimVibe - Audio Silence Trimmer for KO II Sampler
+# KO Trimmer - Audio Silence Trimmer for KO II Sampler
 
 A cross-platform desktop application designed to help users optimize audio files for the Teenage Engineering KO II sampler by automatically trimming silence from audio samples. This maximizes the limited 64MB memory capacity of the KO II by removing unnecessary silent portions.
 
@@ -38,12 +38,12 @@ Download from [FFmpeg website](https://ffmpeg.org/download.html) or install via 
 choco install ffmpeg
 ```
 
-### Install TrimVibe
+### Install KO Trimmer
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/trimvibe.git
-cd trimvibe
+git clone https://github.com/yourusername/ko-trimmer.git
+cd ko-trimmer
 ```
 
 2. Create a virtual environment (recommended):
@@ -83,7 +83,7 @@ python src/main.py
 
 ## Audio Processing
 
-TrimVibe uses advanced audio processing techniques:
+KO Trimmer uses advanced audio processing techniques:
 
 - **librosa**: For audio analysis and feature extraction
 - **pydub**: For high-level audio manipulation
@@ -100,7 +100,7 @@ TrimVibe uses advanced audio processing techniques:
 ### Project Structure
 
 ```
-TrimVibe/
+KO Trimmer/
 ├── src/
 │   ├── main.py              # Application entry point
 │   ├── ui/                  # Qt UI components
@@ -130,7 +130,7 @@ pytest tests/
 pip install pyinstaller
 
 # Build executable
-pyinstaller --onefile --windowed src/main.py --name TrimVibe
+pyinstaller --onefile --windowed src/main.py --name KO-Trimmer
 ```
 
 ## Technology Stack

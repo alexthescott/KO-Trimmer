@@ -1,5 +1,5 @@
 """
-Main window for TrimVibe application
+Main window for KO Trimmer application
 """
 
 import os
@@ -31,8 +31,14 @@ class MainWindow(QMainWindow):
         
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("TrimVibe - Audio Silence Trimmer")
+        self.setWindowTitle("KO Trimmer - Audio Silence Trimmer")
         self.setMinimumSize(800, 600)
+        self.setWindowIconText("KO Trimmer")
+        
+        # Set window icon
+        icon_path = Path(__file__).parent / "images" / "Knockout.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         
         # Create central widget
         central_widget = QWidget()
