@@ -219,11 +219,11 @@ class AudioProcessor:
                 relative_path = input_path_obj.relative_to(root_dir)
                 
                 # Create the new output path maintaining folder structure
-                # Add "trimmed" prefix to the filename
+                # Add "trimmed" suffix to the filename
                 filename = relative_path.name
                 stem = relative_path.stem
                 suffix = relative_path.suffix
-                new_filename = f"{stem}{suffix}_trimmed"
+                new_filename = f"{stem}_trimmed{suffix}"
                 new_relative_path = relative_path.parent / new_filename
                 
                 output_path = new_root_path / new_relative_path
@@ -240,7 +240,7 @@ class AudioProcessor:
                 else:
                     output_dir = input_path_obj.parent / "trimmed_mono"
                 output_dir.mkdir(exist_ok=True)
-                output_name = f"{input_path_obj.stem}{input_path_obj.suffix}_trimmed"
+                output_name = f"{input_path_obj.stem}_trimmed{input_path_obj.suffix}"
                 return str(output_dir / output_name)
                 
     def _find_root_directory(self, file_path: str) -> Optional[Path]:

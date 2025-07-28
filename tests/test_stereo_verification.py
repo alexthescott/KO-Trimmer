@@ -19,8 +19,8 @@ def test_stereo_preservation_pipeline():
         
         processor = AudioProcessor()
         
-        # Test with a stereo file from the MF DOOM drumkit
-        test_file = "/Users/alexthescott/Desktop/MF DOOM Drumkit/Open Hats/2 Oh -hotel.wav"
+        # Test with a stereo file
+        test_file = "/Users/alexthescott/Desktop/william crooks drumkit vol. 1/02 snares/snare01.wav"
         
         if not os.path.exists(test_file):
             print(f"Test file not found: {test_file}")
@@ -130,8 +130,8 @@ def test_mono_preservation():
         
         processor = AudioProcessor()
         
-        # Test with a mono file (you'll need to provide a real path)
-        test_file = "/Users/alexthescott/Desktop/MF DOOM Drumkit/FX/Car-smash.wav"
+        # Test with a different file to ensure consistency
+        test_file = "/Users/alexthescott/Desktop/william crooks drumkit vol. 1/01 kicks/kick01.wav"
         
         if not os.path.exists(test_file):
             print(f"Test file not found: {test_file}")

@@ -147,7 +147,7 @@ class MainWindow(QMainWindow):
         padding_layout.addWidget(QLabel("Padding (ms):"))
         self.padding_spin = QSpinBox()
         self.padding_spin.setRange(0, 1000)
-        self.padding_spin.setValue(100)  # More padding to preserve natural sound
+        self.padding_spin.setValue(20)  # Reduced padding for tighter trimming
         self.padding_spin.setSuffix(" ms")
         padding_layout.addWidget(self.padding_spin)
         settings_layout.addLayout(padding_layout)
@@ -308,12 +308,24 @@ class MainWindow(QMainWindow):
         summary_info = self.progress_widget.get_summary_info()
         output_dir = self._get_output_directory()
         
-        # Create completion message
-        message = "All files have been processed successfully!\n\n"
+        # Check if there were any failures
+        failed_files = summary_info.get('failed_files', 0) if summary_info else 0
+        total_files = summary_info.get('total_files', 0) if summary_info else 0
+        processed_files = summary_info.get('files_processed', 0) if summary_info else 0
+        
+        # Create completion message based on results
+        if failed_files == 0:
+            message = "All files have been processed successfully!\n\n"
+        elif processed_files == 0:
+            message = "Processing completed with errors.\n\n"
+        else:
+            message = f"Processing completed with {failed_files} file(s) that failed to process.\n\n"
         
         if summary_info:
             message += f"📊 Processing Summary:\n"
-            message += f"Files: {summary_info['files_processed']}/{summary_info['total_files']} processed\n"
+            message += f"Files: {processed_files}/{total_files} processed successfully\n"
+            if failed_files > 0:
+                message += f"Failed: {failed_files} file(s)\n"
             message += f"Original: {summary_info['original_mb']:.1f} MB\n"
             message += f"Processed: {summary_info['processed_mb']:.1f} MB\n"
             message += f"Reduction: {summary_info['reduction_percent']:.1f}% ({summary_info['reduction_mb']:.1f} MB)\n\n"
@@ -323,11 +335,19 @@ class MainWindow(QMainWindow):
         else:
             message += "📁 Check the original file locations for processed files"
         
-        QMessageBox.information(
-            self,
-            "Processing Complete",
-            message
-        )
+        # Use appropriate dialog type based on results
+        if failed_files == 0:
+            QMessageBox.information(
+                self,
+                "Processing Complete",
+                message
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "Processing Complete",
+                message
+            )
         
     def _get_output_directory(self):
         """Get the output directory path"""

@@ -17,6 +17,7 @@ class ProcessingProgressWidget(QWidget):
         super().__init__()
         self.original_sizes = {}  # Track original file sizes
         self.processed_sizes = {}  # Track processed file sizes
+        self.failed_files = []  # Track failed files
         self.init_ui()
         
     def init_ui(self):
@@ -64,6 +65,7 @@ class ProcessingProgressWidget(QWidget):
         # Reset tracking
         self.original_sizes = {}
         self.processed_sizes = {}
+        self.failed_files = []
         
     def update_progress(self, percentage: int):
         """Update the overall progress"""
@@ -77,6 +79,8 @@ class ProcessingProgressWidget(QWidget):
             self._track_file_sizes(file_path, output_path)
         else:
             self.log_text.append(f"❌ Failed: {file_path}")
+            # Track failed files
+            self.failed_files.append(file_path)
             
         # Scroll to bottom
         scrollbar = self.log_text.verticalScrollBar()
@@ -144,21 +148,25 @@ class ProcessingProgressWidget(QWidget):
         total_processed = sum(self.processed_sizes.values())
         files_processed = len(self.processed_sizes)
         total_files = len(self.original_sizes)
-        
-        if total_processed == 0:
-            return None
-            
-        reduction_bytes = total_original - total_processed
-        reduction_percent = (reduction_bytes / total_original) * 100
+        failed_files = len(self.failed_files)
         
         # Convert to MB for display
         original_mb = total_original / (1024 * 1024)
         processed_mb = total_processed / (1024 * 1024)
-        reduction_mb = reduction_bytes / (1024 * 1024)
+        
+        # Calculate reduction only if there are processed files
+        if total_processed > 0:
+            reduction_bytes = total_original - total_processed
+            reduction_percent = (reduction_bytes / total_original) * 100
+            reduction_mb = reduction_bytes / (1024 * 1024)
+        else:
+            reduction_percent = 0
+            reduction_mb = 0
         
         return {
             'files_processed': files_processed,
             'total_files': total_files,
+            'failed_files': failed_files,
             'original_mb': original_mb,
             'processed_mb': processed_mb,
             'reduction_percent': reduction_percent,

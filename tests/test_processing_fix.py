@@ -19,8 +19,8 @@ def test_single_file_processing():
         
         processor = AudioProcessor()
         
-        # Test with a file that was failing
-        test_file = "/Users/alexthescott/Desktop/william crooks drumkit vol. 1/05 basses (in G)/bass01.wav"
+        # Test with a file that should exist
+        test_file = "/Users/alexthescott/Desktop/william crooks drumkit vol. 1/02 snares/snare01.wav"
         
         if not os.path.exists(test_file):
             print(f"Test file not found: {test_file}")

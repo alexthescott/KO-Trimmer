@@ -20,7 +20,7 @@ def test_stereo_preservation_settings():
         processor = AudioProcessor()
         
         # Test with a stereo file
-        test_file = "/Users/alexthescott/Desktop/william crooks drumkit vol. 1/05 basses (in G)/bass01.wav"
+        test_file = "/Users/alexthescott/Desktop/william crooks drumkit vol. 1/02 snares/snare01.wav"
         
         if not os.path.exists(test_file):
             print(f"Test file not found: {test_file}")
@@ -71,9 +71,9 @@ def test_stereo_preservation_settings():
         output_path = processor.get_output_path(test_file, settings_preserve)
         print(f"Output path: {output_path}")
         
-        # Check if filename ends with "_trimmed"
+        # Check if filename contains "_trimmed" before the extension
         output_filename = Path(output_path).name
-        has_suffix = output_filename.endswith("_trimmed")
+        has_suffix = "_trimmed" in output_filename and output_filename.endswith(".wav")
         print(f"Filename: {output_filename}")
         print(f"Has '_trimmed' suffix: {has_suffix}")
         
