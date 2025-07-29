@@ -254,6 +254,23 @@ python3 -m PyInstaller "KO Trimmer.spec" --onefile --windowed
 - ✅ **Failure Tracking**: Popup messages now show failure information
 - ✅ **Test Directory**: All tests updated to use consistent directory path
 
+### Bug Fixes (Latest)
+- ✅ **Favorites Renaming**: Fixed favorites renaming functionality - custom display names now persist
+- ✅ **Favorites Storage**: Extended favorites storage to support custom display names
+- ✅ **Backward Compatibility**: Old favorites format automatically converted to new format
+- ✅ **Duplicate Prevention**: Fixed duplicate favorites prevention in add_favorite method
+- ✅ **Comprehensive Testing**: Added comprehensive test suite for favorites system
+
+### New Features (Latest)
+- ✅ **Output Directory Preview**: Shows output directory before processing files
+- ✅ **Clickable Output Directory**: Click on output directory field to change location
+- ✅ **Simplified Interface**: Removed buttons, keeping only the clickable output directory field
+- ✅ **Unified Drag-Drop Interface**: Entire "Files to Process" section is now a single drag-drop area with integrated file list and compact placeholder text
+- ✅ **Overwrite Integration**: Overwrite checkbox automatically clears custom output directory
+- ✅ **Real-time Updates**: Output directory display updates when settings change
+- ✅ **Bottom Layout**: Output directory panel positioned at bottom of right panel for better UX
+- ✅ **Comprehensive Testing**: Full test suite for output directory functionality
+
 ### Bug Fixes
 - ✅ **Filename Extension**: Fixed "_trimmed" placement before file extension
 - ✅ **Stereo Processing**: Fixed stereo audio handling and preservation
@@ -266,5 +283,9 @@ python3 -m PyInstaller "KO Trimmer.spec" --onefile --windowed
 1. **Cross-Platform Fun**: Test on Windows and Linux to see what breaks! 🎮
 2. **Embedded Preview**: Move audio preview from popup to main window (less clicking!)
 3. **UI Cleanup**: Make it look less like a spreadsheet and more like a music app 🎵
-4. **Phase 3.2**: Enhanced file management features
-5. **Phase 3.3**: Advanced batch operations 
+4. **Settings Page**: Add comprehensive settings page (in planning phase)
+   - **Default Silence Detection**: Save user's preferred threshold, duration, padding
+   - **Default Overwrite**: Remember user's preference for overwriting original files
+   - **Default Stereo**: Remember user's preference for preserving stereo channels
+5. **Phase 3.2**: Enhanced file management features
+6. **Phase 3.3**: Advanced batch operations 

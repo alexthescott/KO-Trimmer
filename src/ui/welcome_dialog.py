@@ -4,7 +4,7 @@ Welcome dialog for KO Trimmer
 
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Dict, Optional
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
+
+from utils.icon_manager import show_information
 
 
 class WelcomeDialog(QDialog):
@@ -161,7 +163,7 @@ class WelcomeDialog(QDialog):
             # Check if directory already exists
             for i in range(self.favorites_list.count()):
                 if self.favorites_list.item(i).data(Qt.ItemDataRole.UserRole) == directory:
-                    QMessageBox.information(self, "Already Added", "This directory is already in your favorites!")
+                    show_information(self, "Already Added", "This directory is already in your favorites!")
                     return
             
             # Add to list
@@ -171,24 +173,45 @@ class WelcomeDialog(QDialog):
             item.setToolTip(directory)
             item.setData(Qt.ItemDataRole.UserRole, directory)
             self.favorites_list.addItem(item)
-            self.favorites.append(directory)
+            self.favorites.append({"path": directory, "display_name": ""})
     
     def remove_favorite_directory(self):
         """Remove selected favorite directory"""
         current_item = self.favorites_list.currentItem()
         if current_item:
             directory = current_item.data(Qt.ItemDataRole.UserRole)
-            self.favorites.remove(directory)
+            self.favorites = [f for f in self.favorites if f["path"] != directory]
             self.favorites_list.takeItem(self.favorites_list.row(current_item))
     
     def skip_setup(self):
         """Skip the welcome setup"""
-        self.favorites = []
+        self.favorites = []  # Empty list of dicts
         self.accept()
     
-    def get_favorites(self) -> List[str]:
-        """Get the list of favorite directories"""
+    def get_favorites(self) -> List[Dict[str, str]]:
+        """Get the list of favorite directories with display names"""
         return self.favorites.copy()
+    
+    def set_favorites(self, favorites: List[Dict[str, str]]):
+        """Set the list of favorite directories with display names"""
+        self.favorites = favorites.copy()
+        self.refresh_favorites_list()
+    
+    def refresh_favorites_list(self):
+        """Refresh the favorites list display"""
+        self.favorites_list.clear()
+        for favorite in self.favorites:
+            path = favorite.get("path", "")
+            if os.path.exists(path):
+                item = QListWidgetItem()
+                # Use custom display name if available, otherwise generate one
+                display_name = favorite.get("display_name", "")
+                if not display_name:
+                    display_name = self._create_display_name(path)
+                item.setText(display_name)
+                item.setToolTip(path)
+                item.setData(Qt.ItemDataRole.UserRole, path)
+                self.favorites_list.addItem(item)
     
     def _create_display_name(self, directory: str) -> str:
         """Create a descriptive display name for a directory"""

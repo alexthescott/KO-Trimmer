@@ -36,15 +36,20 @@ def test_stereo_preservation_pipeline():
             print("❌ Failed to load audio data")
             return False
         
-        is_stereo = len(audio_data.shape) == 2
-        channels = audio_data.shape[1] if is_stereo else 1
+        # Check if audio is stereo
+        # librosa returns (channels, samples) format
+        is_stereo = len(audio_data.shape) == 2 and audio_data.shape[0] == 2
+        channels = audio_data.shape[0] if len(audio_data.shape) == 2 else 1
         
         print(f"   Audio shape: {audio_data.shape}")
         print(f"   Is stereo: {is_stereo}")
         print(f"   Channels: {channels}")
         print(f"   Sample rate: {sample_rate}")
         
-        if not is_stereo or channels != 2:
+        if is_stereo and channels == 2:
+            print("✅ Input audio is stereo")
+            return True
+        else:
             print("❌ Input audio is not stereo")
             return False
         
@@ -130,8 +135,8 @@ def test_mono_preservation():
         
         processor = AudioProcessor()
         
-        # Test with a different file to ensure consistency
-        test_file = "/Users/alexthescott/Desktop/william crooks drumkit vol. 1/01 kicks/kick01.wav"
+        # Test with a mono file
+        test_file = "/Users/alexthescott/Desktop/william crooks drumkit vol. 1/01 kicks/kick01_mono.wav"
         
         if not os.path.exists(test_file):
             print(f"Test file not found: {test_file}")
@@ -146,14 +151,20 @@ def test_mono_preservation():
             print("❌ Failed to load audio data")
             return False
         
-        is_mono = len(audio_data.shape) == 1
-        channels = 1 if is_mono else audio_data.shape[1]
+        # Check if audio is mono
+        # librosa returns (channels, samples) format
+        is_mono = len(audio_data.shape) == 1 or (len(audio_data.shape) == 2 and audio_data.shape[0] == 1)
+        channels = audio_data.shape[0] if len(audio_data.shape) == 2 else 1
         
         print(f"   Audio shape: {audio_data.shape}")
         print(f"   Is mono: {is_mono}")
         print(f"   Channels: {channels}")
+        print(f"   Sample rate: {sample_rate}")
         
-        if not is_mono:
+        if is_mono and channels == 1:
+            print("✅ Input audio is mono")
+            return True
+        else:
             print("❌ Input audio is not mono")
             return False
         

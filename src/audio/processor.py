@@ -64,7 +64,8 @@ class AudioProcessor:
             trimmed_audio = self.trim_audio(audio_data, silence_regions, settings, sample_rate)
             
             # Save the trimmed audio
-            output_path = self.get_output_path(file_path, settings)
+            custom_output_dir = settings.get('custom_output_dir')
+            output_path = self.get_output_path(file_path, settings, custom_output_dir)
             success = self.save_audio(trimmed_audio, sample_rate, output_path)
             
             if success:
@@ -189,64 +190,89 @@ class AudioProcessor:
             # Mono audio
             return audio_data[start_sample:end_sample]
         
-    def get_output_path(self, input_path: str, settings: Dict[str, Any]) -> str:
-        """
-        Determine output path for processed file
-        
-        Args:
-            input_path: Input file path
-            settings: Processing settings
+    def get_output_path(self, input_path: str, settings: dict, custom_output_dir: str = None) -> str:
+        """Get the output path for a processed file"""
+        try:
+            input_path_obj = Path(input_path)
             
-        Returns:
-            Output file path
-        """
-        input_path_obj = Path(input_path)
-        
-        if settings.get('overwrite', False):
-            return input_path
-        else:
-            # Find the root directory (the top-level folder that was dragged in)
-            # This assumes the root directory is the first directory in the path
-            # that contains the original file
+            # If custom output directory is provided, use it
+            if custom_output_dir:
+                custom_output_path = Path(custom_output_dir)
+                custom_output_path.mkdir(parents=True, exist_ok=True)
+                
+                # Get the relative path from the root directory
+                root_dir = self._find_root_directory(input_path)
+                if root_dir:
+                    relative_path = input_path_obj.relative_to(root_dir)
+                    output_path = custom_output_path / relative_path
+                else:
+                    # Fallback: use just the filename
+                    output_path = custom_output_path / input_path_obj.name
+                
+                # Create the output directory
+                output_dir = output_path.parent
+                output_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Add stereo/mono suffix to filename
+                preserve_stereo = settings.get('preserve_stereo', True)
+                suffix = "_trimmed_stereo" if preserve_stereo else "_trimmed_mono"
+                
+                # Add suffix before extension
+                stem = output_path.stem
+                extension = output_path.suffix
+                new_filename = f"{stem}{suffix}{extension}"
+                
+                return str(output_path.parent / new_filename)
+            
+            # Get the root directory that was originally dragged in
             root_dir = self._find_root_directory(input_path)
             
             if root_dir:
-                # Create the new root directory name with stereo/mono suffix
+                # Create the root trimmed directory path
                 root_name = root_dir.name
-                preserve_stereo = settings.get('preserve_stereo', True)
-                if preserve_stereo:
-                    new_root_name = f"{root_name}_trimmed_stereo"
-                else:
-                    new_root_name = f"{root_name}_trimmed_mono"
+                new_root_name = f"{root_name}_trimmed"
                 new_root_path = root_dir.parent / new_root_name
                 
-                # Create the relative path from the root
+                # Create the new root directory if it doesn't exist
+                new_root_path.mkdir(parents=True, exist_ok=True)
+                
+                # Get the relative path from the root
                 relative_path = input_path_obj.relative_to(root_dir)
                 
-                # Create the new output path maintaining folder structure
-                # Add "trimmed" suffix to the filename
-                filename = relative_path.name
-                stem = relative_path.stem
-                suffix = relative_path.suffix
-                new_filename = f"{stem}_trimmed{suffix}"
-                new_relative_path = relative_path.parent / new_filename
+                # Create the output path
+                output_path = new_root_path / relative_path
                 
-                output_path = new_root_path / new_relative_path
+                # Create the output directory
+                output_dir = output_path.parent
+                output_dir.mkdir(parents=True, exist_ok=True)
                 
-                # Ensure the output directory exists
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                
-                return str(output_path)
-            else:
-                # Fallback to original behavior if we can't determine root
+                # Add stereo/mono suffix to filename
                 preserve_stereo = settings.get('preserve_stereo', True)
-                if preserve_stereo:
-                    output_dir = input_path_obj.parent / "trimmed_stereo"
-                else:
-                    output_dir = input_path_obj.parent / "trimmed_mono"
-                output_dir.mkdir(exist_ok=True)
-                output_name = f"{input_path_obj.stem}_trimmed{input_path_obj.suffix}"
-                return str(output_dir / output_name)
+                suffix = "_trimmed_stereo" if preserve_stereo else "_trimmed_mono"
+                
+                # Add suffix before extension
+                stem = output_path.stem
+                extension = output_path.suffix
+                new_filename = f"{stem}{suffix}{extension}"
+                
+                return str(output_path.parent / new_filename)
+            else:
+                # Fallback: create output in the same directory as input
+                output_dir = input_path_obj.parent
+                output_dir.mkdir(parents=True, exist_ok=True)
+                
+                preserve_stereo = settings.get('preserve_stereo', True)
+                suffix = "_trimmed_stereo" if preserve_stereo else "_trimmed_mono"
+                
+                stem = input_path_obj.stem
+                extension = input_path_obj.suffix
+                new_filename = f"{stem}{suffix}{extension}"
+                
+                return str(output_dir / new_filename)
+                
+        except Exception as e:
+            print(f"Error getting output path: {e}")
+            return None
                 
     def _find_root_directory(self, file_path: str) -> Optional[Path]:
         """
@@ -308,7 +334,8 @@ class AudioProcessor:
                 return True
             
             # Check if the output file already exists
-            output_path = self.get_output_path(file_path, settings)
+            custom_output_dir = settings.get('custom_output_dir')
+            output_path = self.get_output_path(file_path, settings, custom_output_dir)
             if Path(output_path).exists():
                 return True
             

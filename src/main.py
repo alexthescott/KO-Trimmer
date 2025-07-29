@@ -14,9 +14,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
-import sys
-import os
-from pathlib import Path
 
 # Add src directory to path for PyInstaller
 if getattr(sys, 'frozen', False):
@@ -33,6 +30,7 @@ if getattr(sys, 'frozen', False):
             sys.path.insert(0, str(src_dir))
 
 from ui.main_window import MainWindow
+from utils.icon_manager import get_app_icon
 
 
 def main():
@@ -62,10 +60,12 @@ def main():
     # Enable high DPI scaling (PyQt6 handles this automatically)
     # Note: PyQt6 has better DPI support built-in, so we don't need to set these attributes
     
-    # Set application icon
-    icon_path = Path(__file__).parent / "ui" / "images" / "Knockout.png"
-    if icon_path.exists():
-        app.setWindowIcon(QIcon(str(icon_path)))
+    # Set application icon aggressively
+    app_icon = get_app_icon()
+    if not app_icon.isNull():
+        app.setWindowIcon(app_icon)
+        # Also set the icon property
+        app.setProperty("windowIcon", app_icon)
     
     # Create and show the main window
     window = MainWindow()

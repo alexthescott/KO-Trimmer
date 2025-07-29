@@ -14,6 +14,8 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtCore import QUrl
 
+from utils.icon_manager import set_dialog_icon
+
 
 class AudioPreviewDialog(QDialog):
     """Dialog for previewing original vs trimmed audio files"""
@@ -61,6 +63,9 @@ class AudioPreviewDialog(QDialog):
         """Initialize the user interface"""
         self.setWindowTitle("Audio Preview - Original vs Trimmed")
         self.setMinimumSize(600, 400)
+        
+        # Set dialog icon
+        set_dialog_icon(self)
         
         layout = QVBoxLayout(self)
         

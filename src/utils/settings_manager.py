@@ -23,22 +23,28 @@ class SettingsManager:
         app_data_dir.mkdir(parents=True, exist_ok=True)
         return app_data_dir / "favorites.json"
         
-    def save_favorites(self, favorites: List[str]):
-        """Save favorites to file"""
+    def save_favorites(self, favorites: List[Dict[str, str]]):
+        """Save favorites to file with custom display names"""
         try:
             with open(self.favorites_file, 'w') as f:
                 json.dump(favorites, f, indent=2)
         except Exception as e:
             print(f"Error saving favorites: {e}")
             
-    def load_favorites(self) -> List[str]:
-        """Load favorites from file"""
+    def load_favorites(self) -> List[Dict[str, str]]:
+        """Load favorites from file with custom display names"""
         try:
             if self.favorites_file.exists():
                 with open(self.favorites_file, 'r') as f:
                     favorites = json.load(f)
+                    
+                    # Handle legacy format (list of strings)
+                    if favorites and isinstance(favorites[0], str):
+                        # Convert old format to new format
+                        favorites = [{"path": path, "display_name": ""} for path in favorites]
+                    
                     # Filter out non-existent directories
-                    return [f for f in favorites if os.path.exists(f)]
+                    return [f for f in favorites if os.path.exists(f.get("path", ""))]
         except Exception as e:
             print(f"Error loading favorites: {e}")
         return []

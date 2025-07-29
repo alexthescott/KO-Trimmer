@@ -48,5 +48,5 @@ app = BUNDLE(
     exe,
     name='KO Trimmer.app',
     icon='src/ui/images/Knockout.png',
-    bundle_identifier=None,
+    bundle_identifier='com.kotrimmer.app',
 )

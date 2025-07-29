@@ -5,25 +5,27 @@ Main window for KO Trimmer application
 import os
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QProgressBar, QListWidget,
     QListWidgetItem, QMessageBox, QFileDialog, QGroupBox,
     QSpinBox, QDoubleSpinBox, QCheckBox, QSplitter, QMenu,
-    QProgressDialog
+    QProgressDialog, QLineEdit, QInputDialog, QMenuBar,
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData, QTimer
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QAction
 
 from audio.processor import AudioProcessor
-from ui.drag_drop import DragDropWidget
+from ui.combined_file_widget import CombinedFileWidget
 from ui.progress import ProcessingProgressWidget
 from ui.audio_preview import AudioPreviewDialog
 from ui.favorites_sidebar import FavoritesSidebar
 from ui.welcome_dialog import WelcomeDialog
 from utils.settings_manager import SettingsManager
+from utils.icon_manager import show_information, show_warning, show_critical, set_dialog_icon, get_app_icon
 
 
 class MainWindow(QMainWindow):
@@ -36,6 +38,7 @@ class MainWindow(QMainWindow):
         self.directory_scan_thread = None
         self.settings_manager = SettingsManager()
         self.favorites = []
+        self.custom_output_directory = None  # Store custom output directory
         self.init_ui()
         self.load_settings()
         self.show_welcome_if_needed()
@@ -43,7 +46,8 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """Initialize the user interface"""
         self.setWindowTitle("KO Trimmer - Audio Silence Trimmer")
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(900, 600)  # Increased to accommodate full layout
+        self.resize(900, 600)  # Set initial size to full layout size
         self.setWindowIconText("KO Trimmer")
         
         # Set window properties for better macOS integration
@@ -52,10 +56,11 @@ class MainWindow(QMainWindow):
         # Set window name for task switcher
         self.setObjectName("KO Trimmer")
         
-        # Set window icon
-        icon_path = Path(__file__).parent / "images" / "Knockout.png"
-        if icon_path.exists():
-            self.setWindowIcon(QIcon(str(icon_path)))
+        # Set window icon using icon manager
+        self.setWindowIcon(get_app_icon())
+        
+        # Create menu bar
+        self.create_menu_bar()
         
         # Create central widget
         central_widget = QWidget()
@@ -65,45 +70,61 @@ class MainWindow(QMainWindow):
         main_layout = QHBoxLayout(central_widget)
         
         # Create splitter for resizable panels
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(splitter)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_layout.addWidget(self.splitter)
         
         # Left panel - Favorites sidebar
         self.favorites_sidebar = FavoritesSidebar()
         self.favorites_sidebar.favorite_selected.connect(self.on_favorite_selected)
         self.favorites_sidebar.favorites_changed.connect(self.on_favorites_changed)
-        splitter.addWidget(self.favorites_sidebar)
+        self.splitter.addWidget(self.favorites_sidebar)
         
         # Center panel - File management
         center_panel = self.create_file_panel()
-        splitter.addWidget(center_panel)
+        self.splitter.addWidget(center_panel)
         
         # Right panel - Settings and controls
-        right_panel = self.create_control_panel()
-        splitter.addWidget(right_panel)
+        self.right_panel = self.create_control_panel()
+        self.splitter.addWidget(self.right_panel)
         
         # Set splitter proportions
-        splitter.setSizes([200, 400, 300])
+        self.splitter.setSizes([200, 400, 300])
+        
+        # Initially hide the right panel until files are added
+        self.right_panel.hide()
+        self.splitter.setSizes([200, 400, 0])
+        
+    def create_menu_bar(self):
+        """Create the menu bar with undo functionality"""
+        menubar = self.menuBar()
+        
+        # Edit menu
+        edit_menu = menubar.addMenu("Edit")
+        
+        # Undo action
+        self.undo_action = QAction("Undo", self)
+        self.undo_action.setShortcut("Ctrl+Z")
+        self.undo_action.setEnabled(False)
+        self.undo_action.triggered.connect(self.undo_last_action)
+        edit_menu.addAction(self.undo_action)
         
     def create_file_panel(self) -> QWidget:
         """Create the file management panel"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
         
-        # Drag and drop area
-        self.drag_drop_widget = DragDropWidget()
-        self.drag_drop_widget.files_dropped.connect(self.on_files_dropped)
-        layout.addWidget(self.drag_drop_widget)
-        
-        # File list
+        # Combined file section
         file_group = QGroupBox("Files to Process")
         file_layout = QVBoxLayout(file_group)
         
-        self.file_list = QListWidget()
-        self.file_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        # Combined drag-drop and file list widget
+        self.combined_file_widget = CombinedFileWidget()
+        self.combined_file_widget.files_dropped.connect(self.on_files_dropped)
+        file_layout.addWidget(self.combined_file_widget)
+        
+        # Get the file list from the combined widget
+        self.file_list = self.combined_file_widget.get_file_list()
         self.file_list.customContextMenuRequested.connect(self.show_context_menu)
-        file_layout.addWidget(self.file_list)
         
         # File list buttons
         file_buttons_layout = QHBoxLayout()
@@ -171,11 +192,13 @@ class MainWindow(QMainWindow):
         # Options
         self.overwrite_check = QCheckBox("Overwrite original files")
         self.overwrite_check.setChecked(False)
+        self.overwrite_check.toggled.connect(self.on_overwrite_changed)
         settings_layout.addWidget(self.overwrite_check)
         
         # Stereo preservation option
         self.preserve_stereo_check = QCheckBox("Preserve stereo channels (convert to mono if unchecked)")
         self.preserve_stereo_check.setChecked(True)  # Default to preserving stereo
+        self.preserve_stereo_check.toggled.connect(self.on_settings_changed)
         settings_layout.addWidget(self.preserve_stereo_check)
         
         layout.addWidget(settings_group)
@@ -203,8 +226,36 @@ class MainWindow(QMainWindow):
         progress_layout.addLayout(buttons_layout)
         layout.addWidget(progress_group)
         
-        # Add stretch to push everything to the top
+        # Add stretch to push output directory to the bottom
         layout.addStretch()
+        
+        # Output directory group (moved to bottom)
+        output_group = QGroupBox("Output Directory")
+        output_layout = QVBoxLayout(output_group)
+        
+        # Output directory display
+        self.output_dir_edit = QLineEdit()
+        self.output_dir_edit.setPlaceholderText("Output directory will be shown here")
+        self.output_dir_edit.setReadOnly(True)
+        self.output_dir_edit.setStyleSheet("""
+            QLineEdit {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                padding: 8px;
+                color: #495057;
+                font-family: monospace;
+                font-size: 11px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #007bff;
+            }
+        """)
+        self.output_dir_edit.mousePressEvent = self.on_output_dir_click
+        output_layout.addWidget(self.output_dir_edit)
+        
+
+        layout.addWidget(output_group)
         
         return panel
         
@@ -242,22 +293,12 @@ class MainWindow(QMainWindow):
                 
     def add_files_to_list(self, file_paths: List[str]):
         """Add files to the file list"""
-        for file_path in file_paths:
-            # Check if file is already in the list
-            existing_items = [
-                self.file_list.item(i).text() 
-                for i in range(self.file_list.count())
-            ]
-            
-            if file_path not in existing_items:
-                item = QListWidgetItem(file_path)
-                self.file_list.addItem(item)
-                
+        self.combined_file_widget.add_files(file_paths)
         self.update_process_button()
         
     def clear_files(self):
         """Clear all files from the list"""
-        self.file_list.clear()
+        self.combined_file_widget.clear_files()
         self.update_process_button()
         
     def on_files_dropped(self, file_paths: List[str]):
@@ -265,19 +306,50 @@ class MainWindow(QMainWindow):
         self.add_files_to_list(file_paths)
         
     def update_process_button(self):
-        """Update the process button state"""
-        self.process_btn.setEnabled(self.file_list.count() > 0)
+        """Update the process button state and show/hide right panel"""
+        # Check if there are files (excluding placeholder)
+        has_files = False
+        if self.file_list.rowCount() > 0:
+            # Check if the first row is not a placeholder
+            first_item = self.file_list.item(0, 0)
+            if first_item and first_item.flags() != Qt.ItemFlag.NoItemFlags:
+                has_files = True
+        
+        self.process_btn.setEnabled(has_files)
+        
+        # Show/hide right panel based on whether files are selected
+        if has_files:
+            self.right_panel.setVisible(True)
+            self.right_panel.show()
+            # Force the splitter to show the right panel
+            self.splitter.setSizes([200, 400, 300])
+        else:
+            self.right_panel.setVisible(False)
+            self.right_panel.hide()
+            # Hide the right panel by setting its size to 0
+            self.splitter.setSizes([200, 400, 0])
+            
+        self.update_output_directory_display()
         
     def process_files(self):
         """Start processing the files"""
-        if self.file_list.count() == 0:
+        # Check if there are files (excluding placeholder)
+        has_files = False
+        if self.file_list.rowCount() > 0:
+            # Check if the first row is not a placeholder
+            first_item = self.file_list.item(0, 0)
+            if first_item and first_item.flags() != Qt.ItemFlag.NoItemFlags:
+                has_files = True
+        
+        if not has_files:
             return
             
-        # Get file paths
-        file_paths = [
-            self.file_list.item(i).text() 
-            for i in range(self.file_list.count())
-        ]
+        # Get file paths from the second column
+        file_paths = []
+        for row in range(self.file_list.rowCount()):
+            path_item = self.file_list.item(row, 1)
+            if path_item and path_item.flags() != Qt.ItemFlag.NoItemFlags:
+                file_paths.append(path_item.text())
         
         # Get settings
         settings = {
@@ -287,6 +359,10 @@ class MainWindow(QMainWindow):
             'overwrite': self.overwrite_check.isChecked(),
             'preserve_stereo': self.preserve_stereo_check.isChecked()
         }
+        
+        # Add custom output directory to settings if set
+        if self.custom_output_directory:
+            settings['custom_output_dir'] = self.custom_output_directory
         
         # Start processing in a separate thread
         self.processing_thread = ProcessingThread(
@@ -367,11 +443,26 @@ class MainWindow(QMainWindow):
         
     def _get_output_directory(self):
         """Get the output directory path"""
-        if self.file_list.count() == 0:
+        # Check if there are files (excluding placeholder)
+        has_files = False
+        if self.file_list.rowCount() > 0:
+            # Check if the first row is not a placeholder
+            first_item = self.file_list.item(0, 0)
+            if first_item and first_item.flags() != Qt.ItemFlag.NoItemFlags:
+                has_files = True
+        
+        if not has_files:
             return None
             
+        # If custom output directory is set, use it
+        if self.custom_output_directory:
+            return self.custom_output_directory
+            
         # Get the first file to determine output directory
-        first_file = self.file_list.item(0).text()
+        first_file_item = self.file_list.item(0, 1)  # Get from second column
+        if not first_file_item:
+            return None
+        first_file = first_file_item.text()
         try:
             from audio.processor import AudioProcessor
             processor = AudioProcessor()
@@ -405,11 +496,58 @@ class MainWindow(QMainWindow):
             
         return None
         
+    def update_output_directory_display(self):
+        """Update the output directory display"""
+        output_dir = self._get_output_directory()
+        
+        if output_dir:
+            # Show the output directory path
+            self.output_dir_edit.setText(f"📁 {output_dir}")
+            self.output_dir_edit.setToolTip(output_dir)
+        else:
+            # No files selected
+            self.output_dir_edit.setText("")
+            self.output_dir_edit.setToolTip("")
+            
+    def change_output_directory(self):
+        """Change the output directory"""
+        new_dir = QFileDialog.getExistingDirectory(
+            self,
+            "Select Output Directory",
+            str(Path.home()),
+            QFileDialog.Option.ShowDirsOnly
+        )
+        
+        if new_dir:
+            self.custom_output_directory = new_dir
+            self.update_output_directory_display()
+            
+    def reset_output_directory(self):
+        """Reset to default output directory"""
+        self.custom_output_directory = None
+        self.update_output_directory_display()
+        
+    def on_overwrite_changed(self, checked: bool):
+        """Handle overwrite checkbox changes"""
+        if checked:
+            # If overwrite is checked, clear custom output directory
+            self.custom_output_directory = None
+        self.update_output_directory_display()
+        
+    def on_settings_changed(self):
+        """Handle settings changes that affect output directory"""
+        self.update_output_directory_display()
+        
+    def on_output_dir_click(self, event):
+        """Handle click on output directory field"""
+        # Open directory dialog when clicked
+        self.change_output_directory()
+        
     def preview_selected(self):
         """Preview the selected file"""
-        selected_items = self.file_list.selectedItems()
+        selected_rows = self.file_list.selectionModel().selectedRows()
         
-        if not selected_items:
+        if not selected_rows:
             QMessageBox.information(
                 self,
                 "No File Selected",
@@ -417,7 +555,7 @@ class MainWindow(QMainWindow):
             )
             return
             
-        if len(selected_items) > 1:
+        if len(selected_rows) > 1:
             QMessageBox.information(
                 self,
                 "Multiple Files Selected",
@@ -425,8 +563,18 @@ class MainWindow(QMainWindow):
             )
             return
             
-        # Get the selected file
-        original_file = selected_items[0].text()
+        # Get the selected file path from the second column
+        row = selected_rows[0].row()
+        path_item = self.file_list.item(row, 1)
+        if not path_item:
+            QMessageBox.information(
+                self,
+                "No File Selected",
+                "Please select a file to preview."
+            )
+            return
+            
+        original_file = path_item.text()
         
         # Check if the file has been processed
         settings = {
@@ -437,7 +585,8 @@ class MainWindow(QMainWindow):
         }
         
         # Get the output path
-        output_path = self.audio_processor.get_output_path(original_file, settings)
+        custom_output_dir = self.custom_output_directory
+        output_path = self.audio_processor.get_output_path(original_file, settings, custom_output_dir)
         
         # Check if trimmed file exists
         if not os.path.exists(output_path):
@@ -468,10 +617,17 @@ class MainWindow(QMainWindow):
         
         # Get the item at the clicked position
         item = self.file_list.itemAt(position)
-        if item:
+        if item and item.flags() != Qt.ItemFlag.NoItemFlags:
             # Add preview action
             preview_action = menu.addAction("Preview")
             preview_action.triggered.connect(self.preview_selected)
+            
+            # Add separator
+            menu.addSeparator()
+            
+            # Add rename action
+            rename_action = menu.addAction("Rename File")
+            rename_action.triggered.connect(lambda: self.rename_selected_file_inline(item))
             
             # Add separator
             menu.addSeparator()
@@ -485,8 +641,206 @@ class MainWindow(QMainWindow):
     def remove_selected_file(self, item):
         """Remove a file from the list"""
         row = self.file_list.row(item)
-        self.file_list.takeItem(row)
+        self.file_list.removeRow(row)
         self.update_process_button()
+        
+    def rename_selected_file(self, item):
+        """Rename a file with undo support"""
+        row = self.file_list.row(item)
+        path_item = self.file_list.item(row, 1)
+        if not path_item:
+            return
+            
+        old_path = path_item.text()
+        old_filename = self.file_list.item(row, 0).text()
+        
+        # Get new filename from user
+        new_filename, ok = QInputDialog.getText(
+            self, 
+            "Rename File", 
+            "Enter new filename:", 
+            QLineEdit.EchoMode.Normal, 
+            old_filename
+        )
+        
+        # Only proceed if user clicked OK and entered a different name
+        if ok and new_filename and new_filename != old_filename:
+            try:
+                from pathlib import Path
+                old_path_obj = Path(old_path)
+                new_path_obj = old_path_obj.parent / new_filename
+                
+                # Check if new filename already exists
+                if new_path_obj.exists():
+                    QMessageBox.warning(
+                        self,
+                        "File Exists",
+                        f"A file named '{new_filename}' already exists in this directory."
+                    )
+                    return
+                
+                # Store undo information BEFORE renaming
+                if not hasattr(self, 'undo_stack'):
+                    self.undo_stack = []
+                
+                undo_info = {
+                    'type': 'rename',
+                    'old_path': str(old_path_obj),
+                    'new_path': str(new_path_obj),
+                    'row': row
+                }
+                self.undo_stack.append(undo_info)
+                
+                # Rename the file on disk
+                old_path_obj.rename(new_path_obj)
+                
+                # Update the display
+                self.file_list.item(row, 0).setText(new_filename)
+                self.file_list.item(row, 1).setText(str(new_path_obj))
+                
+                # Enable undo action
+                if hasattr(self, 'undo_action'):
+                    self.undo_action.setEnabled(True)
+                    
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Rename Error",
+                    f"Failed to rename file:\n{str(e)}"
+                )
+                
+    def rename_selected_file_inline(self, item):
+        """Rename a file with inline editing behavior"""
+        row = self.file_list.row(item)
+        path_item = self.file_list.item(row, 1)
+        if not path_item:
+            return
+            
+        old_path = path_item.text()
+        old_filename = self.file_list.item(row, 0).text()
+        
+        # Create a custom dialog for inline editing
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Rename File")
+        dialog.setModal(True)
+        dialog.setFixedSize(400, 150)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # Label
+        label = QLabel(f"Rename '{old_filename}' to:")
+        layout.addWidget(label)
+        
+        # Input field
+        input_field = QLineEdit(old_filename)
+        input_field.selectAll()  # Select all text for easy editing
+        layout.addWidget(input_field)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        cancel_btn = QPushButton("Cancel")
+        rename_btn = QPushButton("Rename")
+        rename_btn.setDefault(True)
+        
+        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(rename_btn)
+        layout.addLayout(button_layout)
+        
+        # Connect signals
+        cancel_btn.clicked.connect(dialog.reject)
+        rename_btn.clicked.connect(dialog.accept)
+        input_field.returnPressed.connect(dialog.accept)
+        input_field.escapePressed.connect(dialog.reject)
+        
+        # Focus on input field
+        input_field.setFocus()
+        
+        # Show dialog
+        result = dialog.exec()
+        
+        if result == QDialog.DialogCode.Accepted:
+            new_filename = input_field.text().strip()
+            
+            # Only proceed if name changed
+            if new_filename and new_filename != old_filename:
+                try:
+                    from pathlib import Path
+                    old_path_obj = Path(old_path)
+                    new_path_obj = old_path_obj.parent / new_filename
+                    
+                    # Check if new filename already exists
+                    if new_path_obj.exists():
+                        QMessageBox.warning(
+                            self,
+                            "File Exists",
+                            f"A file named '{new_filename}' already exists in this directory."
+                        )
+                        return
+                    
+                    # Store undo information BEFORE renaming
+                    if not hasattr(self, 'undo_stack'):
+                        self.undo_stack = []
+                    
+                    undo_info = {
+                        'type': 'rename',
+                        'old_path': str(old_path_obj),
+                        'new_path': str(new_path_obj),
+                        'row': row
+                    }
+                    self.undo_stack.append(undo_info)
+                    
+                    # Rename the file on disk
+                    old_path_obj.rename(new_path_obj)
+                    
+                    # Update the display
+                    self.file_list.item(row, 0).setText(new_filename)
+                    self.file_list.item(row, 1).setText(str(new_path_obj))
+                    
+                    # Enable undo action
+                    if hasattr(self, 'undo_action'):
+                        self.undo_action.setEnabled(True)
+                        
+                except Exception as e:
+                    QMessageBox.critical(
+                        self,
+                        "Rename Error",
+                        f"Failed to rename file:\n{str(e)}"
+                    )
+                
+    def undo_last_action(self):
+        """Undo the last action"""
+        if not hasattr(self, 'undo_stack') or not self.undo_stack:
+            return
+            
+        undo_info = self.undo_stack.pop()
+        
+        if undo_info['type'] == 'rename':
+            try:
+                from pathlib import Path
+                old_path = Path(undo_info['old_path'])
+                new_path = Path(undo_info['new_path'])
+                
+                # Rename back
+                new_path.rename(old_path)
+                
+                # Update display
+                row = undo_info['row']
+                if row < self.file_list.rowCount():
+                    old_filename = old_path.name
+                    self.file_list.item(row, 0).setText(old_filename)
+                    self.file_list.item(row, 1).setText(str(old_path))
+                    
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Undo Error",
+                    f"Failed to undo rename:\n{str(e)}"
+                )
+        
+        # Disable undo if no more actions
+        if not self.undo_stack and hasattr(self, 'undo_action'):
+            self.undo_action.setEnabled(False)
             
     def on_processing_error(self, error_message: str):
         """Handle processing errors"""
@@ -596,7 +950,7 @@ class MainWindow(QMainWindow):
             f"Error scanning directory:\n{error_message}"
         )
         
-    def on_favorites_changed(self, favorites: List[str]):
+    def on_favorites_changed(self, favorites: List[Dict[str, str]]):
         """Handle favorites list changes"""
         self.favorites = favorites
         self.settings_manager.save_favorites(favorites)
@@ -726,6 +1080,9 @@ class ProcessingThread(QThread):
                     break
                     
                 try:
+                    # Get custom output directory from settings
+                    custom_output_dir = self.settings.get('custom_output_dir')
+                    
                     # Process the file
                     success = self.processor.process_file(
                         file_path, 
@@ -735,7 +1092,7 @@ class ProcessingThread(QThread):
                     # Get output path for successful processing
                     output_path = ""
                     if success:
-                        output_path = self.processor.get_output_path(file_path, self.settings)
+                        output_path = self.processor.get_output_path(file_path, self.settings, custom_output_dir)
                     
                     # Emit progress signals
                     progress = int((i + 1) / total_files * 100)

@@ -34,8 +34,9 @@ def test_stereo_loading():
             return False
         
         # Check if audio is stereo
-        is_stereo = len(audio_data.shape) == 2
-        channels = audio_data.shape[1] if is_stereo else 1
+        # librosa returns (channels, samples) format
+        is_stereo = len(audio_data.shape) == 2 and audio_data.shape[0] == 2
+        channels = audio_data.shape[0] if len(audio_data.shape) == 2 else 1
         
         print(f"Audio shape: {audio_data.shape}")
         print(f"Is stereo: {is_stereo}")
@@ -97,8 +98,8 @@ def test_stereo_processing():
             print("❌ Failed to load output audio")
             return False
         
-        output_is_stereo = len(output_audio.shape) == 2
-        output_channels = output_audio.shape[1] if output_is_stereo else 1
+        output_is_stereo = len(output_audio.shape) == 2 and output_audio.shape[0] == 2
+        output_channels = output_audio.shape[0] if len(output_audio.shape) == 2 else 1
         
         print(f"Output audio shape: {output_audio.shape}")
         print(f"Output is stereo: {output_is_stereo}")

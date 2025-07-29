@@ -4,7 +4,7 @@ Favorites sidebar for KO Trimmer
 
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
+
+from utils.icon_manager import show_information, show_warning
 
 
 class FavoritesSidebar(QWidget):
@@ -23,7 +25,7 @@ class FavoritesSidebar(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.favorites = []
+        self.favorites = []  # List of dicts: [{"path": "...", "display_name": "..."}]
         self.init_ui()
         
     def init_ui(self):
@@ -76,29 +78,36 @@ class FavoritesSidebar(QWidget):
         # Update visibility
         self.update_empty_state()
         
-    def set_favorites(self, favorites: List[str]):
-        """Set the list of favorite directories"""
+    def set_favorites(self, favorites: List[Dict[str, str]]):
+        """Set the list of favorite directories with display names"""
         self.favorites = favorites.copy()
         self.refresh_list()
         
-    def get_favorites(self) -> List[str]:
-        """Get the current list of favorite directories"""
+    def get_favorites(self) -> List[Dict[str, str]]:
+        """Get the current list of favorite directories with display names"""
         return self.favorites.copy()
+        
+    def get_favorite_paths(self) -> List[str]:
+        """Get just the paths from favorites (for backward compatibility)"""
+        return [f["path"] for f in self.favorites]
         
     def refresh_list(self):
         """Refresh the favorites list display"""
         self.favorites_list.clear()
         
-        for directory in self.favorites:
-            if os.path.exists(directory):
+        for favorite in self.favorites:
+            path = favorite.get("path", "")
+            if os.path.exists(path):
                 item = QListWidgetItem()
                 
-                # Create a more descriptive display name
-                display_name = self._create_display_name(directory)
+                # Use custom display name if available, otherwise generate one
+                display_name = favorite.get("display_name", "")
+                if not display_name:
+                    display_name = self._create_display_name(path)
                 
                 item.setText(display_name)
-                item.setToolTip(directory)  # Full path in tooltip
-                item.setData(Qt.ItemDataRole.UserRole, directory)
+                item.setToolTip(path)  # Full path in tooltip
+                item.setData(Qt.ItemDataRole.UserRole, path)
                 
                 # Add folder icon
                 item.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_DirIcon))
@@ -123,35 +132,45 @@ class FavoritesSidebar(QWidget):
         
         if directory:
             # Check if already exists
-            if directory in self.favorites:
-                QMessageBox.information(self, "Already Added", "This directory is already in your favorites!")
+            if any(f["path"] == directory for f in self.favorites):
+                show_information(self, "Already Added", "This directory is already in your favorites!")
                 return
             
-            # Add to favorites
-            self.favorites.append(directory)
+            # Add to favorites with empty display name (will be auto-generated)
+            self.favorites.append({"path": directory, "display_name": ""})
             self.refresh_list()
             self.favorites_changed.emit(self.favorites)
             
     def remove_favorite(self, directory: str):
         """Remove a favorite directory"""
-        if directory in self.favorites:
-            self.favorites.remove(directory)
-            self.refresh_list()
-            self.favorites_changed.emit(self.favorites)
+        self.favorites = [f for f in self.favorites if f["path"] != directory]
+        self.refresh_list()
+        self.favorites_changed.emit(self.favorites)
             
-    def rename_favorite(self, old_directory: str):
+    def rename_favorite(self, directory: str):
         """Rename a favorite directory display name"""
+        # Find the current favorite
+        favorite = next((f for f in self.favorites if f["path"] == directory), None)
+        if not favorite:
+            return
+            
+        # Get current display name or generate one
+        current_name = favorite.get("display_name", "")
+        if not current_name:
+            current_name = self._create_display_name(directory)
+        
         new_name, ok = QInputDialog.getText(
             self,
             "Rename Favorite",
             "Enter a display name for this directory:",
-            text=Path(old_directory).name
+            text=current_name
         )
         
         if ok and new_name.strip():
-            # For now, we'll just update the display name in the list
-            # In a more advanced implementation, we could store custom names
+            # Update the display name
+            favorite["display_name"] = new_name.strip()
             self.refresh_list()
+            self.favorites_changed.emit(self.favorites)
             
     def show_context_menu(self, position):
         """Show context menu for favorites list"""
@@ -191,7 +210,7 @@ class FavoritesSidebar(QWidget):
         try:
             subprocess.run(["open", directory])
         except Exception as e:
-            QMessageBox.warning(self, "Error", f"Could not open directory: {e}")
+            show_warning(self, "Error", f"Could not open directory: {e}")
             
     def _create_display_name(self, directory: str) -> str:
         """Create a descriptive display name for a directory"""
