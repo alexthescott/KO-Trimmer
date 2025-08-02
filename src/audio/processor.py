@@ -200,6 +200,29 @@ class AudioProcessor:
         new_filename = f"{stem}{suffix}{extension}"
         
         return str(path.parent / new_filename)
+    
+    def clear_output_directories(self, file_paths: list, settings: dict, custom_output_dir: str = None):
+        """Clear output directories before processing to overwrite with new content"""
+        try:
+            # Get unique output directories for all files
+            output_dirs = set()
+            
+            for file_path in file_paths:
+                output_path = self._get_output_path(file_path, settings, custom_output_dir)
+                if output_path:
+                    output_dir = Path(output_path).parent
+                    output_dirs.add(str(output_dir))
+            
+            # Clear each unique output directory
+            import shutil
+            for output_dir in output_dirs:
+                output_path = Path(output_dir)
+                if output_path.exists():
+                    shutil.rmtree(output_path)
+                    print(f"Cleared output directory: {output_dir}")
+                    
+        except Exception as e:
+            print(f"Error clearing output directories: {e}")
                 
     def _find_root_directory(self, file_path: str) -> Optional[Path]:
         """

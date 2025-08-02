@@ -9,6 +9,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from pathlib import Path
 
+from .ui_utils import UIUtils
+
 
 class ProcessingProgressWidget(QWidget):
     """Widget for displaying processing progress"""
@@ -39,18 +41,16 @@ class ProcessingProgressWidget(QWidget):
         layout.addWidget(self.file_progress)
         
         # Status label
-        self.status_label = QLabel("Ready to process")
+        self.status_label = UIUtils.create_styled_label("Ready to process", 12, False)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.status_label)
         
-
-        
         # Log area
-        log_group = QGroupBox("Processing Log")
+        log_group = UIUtils.create_group_box("Processing Log")
         log_layout = QVBoxLayout(log_group)
         
         self.log_text = QTextEdit()
-        self.log_text.setMaximumHeight(100)
+        self.log_text.setMinimumHeight(200)
         self.log_text.setReadOnly(True)
         log_layout.addWidget(self.log_text)
         
@@ -132,8 +132,6 @@ class ProcessingProgressWidget(QWidget):
         self.overall_progress.setValue(100)
         self.file_progress.setValue(100)
         self.status_label.setText("Processing complete!")
-        
-
         
     def update_status(self, message: str):
         """Update the status message"""

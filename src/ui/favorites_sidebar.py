@@ -15,6 +15,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
 
 from utils.icon_manager import show_information, show_warning
+from .ui_utils import UIUtils
 
 
 class FavoritesSidebar(QWidget):
@@ -33,11 +34,14 @@ class FavoritesSidebar(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         
+        # Set maximum width for the sidebar
+        self.setMaximumWidth(250)
+        self.setMinimumWidth(200)
+        
         # Header
         header_layout = QHBoxLayout()
         
-        title = QLabel("Favorites")
-        title.setStyleSheet("font-weight: bold; font-size: 14px; color: #2c3e50;")
+        title = UIUtils.create_styled_label("Favorites", 14, True, "#2c3e50")
         header_layout.addWidget(title)
         
         # Add button
@@ -69,11 +73,17 @@ class FavoritesSidebar(QWidget):
         layout.addWidget(self.favorites_list)
         
         # Empty state
-        self.empty_label = QLabel("No favorites yet.\nClick + to add directories!")
+        self.empty_label = UIUtils.create_styled_label(
+            "No favorites yet.\nClick + to add directories!", 
+            12, False, "#7f8c8d"
+        )
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 20px;")
         self.empty_label.setWordWrap(True)
         layout.addWidget(self.empty_label)
+        
+        # Initially hide the sidebar when no favorites
+        self.hide()
         
         # Update visibility
         self.update_empty_state()
@@ -103,7 +113,7 @@ class FavoritesSidebar(QWidget):
                 # Use custom display name if available, otherwise generate one
                 display_name = favorite.get("display_name", "")
                 if not display_name:
-                    display_name = self._create_display_name(path)
+                    display_name = UIUtils.create_display_name(path)
                 
                 item.setText(display_name)
                 item.setToolTip(path)  # Full path in tooltip
@@ -117,9 +127,15 @@ class FavoritesSidebar(QWidget):
         self.update_empty_state()
         
     def update_empty_state(self):
-        """Update the empty state visibility"""
+        """Update the empty state visibility and sidebar visibility"""
         has_favorites = self.favorites_list.count() > 0
         self.empty_label.setVisible(not has_favorites)
+        
+        # Show/hide the entire sidebar based on whether there are favorites
+        if has_favorites:
+            self.show()
+        else:
+            self.hide()
         
     def add_favorite(self):
         """Add a new favorite directory"""
@@ -157,7 +173,7 @@ class FavoritesSidebar(QWidget):
         # Get current display name or generate one
         current_name = favorite.get("display_name", "")
         if not current_name:
-            current_name = self._create_display_name(directory)
+            current_name = UIUtils.create_display_name(directory)
         
         new_name, ok = QInputDialog.getText(
             self,
@@ -211,30 +227,6 @@ class FavoritesSidebar(QWidget):
             subprocess.run(["open", directory])
         except Exception as e:
             show_warning(self, "Error", f"Could not open directory: {e}")
-            
-    def _create_display_name(self, directory: str) -> str:
-        """Create a descriptive display name for a directory"""
-        path_obj = Path(directory)
-        
-        # If it's in the user's home directory, show a relative path
-        try:
-            relative_path = path_obj.relative_to(Path.home())
-            if len(str(relative_path).split('/')) <= 2:
-                # For shallow paths, show the full relative path
-                return f"📁 {relative_path}"
-            else:
-                # For deeper paths, show parent/name
-                parts = str(relative_path).split('/')
-                if len(parts) >= 2:
-                    return f"📁 {parts[-2]}/{parts[-1]}"
-                else:
-                    return f"📁 {path_obj.name}"
-        except ValueError:
-            # If not in home directory, show parent/name
-            try:
-                return f"📁 {path_obj.parent.name}/{path_obj.name}"
-            except:
-                return f"📁 {path_obj.name}"
     
     def on_favorite_double_clicked(self, item):
         """Handle double-click on favorite item"""

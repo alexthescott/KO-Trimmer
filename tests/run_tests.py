@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run KO Trimmer tests")
     parser.add_argument(
         "--category", "-c",
-        choices=["core", "audio", "ui", "favorites", "output", "settings", "sample", "autoupdate", "duration", "edgecases", "reduction", "all"],
+        choices=["core", "audio", "ui", "favorites", "output", "settings", "sample", "autoupdate", "duration", "edgecases", "reduction", "pathsafety", "all"],
         default="all",
         help="Test category to run (default: all)"
     )
@@ -90,6 +90,10 @@ def main():
             suite.results.append(suite.run_test(suite.test_reduction_debug, "Reduction Debug"))
             suite.results.append(suite.run_test(suite.test_reduction_calculation, "Reduction Calculation"))
             suite.results.append(suite.run_test(suite.test_reduction_update, "Reduction Update"))
+        elif args.category == "pathsafety":
+            suite.results.append(suite.run_test(suite.test_hardcoded_paths, "Hardcoded Paths Check"))
+            suite.results.append(suite.run_test(suite.test_path_safety, "Path Safety"))
+            suite.results.append(suite.run_test(suite.test_file_processing_isolation, "File Processing Isolation"))
         
         suite.print_results()
 

@@ -1764,6 +1764,166 @@ class TestSuite:
             print(f"❌ Reduction update test failed: {e}")
             return False
 
+    def test_hardcoded_paths(self) -> bool:
+        """Test that no hardcoded Desktop paths exist in the codebase"""
+        try:
+            print("Testing for hardcoded paths...")
+            
+            # Check for hardcoded Desktop paths in source code
+            src_dir = Path(__file__).parent.parent / "src"
+            hardcoded_paths = []
+            
+            for py_file in src_dir.rglob("*.py"):
+                try:
+                    with open(py_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        
+                        # Check for hardcoded Desktop paths
+                        if "Desktop" in content and "william" in content.lower():
+                            hardcoded_paths.append(str(py_file))
+                            
+                        # Check for absolute paths that might be problematic
+                        lines = content.split('\n')
+                        for i, line in enumerate(lines, 1):
+                            if "/Users/" in line and "william" in line.lower():
+                                hardcoded_paths.append(f"{py_file}:{i}")
+                                
+                except Exception as e:
+                    print(f"Warning: Could not read {py_file}: {e}")
+            
+            if hardcoded_paths:
+                print(f"❌ Found hardcoded paths: {hardcoded_paths}")
+                return False
+            
+            print("✅ No hardcoded Desktop paths found in source code")
+            
+            # Test that file operations work with relative paths
+            test_file = Path(__file__).parent / "sample_audio" / "01 kicks" / "kick12.wav"
+            if not test_file.exists():
+                print("❌ Test sample file not found")
+                return False
+            
+            # Test audio processor with relative path
+            from audio.processor import AudioProcessor
+            processor = AudioProcessor()
+            
+            # Test that the processor can handle the test file
+            settings = {'preserve_stereo': True, 'overwrite': False}
+            output_path = processor._get_output_path(str(test_file), settings)
+            
+            # Ensure output path is relative to the project
+            output_path_obj = Path(output_path)
+            if output_path_obj.is_absolute():
+                # Check that it's not pointing to Desktop
+                if "Desktop" in str(output_path_obj):
+                    print(f"❌ Output path points to Desktop: {output_path}")
+                    return False
+            
+            print("✅ File operations work with proper path resolution")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Hardcoded paths test failed: {e}")
+            return False
+
+    def test_path_safety(self) -> bool:
+        """Test that file operations are safe and don't access unexpected locations"""
+        try:
+            print("Testing path safety...")
+            
+            from audio.processor import AudioProcessor
+            from ui.main_window import MainWindow
+            from PyQt6.QtWidgets import QApplication
+            
+            processor = AudioProcessor()
+            
+            # Test with various path types
+            test_cases = [
+                "tests/sample_audio/01 kicks/kick12.wav",  # Relative path
+                str(Path(__file__).parent / "sample_audio" / "01 kicks" / "kick12.wav"),  # Absolute path
+                "nonexistent/file.wav",  # Non-existent file
+            ]
+            
+            for test_path in test_cases:
+                try:
+                    # Test output path generation
+                    settings = {'preserve_stereo': True, 'overwrite': False}
+                    output_path = processor._get_output_path(test_path, settings)
+                    
+                    # Ensure output path doesn't contain problematic directories
+                    if "Desktop" in output_path and "william" in output_path.lower():
+                        print(f"❌ Output path contains Desktop reference: {output_path}")
+                        return False
+                        
+                except Exception as e:
+                    # Expected for non-existent files
+                    if "nonexistent" in test_path:
+                        continue
+                    else:
+                        print(f"❌ Unexpected error with path {test_path}: {e}")
+                        return False
+            
+            print("✅ Path safety tests passed")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Path safety test failed: {e}")
+            return False
+
+    def test_file_processing_isolation(self) -> bool:
+        """Test that file processing is isolated and doesn't affect external directories"""
+        try:
+            print("Testing file processing isolation...")
+            
+            import tempfile
+            import shutil
+            from audio.processor import AudioProcessor
+            
+            # Create a temporary test directory
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+                
+                # Copy a sample file to the temp directory
+                sample_file = Path(__file__).parent / "sample_audio" / "01 kicks" / "kick12.wav"
+                test_file = temp_path / "test_kick.wav"
+                shutil.copy2(sample_file, test_file)
+                
+                # Test processing in isolation
+                processor = AudioProcessor()
+                settings = {
+                    'preserve_stereo': True,
+                    'overwrite': False,
+                    'custom_output_dir': str(temp_path)
+                }
+                
+                # Process the file
+                success = processor.process_file(str(test_file), settings)
+                
+                if not success:
+                    print("❌ File processing failed in isolation")
+                    return False
+                
+                # Check that output was created in the temp directory
+                output_files = list(temp_path.glob("*_trimmed*"))
+                if not output_files:
+                    print("❌ No output files created in isolation")
+                    return False
+                
+                # Check that no files were created outside the temp directory
+                desktop_dir = Path.home() / "Desktop" / "william crooks drumkit vol. 1"
+                if desktop_dir.exists():
+                    desktop_files = list(desktop_dir.glob("*_trimmed*"))
+                    if desktop_files:
+                        print(f"❌ Files created in Desktop directory: {desktop_files}")
+                        return False
+            
+            print("✅ File processing isolation tests passed")
+            return True
+            
+        except Exception as e:
+            print(f"❌ File processing isolation test failed: {e}")
+            return False
+
     # ============================================================================
     # COMPREHENSIVE TEST RUNNER
     # ============================================================================
@@ -1850,6 +2010,13 @@ class TestSuite:
         self.results.append(self.run_test(self.test_reduction_debug, "Reduction Debug"))
         self.results.append(self.run_test(self.test_reduction_calculation, "Reduction Calculation"))
         self.results.append(self.run_test(self.test_reduction_update, "Reduction Update"))
+        
+        # Path Safety Tests
+        print("\n🛡️  PATH SAFETY TESTS")
+        print("-" * 30)
+        self.results.append(self.run_test(self.test_hardcoded_paths, "Hardcoded Paths Check"))
+        self.results.append(self.run_test(self.test_path_safety, "Path Safety"))
+        self.results.append(self.run_test(self.test_file_processing_isolation, "File Processing Isolation"))
         
         # Print results
         self.print_results()

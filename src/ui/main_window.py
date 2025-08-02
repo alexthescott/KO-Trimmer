@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QProgressBar, QListWidget,
     QListWidgetItem, QMessageBox, QFileDialog, QGroupBox,
-    QSpinBox, QDoubleSpinBox, QCheckBox, QSplitter, QMenu,
+    QSpinBox, QDoubleSpinBox, QCheckBox, QMenu,
     QProgressDialog, QLineEdit, QInputDialog, QMenuBar,
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 )
@@ -20,9 +20,9 @@ from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QAction
 
 from audio.processor import AudioProcessor
 from ui.combined_file_widget import CombinedFileWidget
-from ui.progress import ProcessingProgressWidget
 from ui.audio_preview import AudioPreviewDialog, AudioPreviewWidget
 from ui.favorites_sidebar import FavoritesSidebar
+from ui.processing_window import ProcessingWindow
 from ui.welcome_dialog import WelcomeDialog
 from utils.settings_manager import SettingsManager
 from utils.icon_manager import show_information, show_warning, show_critical, set_dialog_icon, get_app_icon
@@ -36,6 +36,7 @@ class MainWindow(QMainWindow):
         self.audio_processor = AudioProcessor()
         self.processing_thread = None
         self.directory_scan_thread = None
+        self.processing_window = None
         self.settings_manager = SettingsManager()
         self.favorites = []
         self.custom_output_directory = None  # Store custom output directory
@@ -46,8 +47,8 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """Initialize the user interface"""
         self.setWindowTitle("KO Trimmer - Audio Silence Trimmer")
-        self.setMinimumSize(900, 600)  # Increased to accommodate full layout
-        self.resize(900, 600)  # Set initial size to full layout size
+        self.setMinimumSize(900, 700)  # Increased height for new layout
+        self.resize(900, 700)  # Set initial size to full layout size
         self.setWindowIconText("KO Trimmer")
         
         # Set window properties for better macOS integration
@@ -66,33 +67,51 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Create main layout
+        # Create main layout - horizontal with favorites on left
         main_layout = QHBoxLayout(central_widget)
         
-        # Create splitter for resizable panels
-        self.splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(self.splitter)
-        
-        # Left panel - Favorites sidebar
+        # Left panel - Favorites sidebar (always on left)
         self.favorites_sidebar = FavoritesSidebar()
         self.favorites_sidebar.favorite_selected.connect(self.on_favorite_selected)
         self.favorites_sidebar.favorites_changed.connect(self.on_favorites_changed)
-        self.splitter.addWidget(self.favorites_sidebar)
         
-        # Center panel - File management
-        center_panel = self.create_file_panel()
-        self.splitter.addWidget(center_panel)
+        # Set size policy to prevent favorites from taking too much space
+        from PyQt6.QtWidgets import QSizePolicy
+        self.favorites_sidebar.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        
+        # Connect to favorites changed to handle visibility
+        self.favorites_sidebar.favorites_changed.connect(self.on_favorites_visibility_changed)
+        
+        main_layout.addWidget(self.favorites_sidebar)
+        
+        # Right section - Vertical layout for everything else
+        right_section = QWidget()
+        right_layout = QVBoxLayout(right_section)
+        
+        # Top section - Audio Preview and Settings
+        top_layout = QHBoxLayout()
+        
+        # Center panel - Audio Preview
+        self.audio_preview_widget = AudioPreviewWidget()
+        self.audio_preview_widget.preview_closed.connect(self.on_preview_closed)
+        top_layout.addWidget(self.audio_preview_widget)
         
         # Right panel - Settings and controls
         self.right_panel = self.create_control_panel()
-        self.splitter.addWidget(self.right_panel)
+        top_layout.addWidget(self.right_panel)
         
-        # Set splitter proportions
-        self.splitter.setSizes([200, 400, 300])
+        # Add top section to right layout
+        right_layout.addLayout(top_layout)
+        
+        # Bottom section - Files to Process (full width of right section)
+        bottom_panel = self.create_file_panel()
+        right_layout.addWidget(bottom_panel)
+        
+        # Add right section to main layout
+        main_layout.addWidget(right_section)
         
         # Initially hide the right panel until files are added
         self.right_panel.hide()
-        self.splitter.setSizes([200, 400, 0])
         
     def create_menu_bar(self):
         """Create the menu bar with undo functionality"""
@@ -112,11 +131,6 @@ class MainWindow(QMainWindow):
         """Create the file management panel"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        
-        # Audio preview section (initially hidden)
-        self.audio_preview_widget = AudioPreviewWidget()
-        self.audio_preview_widget.preview_closed.connect(self.on_preview_closed)
-        layout.addWidget(self.audio_preview_widget)
         
         # Combined file section
         file_group = QGroupBox("Files to Process")
@@ -163,7 +177,10 @@ class MainWindow(QMainWindow):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         
-        # Settings group
+        # Create horizontal layout for settings and controls
+        top_layout = QHBoxLayout()
+        
+        # Left side - Settings group
         settings_group = QGroupBox("Silence Detection Settings")
         settings_layout = QVBoxLayout(settings_group)
         
@@ -174,7 +191,9 @@ class MainWindow(QMainWindow):
         self.threshold_spin.setRange(-60, 0)
         self.threshold_spin.setValue(-50)  # More forgiving for natural decay
         self.threshold_spin.setSuffix(" dB")
+        self.threshold_spin.setMaximumWidth(80)  # Limit width
         threshold_layout.addWidget(self.threshold_spin)
+        threshold_layout.addStretch()  # Push to left
         settings_layout.addLayout(threshold_layout)
         
         # Minimum silence duration
@@ -184,7 +203,9 @@ class MainWindow(QMainWindow):
         self.duration_spin.setRange(100, 10000)
         self.duration_spin.setValue(1000)  # Longer duration to avoid cutting natural decay
         self.duration_spin.setSuffix(" ms")
+        self.duration_spin.setMaximumWidth(80)  # Limit width
         duration_layout.addWidget(self.duration_spin)
+        duration_layout.addStretch()  # Push to left
         settings_layout.addLayout(duration_layout)
         
         # Padding
@@ -194,50 +215,51 @@ class MainWindow(QMainWindow):
         self.padding_spin.setRange(0, 1000)
         self.padding_spin.setValue(20)  # Reduced padding for tighter trimming
         self.padding_spin.setSuffix(" ms")
+        self.padding_spin.setMaximumWidth(80)  # Limit width
         padding_layout.addWidget(self.padding_spin)
+        padding_layout.addStretch()  # Push to left
         settings_layout.addLayout(padding_layout)
         
-        # Options
-        self.overwrite_check = QCheckBox("Overwrite original files")
+        # Options - reorganized with checkboxes on left
+        options_layout = QHBoxLayout()
+        
+        # Left side - checkboxes
+        checkbox_layout = QVBoxLayout()
+        
+        self.overwrite_check = QCheckBox("Overwrite")
         self.overwrite_check.setChecked(False)
         self.overwrite_check.toggled.connect(self.on_overwrite_changed)
-        settings_layout.addWidget(self.overwrite_check)
+        checkbox_layout.addWidget(self.overwrite_check)
         
-        # Stereo preservation option
-        self.preserve_stereo_check = QCheckBox("Preserve stereo channels (convert to mono if unchecked)")
+        self.preserve_stereo_check = QCheckBox("Preserve Stereo")
         self.preserve_stereo_check.setChecked(True)  # Default to preserving stereo
         self.preserve_stereo_check.toggled.connect(self.on_settings_changed)
-        settings_layout.addWidget(self.preserve_stereo_check)
+        checkbox_layout.addWidget(self.preserve_stereo_check)
         
-        layout.addWidget(settings_group)
+        options_layout.addLayout(checkbox_layout)
         
-        # Progress group
-        progress_group = QGroupBox("Processing")
-        progress_layout = QVBoxLayout(progress_group)
+        # Right side - descriptions
+        description_layout = QVBoxLayout()
         
-        self.progress_widget = ProcessingProgressWidget()
-        progress_layout.addWidget(self.progress_widget)
+        overwrite_desc = QLabel("Overwrite original files")
+        overwrite_desc.setStyleSheet("color: #666666; font-size: 11px;")
+        description_layout.addWidget(overwrite_desc)
         
-        # Control buttons
-        buttons_layout = QHBoxLayout()
+        stereo_desc = QLabel("Convert to mono if unchecked")
+        stereo_desc.setStyleSheet("color: #666666; font-size: 11px;")
+        description_layout.addWidget(stereo_desc)
         
-        self.process_btn = QPushButton("Process Files")
-        self.process_btn.clicked.connect(self.process_files)
-        self.process_btn.setEnabled(False)
-        buttons_layout.addWidget(self.process_btn)
+        options_layout.addLayout(description_layout)
+        options_layout.addStretch()  # Push everything to left
         
-        self.stop_btn = QPushButton("Stop")
-        self.stop_btn.clicked.connect(self.stop_processing)
-        self.stop_btn.setEnabled(False)
-        buttons_layout.addWidget(self.stop_btn)
+        settings_layout.addLayout(options_layout)
         
-        progress_layout.addLayout(buttons_layout)
-        layout.addWidget(progress_group)
+        top_layout.addWidget(settings_group)
         
-        # Add stretch to push output directory to the bottom
-        layout.addStretch()
+        # Right side - Output directory and Process button
+        right_layout = QVBoxLayout()
         
-        # Output directory group (moved to bottom)
+        # Output directory group
         output_group = QGroupBox("Output Directory")
         output_layout = QVBoxLayout(output_group)
         
@@ -261,9 +283,37 @@ class MainWindow(QMainWindow):
         """)
         self.output_dir_edit.mousePressEvent = self.on_output_dir_click
         output_layout.addWidget(self.output_dir_edit)
+        right_layout.addWidget(output_group)
         
-
-        layout.addWidget(output_group)
+        # Process button
+        self.process_btn = QPushButton("Process Files")
+        self.process_btn.clicked.connect(self.process_files)
+        self.process_btn.setEnabled(False)
+        self.process_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 10px 20px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #2ecc71;
+            }
+            QPushButton:disabled {
+                background-color: #bdc3c7;
+                color: #7f8c8d;
+            }
+        """)
+        right_layout.addWidget(self.process_btn)
+        
+        # Add right layout to top layout
+        top_layout.addLayout(right_layout)
+        
+        # Add top layout to main layout
+        layout.addLayout(top_layout)
         
         return panel
         
@@ -329,13 +379,9 @@ class MainWindow(QMainWindow):
         if has_files:
             self.right_panel.setVisible(True)
             self.right_panel.show()
-            # Force the splitter to show the right panel
-            self.splitter.setSizes([200, 400, 300])
         else:
             self.right_panel.setVisible(False)
             self.right_panel.hide()
-            # Hide the right panel by setting its size to 0
-            self.splitter.setSizes([200, 400, 0])
             
         self.update_output_directory_display()
         
@@ -372,82 +418,18 @@ class MainWindow(QMainWindow):
         if self.custom_output_directory:
             settings['custom_output_dir'] = self.custom_output_directory
         
-        # Start processing in a separate thread
-        self.processing_thread = ProcessingThread(
-            file_paths, settings, self.audio_processor
-        )
-        self.processing_thread.progress_updated.connect(
-            self.progress_widget.update_progress
-        )
-        self.processing_thread.file_processed.connect(
-            lambda file_path, success, output_path: self.progress_widget.update_file_progress(file_path, success, output_path)
-        )
-        self.processing_thread.finished.connect(self.on_processing_finished)
-        self.processing_thread.error_occurred.connect(self.on_processing_error)
+        # Create and show processing window
+        self.processing_window = ProcessingWindow(self)
+        self.processing_window.processing_finished.connect(self.on_processing_finished)
+        self.processing_window.start_processing(file_paths, settings, self.audio_processor)
         
-        # Update UI state
-        self.process_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.progress_widget.start_processing()
-        
-        # Start the thread
-        self.processing_thread.start()
-        
-    def stop_processing(self):
-        """Stop the processing thread"""
-        if self.processing_thread and self.processing_thread.isRunning():
-            self.processing_thread.stop()
-            
-    def on_processing_finished(self):
-        """Handle processing completion"""
+    def on_processing_finished(self, summary_info: Dict[str, Any]):
+        """Handle processing completion from the processing window"""
+        # Re-enable the process button
         self.process_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.progress_widget.finish_processing()
         
-        # Get summary information
-        summary_info = self.progress_widget.get_summary_info()
-        output_dir = self._get_output_directory()
-        
-        # Check if there were any failures
-        failed_files = summary_info.get('failed_files', 0) if summary_info else 0
-        total_files = summary_info.get('total_files', 0) if summary_info else 0
-        processed_files = summary_info.get('files_processed', 0) if summary_info else 0
-        
-        # Create completion message based on results
-        if failed_files == 0:
-            message = "All files have been processed successfully!\n\n"
-        elif processed_files == 0:
-            message = "Processing completed with errors.\n\n"
-        else:
-            message = f"Processing completed with {failed_files} file(s) that failed to process.\n\n"
-        
-        if summary_info:
-            message += f"📊 Processing Summary:\n"
-            message += f"Files: {processed_files}/{total_files} processed successfully\n"
-            if failed_files > 0:
-                message += f"Failed: {failed_files} file(s)\n"
-            message += f"Original: {summary_info['original_mb']:.1f} MB\n"
-            message += f"Processed: {summary_info['processed_mb']:.1f} MB\n"
-            message += f"Reduction: {summary_info['reduction_percent']:.1f}% ({summary_info['reduction_mb']:.1f} MB)\n\n"
-        
-        if output_dir:
-            message += f"📁 Output Directory:\n{output_dir}"
-        else:
-            message += "📁 Check the original file locations for processed files"
-        
-        # Use appropriate dialog type based on results
-        if failed_files == 0:
-            QMessageBox.information(
-                self,
-                "Processing Complete",
-                message
-            )
-        else:
-            QMessageBox.warning(
-                self,
-                "Processing Complete",
-                message
-            )
+        # Clean up the processing window reference
+        self.processing_window = None
         
     def _get_output_directory(self):
         """Get the output directory path"""
@@ -494,7 +476,7 @@ class MainWindow(QMainWindow):
                 return str(new_root_path)
             else:
                 # Fallback: get output path for the first file and go up to parent
-                output_path = processor.get_output_path(first_file, settings)
+                output_path = processor._get_output_path(first_file, settings)
                 if output_path:
                     from pathlib import Path
                     output_dir = Path(output_path).parent
@@ -552,7 +534,15 @@ class MainWindow(QMainWindow):
         self.change_output_directory()
         
     def preview_selected(self):
-        """Preview the selected file"""
+        """Preview the selected file or hide preview if already visible"""
+        # Check if preview is currently visible
+        if self.audio_preview_widget.isVisible():
+            # Hide the preview
+            self.audio_preview_widget.hide()
+            self.preview_btn.setText("Show Preview")
+            return
+            
+        # Show preview logic
         selected_rows = self.file_list.selectionModel().selectedRows()
         
         if not selected_rows:
@@ -589,12 +579,13 @@ class MainWindow(QMainWindow):
             'threshold': self.threshold_spin.value(),
             'min_duration': self.duration_spin.value(),
             'padding': self.padding_spin.value(),
-            'overwrite': self.overwrite_check.isChecked()
+            'overwrite': self.overwrite_check.isChecked(),
+            'preserve_stereo': self.preserve_stereo_check.isChecked()
         }
         
         # Get the output path
         custom_output_dir = self.custom_output_directory
-        output_path = self.audio_processor.get_output_path(original_file, settings, custom_output_dir)
+        output_path = self.audio_processor._get_output_path(original_file, settings, custom_output_dir)
         
         # Check if trimmed file exists
         if not os.path.exists(output_path):
@@ -644,12 +635,13 @@ class MainWindow(QMainWindow):
                         'threshold': self.threshold_spin.value(),
                         'min_duration': self.duration_spin.value(),
                         'padding': self.padding_spin.value(),
-                        'overwrite': self.overwrite_check.isChecked()
+                        'overwrite': self.overwrite_check.isChecked(),
+                        'preserve_stereo': self.preserve_stereo_check.isChecked()
                     }
                     
                     # Get the output path
                     custom_output_dir = self.custom_output_directory
-                    output_path = self.audio_processor.get_output_path(original_file, settings, custom_output_dir)
+                    output_path = self.audio_processor._get_output_path(original_file, settings, custom_output_dir)
                     
                     # Check if trimmed file exists
                     if os.path.exists(output_path):
@@ -894,17 +886,7 @@ class MainWindow(QMainWindow):
         if not self.undo_stack and hasattr(self, 'undo_action'):
             self.undo_action.setEnabled(False)
             
-    def on_processing_error(self, error_message: str):
-        """Handle processing errors"""
-        self.process_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.progress_widget.finish_processing()
-        
-        QMessageBox.critical(
-            self,
-            "Processing Error",
-            f"An error occurred during processing:\n{error_message}"
-        )
+
         
     def on_favorite_selected(self, directory: str):
         """Handle favorite directory selection"""
@@ -1006,6 +988,12 @@ class MainWindow(QMainWindow):
         """Handle favorites list changes"""
         self.favorites = favorites
         self.settings_manager.save_favorites(favorites)
+        
+    def on_favorites_visibility_changed(self, favorites: List[Dict[str, str]]):
+        """Handle favorites visibility changes"""
+        # The sidebar will automatically show/hide based on favorites count
+        # We just need to ensure the layout updates properly
+        self.update()
         
     def load_settings(self):
         """Load application settings"""
@@ -1127,14 +1115,15 @@ class ProcessingThread(QThread):
         try:
             total_files = len(self.file_paths)
             
+            # Clear output directories before processing to overwrite with new content
+            custom_output_dir = self.settings.get('custom_output_dir')
+            self.processor.clear_output_directories(self.file_paths, self.settings, custom_output_dir)
+            
             for i, file_path in enumerate(self.file_paths):
                 if self._stop_flag:
                     break
                     
                 try:
-                    # Get custom output directory from settings
-                    custom_output_dir = self.settings.get('custom_output_dir')
-                    
                     # Process the file
                     success = self.processor.process_file(
                         file_path, 
@@ -1144,7 +1133,7 @@ class ProcessingThread(QThread):
                     # Get output path for successful processing
                     output_path = ""
                     if success:
-                        output_path = self.processor.get_output_path(file_path, self.settings, custom_output_dir)
+                        output_path = self.processor._get_output_path(file_path, self.settings, custom_output_dir)
                     
                     # Emit progress signals
                     progress = int((i + 1) / total_files * 100)

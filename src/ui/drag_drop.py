@@ -8,7 +8,9 @@ from typing import List
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame
 from PyQt6.QtCore import Qt, pyqtSignal, QMimeData
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QPalette, QColor
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont
+
+from .ui_utils import UIUtils
 
 
 class DragDropWidget(QFrame):
@@ -30,17 +32,12 @@ class DragDropWidget(QFrame):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Create label
-        self.label = QLabel("Drop audio files or folders here")
+        # Create labels using UIUtils
+        self.label = UIUtils.create_styled_label("Drop audio files or folders here", 12, True)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        self.label.setStyleSheet("color: #333333;")  # Dark gray text
         
-        # Create subtitle
-        subtitle = QLabel("or click 'Add Files' / 'Add Folder' buttons")
+        subtitle = UIUtils.create_styled_label("or click 'Add Files' / 'Add Folder' buttons", 9, False, "gray")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setFont(QFont("Arial", 9))
-        subtitle.setStyleSheet("color: gray;")
         
         layout.addWidget(self.label)
         layout.addWidget(subtitle)
@@ -50,30 +47,12 @@ class DragDropWidget(QFrame):
         
     def update_style(self, is_drag_over: bool):
         """Update the widget styling based on drag state"""
+        self.setStyleSheet(UIUtils.create_drag_drop_style(is_drag_over))
+        
         if is_drag_over:
-            self.setStyleSheet("""
-                QFrame {
-                    border: 2px dashed #0078d4;
-                    background-color: #f0f8ff;
-                    border-radius: 8px;
-                }
-            """)
             self.label.setText("Drop files here to add them")
-            self.label.setStyleSheet("color: #333333;")  # Dark gray text
         else:
-            self.setStyleSheet("""
-                QFrame {
-                    border: 2px dashed #cccccc;
-                    background-color: #fafafa;
-                    border-radius: 8px;
-                }
-                QFrame:hover {
-                    border-color: #0078d4;
-                    background-color: #f0f8ff;
-                }
-            """)
             self.label.setText("Drop audio files or folders here")
-            self.label.setStyleSheet("color: #333333;")  # Dark gray text
             
     def dragEnterEvent(self, event: QDragEnterEvent):
         """Handle drag enter events"""
@@ -104,33 +83,14 @@ class DragDropWidget(QFrame):
                     
                     if path.is_file():
                         # Single file
-                        if self.is_audio_file(path):
+                        if UIUtils.is_audio_file(path):
                             file_paths.append(str(path))
                     elif path.is_dir():
                         # Directory - find all audio files
-                        audio_files = self.find_audio_files(path)
+                        audio_files = UIUtils.find_audio_files(path)
                         file_paths.extend(audio_files)
                         
             if file_paths:
                 self.files_dropped.emit(file_paths)
                 
-        event.acceptProposedAction()
-        
-    def is_audio_file(self, file_path: Path) -> bool:
-        """Check if a file is an audio file"""
-        audio_extensions = {'.wav', '.mp3', '.flac', '.aiff', '.m4a', '.ogg', '.wma', '.aac'}
-        return file_path.suffix.lower() in audio_extensions
-        
-    def find_audio_files(self, directory: Path) -> List[str]:
-        """Find all audio files in a directory recursively"""
-        audio_files = []
-        
-        try:
-            for file_path in directory.rglob("*"):
-                if file_path.is_file() and self.is_audio_file(file_path):
-                    audio_files.append(str(file_path))
-        except PermissionError:
-            # Skip directories we don't have permission to access
-            pass
-            
-        return audio_files 
+        event.acceptProposedAction() 
