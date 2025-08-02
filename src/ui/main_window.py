@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import (
     QListWidgetItem, QMessageBox, QFileDialog, QGroupBox,
     QSpinBox, QDoubleSpinBox, QCheckBox, QMenu,
     QProgressDialog, QLineEdit, QInputDialog, QMenuBar,
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QApplication
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData, QTimer
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QAction
@@ -69,20 +70,41 @@ class MainWindow(QMainWindow):
         
         # Create main layout - horizontal with favorites on left
         main_layout = QHBoxLayout(central_widget)
-        
-        # Left panel - Favorites sidebar (always on left)
+
+        # Left panel (vertical): will contain either the sidebar or the add button
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+
         self.favorites_sidebar = FavoritesSidebar()
         self.favorites_sidebar.favorite_selected.connect(self.on_favorite_selected)
         self.favorites_sidebar.favorites_changed.connect(self.on_favorites_changed)
-        
-        # Set size policy to prevent favorites from taking too much space
         from PyQt6.QtWidgets import QSizePolicy
         self.favorites_sidebar.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
-        
-        # Connect to favorites changed to handle visibility
         self.favorites_sidebar.favorites_changed.connect(self.on_favorites_visibility_changed)
-        
-        main_layout.addWidget(self.favorites_sidebar)
+
+        self.add_favorite_btn = QPushButton("+ Add Favorite")
+        self.add_favorite_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-weight: bold;
+                font-size: 16px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background-color: #2ecc71;
+            }
+        """)
+        self.add_favorite_btn.clicked.connect(self.add_favorite_from_main)
+        self.add_favorite_btn.setVisible(False)
+        left_layout.addWidget(self.favorites_sidebar)
+        left_layout.addWidget(self.add_favorite_btn)
+        left_layout.addStretch()
+        main_layout.addWidget(left_panel)
         
         # Right section - Vertical layout for everything else
         right_section = QWidget()
@@ -114,8 +136,23 @@ class MainWindow(QMainWindow):
         self.right_panel.hide()
         
     def create_menu_bar(self):
-        """Create the menu bar with undo functionality"""
+        """Create the menu bar with undo functionality and macOS shortcuts"""
         menubar = self.menuBar()
+        
+        # File menu
+        file_menu = menubar.addMenu("File")
+        
+        # Close window action (Cmd+W on macOS)
+        close_action = QAction("Close Window", self)
+        close_action.setShortcut("Ctrl+W")  # Will be Cmd+W on macOS
+        close_action.triggered.connect(self.close)
+        file_menu.addAction(close_action)
+        
+        # Quit action (Cmd+Q on macOS)
+        quit_action = QAction("Quit", self)
+        quit_action.setShortcut("Ctrl+Q")  # Will be Cmd+Q on macOS
+        quit_action.triggered.connect(QApplication.quit)
+        file_menu.addAction(quit_action)
         
         # Edit menu
         edit_menu = menubar.addMenu("Edit")
@@ -151,16 +188,9 @@ class MainWindow(QMainWindow):
         # File list buttons
         file_buttons_layout = QHBoxLayout()
         
-        self.add_files_btn = QPushButton("Add Files")
-        self.add_files_btn.clicked.connect(self.add_files)
-        file_buttons_layout.addWidget(self.add_files_btn)
-        
-        self.add_folder_btn = QPushButton("Add Folder")
-        self.add_folder_btn.clicked.connect(self.add_folder)
-        file_buttons_layout.addWidget(self.add_folder_btn)
-        
         self.clear_btn = QPushButton("Clear All")
         self.clear_btn.clicked.connect(self.clear_files)
+        self.clear_btn.setVisible(False)  # Initially hidden
         file_buttons_layout.addWidget(self.clear_btn)
         
         self.preview_btn = QPushButton("Show Preview")
@@ -317,51 +347,24 @@ class MainWindow(QMainWindow):
         
         return panel
         
-    def add_files(self):
-        """Add files via file dialog"""
-        files, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Select Audio Files",
-            "",
-            "Audio Files (*.wav *.mp3 *.flac *.aiff *.m4a *.ogg);;All Files (*)"
-        )
-        if files:
-            self.add_files_to_list(files)
-            
-    def add_folder(self):
-        """Add folder via folder dialog"""
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "Select Folder with Audio Files"
-        )
-        if folder:
-            # Find all audio files in the folder
-            audio_extensions = {'.wav', '.mp3', '.flac', '.aiff', '.m4a', '.ogg'}
-            audio_files = []
-            
-            for file_path in Path(folder).rglob("*"):
-                if file_path.suffix.lower() in audio_extensions:
-                    audio_files.append(str(file_path))
-                    
-            if audio_files:
-                self.add_files_to_list(audio_files)
-            else:
-                QMessageBox.information(self, "No Audio Files", 
-                                      "No audio files found in the selected folder.")
-                
     def add_files_to_list(self, file_paths: List[str]):
-        """Add files to the file list"""
+        """Add files to the list"""
         self.combined_file_widget.add_files(file_paths)
         self.update_process_button()
+        self.update_preview_button_state()
+        self.update_clear_button_state()
         
     def clear_files(self):
         """Clear all files from the list"""
         self.combined_file_widget.clear_files()
         self.update_process_button()
+        self.update_preview_button_state()
+        self.update_clear_button_state()
         
     def on_files_dropped(self, file_paths: List[str]):
         """Handle files dropped on the drag-drop area"""
         self.add_files_to_list(file_paths)
+        self.update_clear_button_state()
         
     def update_process_button(self):
         """Update the process button state and show/hide right panel"""
@@ -430,6 +433,9 @@ class MainWindow(QMainWindow):
         
         # Clean up the processing window reference
         self.processing_window = None
+        
+        # Update preview button state to show it after processing
+        self.update_preview_button_state()
         
     def _get_output_directory(self):
         """Get the output directory path"""
@@ -540,6 +546,7 @@ class MainWindow(QMainWindow):
             # Hide the preview
             self.audio_preview_widget.hide()
             self.preview_btn.setText("Show Preview")
+            self.update_preview_button_state()
             return
             
         # Show preview logic
@@ -604,6 +611,7 @@ class MainWindow(QMainWindow):
             self.audio_preview_widget.show()
             # Update button text
             self.preview_btn.setText("Hide Preview")
+            self.update_preview_button_state()
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -615,6 +623,7 @@ class MainWindow(QMainWindow):
         """Handle preview widget being closed"""
         # Reset the preview button text
         self.preview_btn.setText("Show Preview")
+        self.update_preview_button_state()
             
     def on_file_selection_changed(self, selected, deselected):
         """Handle file selection changes to auto-update preview"""
@@ -994,7 +1003,36 @@ class MainWindow(QMainWindow):
         # The sidebar will automatically show/hide based on favorites count
         # We just need to ensure the layout updates properly
         self.update()
+        has_favorites = bool(favorites)
+        self.favorites_sidebar.setVisible(has_favorites)
+        self.add_favorite_btn.setVisible(not has_favorites)
+
+    def add_favorite_from_main(self):
+        """Allows adding a favorite directly from the main window when the sidebar is hidden."""
+        self.favorites_sidebar.add_favorite()
+        # The on_favorites_changed signal from sidebar will handle visibility update
+
+    def update_preview_button_state(self):
+        # Enable preview button only if there are files in the list AND they have been processed
+        file_list = self.combined_file_widget.get_file_list()
+        has_files = file_list.rowCount() > 0 and not (
+            file_list.rowCount() == 1 and file_list.item(0, 0) and file_list.item(0, 0).flags() == Qt.ItemFlag.NoItemFlags
+        )
         
+        # Only show preview button if files exist AND we have processed files (check if audio preview widget is visible)
+        has_processed_files = hasattr(self, 'audio_preview_widget') and self.audio_preview_widget.isVisible()
+        
+        self.preview_btn.setVisible(has_files and has_processed_files)
+        self.preview_btn.setEnabled(has_files and has_processed_files)
+
+    def update_clear_button_state(self):
+        """Update the visibility of the Clear All button based on whether files are present"""
+        file_list = self.combined_file_widget.get_file_list()
+        has_files = file_list.rowCount() > 0 and not (
+            file_list.rowCount() == 1 and file_list.item(0, 0) and file_list.item(0, 0).flags() == Qt.ItemFlag.NoItemFlags
+        )
+        self.clear_btn.setVisible(has_files)
+
     def load_settings(self):
         """Load application settings"""
         # Load window geometry and state
@@ -1010,6 +1048,11 @@ class MainWindow(QMainWindow):
         self.favorites = self.settings_manager.load_favorites()
         self.favorites_sidebar.set_favorites(self.favorites)
         
+        # Set initial visibility for add favorite button and preview button
+        self.on_favorites_visibility_changed(self.favorites)
+        self.update_preview_button_state()
+        self.update_clear_button_state()
+
     def save_settings(self):
         """Save application settings"""
         self.settings_manager.save_window_geometry(self.saveGeometry())
@@ -1031,6 +1074,18 @@ class MainWindow(QMainWindow):
         """Handle window close event"""
         self.save_settings()
         super().closeEvent(event)
+        
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts"""
+        # Handle Cmd+W (close window) and Cmd+Q (quit app) on macOS
+        if event.key() == Qt.Key.Key_W and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            self.close()
+            event.accept()
+        elif event.key() == Qt.Key.Key_Q and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            QApplication.quit()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 class DirectoryScanThread(QThread):

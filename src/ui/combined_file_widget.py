@@ -6,11 +6,26 @@ import os
 from pathlib import Path
 from typing import List
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTableWidget, QTableWidgetItem
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTableWidget, QTableWidgetItem, QFileDialog
 from PyQt6.QtCore import Qt, pyqtSignal, QMimeData
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent
 
 from .ui_utils import UIUtils
+
+
+class ClickableTableWidget(QTableWidget):
+    """Custom table widget that handles clicks when in placeholder state"""
+    
+    directory_picker_requested = pyqtSignal()  # Signal when directory picker should be shown
+    
+    def mousePressEvent(self, event: QMouseEvent):
+        """Override mouse press event to handle clicks when in placeholder state"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Check if we're in the placeholder state (no actual files)
+            if self.rowCount() == 1 and self.item(0, 0) and self.item(0, 0).flags() == Qt.ItemFlag.NoItemFlags:
+                self.directory_picker_requested.emit()
+                return  # Don't call parent, handle the event
+        super().mousePressEvent(event)
 
 
 class CombinedFileWidget(QFrame):
@@ -32,13 +47,16 @@ class CombinedFileWidget(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         
-        # Create file table
-        self.file_list = QTableWidget()
+        # Create custom file table
+        self.file_list = ClickableTableWidget()
         self.file_list.setColumnCount(2)
         self.file_list.setHorizontalHeaderLabels(["Filename", "Path"])
         self.file_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.file_list.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
         self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        
+        # Connect the directory picker signal
+        self.file_list.directory_picker_requested.connect(self.show_directory_picker)
         
         # Set column widths
         self.file_list.setColumnWidth(0, 200)  # Filename column
@@ -50,7 +68,7 @@ class CombinedFileWidget(QFrame):
         
         # Create placeholder label
         self.placeholder_label = UIUtils.create_styled_label(
-            "Drop audio files or folders here, or click 'Add Files' / 'Add Folder' buttons", 
+            "Drop audio files or folders here, or click to select a folder", 
             9, False, "#666666"
         )
         self.placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -166,3 +184,26 @@ class CombinedFileWidget(QFrame):
     def get_file_list(self):
         """Get the file list widget for external access"""
         return self.file_list 
+
+    def show_directory_picker(self):
+        """Show a directory picker dialog"""
+        from PyQt6.QtWidgets import QApplication
+        directory = QFileDialog.getExistingDirectory(
+            QApplication.activeWindow(),
+            "Select Folder with Audio Files",
+            str(Path.home()),
+            QFileDialog.Option.ShowDirsOnly
+        )
+        
+        if directory:
+            # Find all audio files in the selected directory
+            audio_files = UIUtils.find_audio_files(Path(directory))
+            if audio_files:
+                self.files_dropped.emit(audio_files)
+            else:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    QApplication.activeWindow(),
+                    "No Audio Files Found",
+                    f"No audio files found in the selected directory:\n{directory}"
+                ) 
