@@ -1,52 +1,115 @@
 # KO Trimmer Tests
 
-This directory contains test files for the KO Trimmer application.
+This directory contains a consolidated test suite for the KO Trimmer application.
 
-## Test Files
+## Test Structure
 
-### Core Functionality Tests
-- **`test_app.py`** - Tests application startup, imports, and basic functionality
-- **`test_single_file.py`** - Tests single file processing with the audio pipeline
-- **`test_gui.py`** - Tests GUI components and basic UI functionality
+The test suite has been consolidated from 35+ individual test files into organized categories:
 
-### Feature Tests
-- **`test_cymbal.py`** - Tests cymbal crash processing with new forgiving settings
-- **`test_cymbal_compare.py`** - Compares old vs new settings for cymbal processing
-- **`test_completion_dialog.py`** - Tests the completion dialog with summary statistics
-- **`test_output_directory.py`** - Tests output directory path generation
-- **`test_output_path.py`** - Tests the new folder structure logic
+### 🔧 Core Application Tests
+- **Module Imports** - Tests all required dependencies
+- **Application Startup** - Tests application initialization
+- **FFmpeg Availability** - Checks audio processing dependencies
+
+### 🎵 Audio Processing Tests
+- **Single File Processing** - Tests audio pipeline functionality
+- **Stereo Preservation** - Tests stereo audio handling
+- **Cymbal Processing** - Tests cymbal crash processing
+
+### 🖥️ UI Component Tests
+- **Main Window Creation** - Tests main UI setup
+- **Drag Drop Widget** - Tests file drag and drop functionality
+- **Audio Preview** - Tests audio preview component
+- **Progress Widget** - Tests progress tracking
+
+### ⭐ Favorites System Tests
+- **Favorites Sidebar** - Tests favorites UI component
+- **Favorites Add/Remove** - Tests adding/removing favorites
+- **Favorites Persistence** - Tests favorites storage across sessions
+
+### 📁 Output Directory Tests
+- **Output Directory Field** - Tests output directory UI
+- **Output Directory Buttons** - Tests directory selection buttons
+
+### ⚙️ Settings and Utilities Tests
+- **Settings Manager** - Tests application settings
+- **Icon Manager** - Tests icon management utilities
 
 ## Running Tests
 
-All tests can be run from the project root directory:
-
+### Run All Tests
 ```bash
-# Test application startup
-python3 tests/test_app.py
+# From project root
+python3 tests/test_suite.py
 
-# Test single file processing
-python3 tests/test_single_file.py
-
-# Test GUI functionality
-python3 tests/test_gui.py
-
-# Test cymbal processing
-python3 tests/test_cymbal.py
-
-# Test completion dialog
-python3 tests/test_completion_dialog.py
+# Or use the test runner
+python3 tests/run_tests.py
 ```
+
+### Run Specific Test Categories
+```bash
+# Core application tests
+python3 tests/run_tests.py --category core
+
+# Audio processing tests
+python3 tests/run_tests.py --category audio
+
+# UI component tests
+python3 tests/run_tests.py --category ui
+
+# Favorites system tests
+python3 tests/run_tests.py --category favorites
+
+# Output directory tests
+python3 tests/run_tests.py --category output
+
+# Settings and utilities tests
+python3 tests/run_tests.py --category settings
+```
+
+### Available Categories
+- `core` - Core application functionality
+- `audio` - Audio processing features
+- `ui` - User interface components
+- `favorites` - Favorites system
+- `output` - Output directory functionality
+- `settings` - Settings and utilities
+- `all` - All tests (default)
+
+## Test Results
+
+The test suite provides detailed results including:
+- ✅ Pass/Fail status for each test
+- ⏱️ Test execution time
+- 📊 Success rate percentage
+- ❌ Detailed error messages for failed tests
+
+## Test Files
+
+### Current Test Files
+- **`test_suite.py`** - Comprehensive test suite with all test categories
+- **`run_tests.py`** - Command-line test runner with category selection
+- **`README.md`** - This documentation
+
+### Archived Files
+- **`archive/`** - Directory containing all old individual test files
+- **`archive_old_tests.py`** - Script to archive old test files
+
+## Migration from Old Tests
+
+The old individual test files have been archived to `tests/archive/` for reference. The new consolidated test suite covers all the functionality from the original tests but in a more organized and maintainable structure.
 
 ## Test Purposes
 
-- **Debugging**: Use these tests to isolate and debug specific functionality
-- **Feature Validation**: Verify new features work correctly before integration
+- **Debugging**: Use specific test categories to isolate issues
+- **Feature Validation**: Verify new features work correctly
 - **Regression Testing**: Ensure changes don't break existing functionality
-- **Development**: Use as examples for understanding how components work
+- **Development**: Use as examples for understanding component interactions
 
 ## Notes
 
 - All tests include proper Python path setup to import from the `src` directory
-- Tests are designed to be run independently
+- Tests are designed to be run independently or as a suite
 - Some tests require specific audio files to be present (update paths as needed)
-- Tests provide detailed output for debugging purposes 
+- Tests provide detailed output for debugging purposes
+- The test suite automatically handles Qt application setup and teardown 
