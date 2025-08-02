@@ -173,6 +173,7 @@ class ProcessingWindow(QDialog):
         )
         self.processing_thread.finished.connect(self.on_processing_finished)
         self.processing_thread.error_occurred.connect(self.on_processing_error)
+        self.processing_thread.processing_stopped.connect(self.on_processing_stopped)
         
         # Start processing
         self.processing_thread.start()
@@ -224,10 +225,46 @@ class ProcessingWindow(QDialog):
         # Enable close button
         self.close_btn.setEnabled(True)
         
+    def on_processing_stopped(self, error_message: str, failed_files: List[str]):
+        """Handle processing stopped due to critical error"""
+        self.progress_widget.finish_processing()
+        self.stop_btn.hide()  # Hide the stop button
+        
+        # Create detailed error summary
+        error_summary = {
+            'error': True,
+            'error_message': error_message,
+            'stopped_early': True,
+            'failed_files': failed_files,
+            'total_files': len(self.file_paths),
+            'files_processed': len(self.file_paths) - len(failed_files)
+        }
+        self.show_results(error_summary)
+        
+        # Enable close button
+        self.close_btn.setEnabled(True)
+        
     def show_results(self, summary_info: Dict[str, Any]):
         """Show processing results"""
         if summary_info.get('error'):
-            results_text = f"❌ Processing Error:\n{summary_info.get('error_message', 'Unknown error')}"
+            error_message = summary_info.get('error_message', 'Unknown error')
+            stopped_early = summary_info.get('stopped_early', False)
+            
+            if stopped_early:
+                results_text = f"⚠️ Processing Stopped Early\n\n"
+                results_text += f"❌ Critical Error:\n{error_message}\n\n"
+                results_text += f"📊 Summary:\n"
+                results_text += f"• Files processed: {summary_info.get('files_processed', 0)}/{summary_info.get('total_files', 0)}\n"
+                results_text += f"• Processing stopped due to critical error\n\n"
+                
+                failed_files = summary_info.get('failed_files', [])
+                if failed_files:
+                    results_text += f"❌ Failed Files:\n"
+                    for file_path in failed_files:
+                        results_text += f"• {os.path.basename(file_path)}\n"
+            else:
+                results_text = f"❌ Processing Error:\n{error_message}"
+                
             self.results_text.setStyleSheet("""
                 QTextEdit {
                     background-color: #f8d7da;

@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QCheckBox, QMenu,
     QProgressDialog, QLineEdit, QInputDialog, QMenuBar,
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QApplication, QSizePolicy
+    QApplication, QSizePolicy, QComboBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData, QTimer
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QAction
@@ -27,6 +27,7 @@ from ui.processing_window import ProcessingWindow
 from ui.welcome_dialog import WelcomeDialog
 from utils.settings_manager import SettingsManager
 from utils.icon_manager import show_information, show_warning, show_critical, set_dialog_icon, get_app_icon
+from utils.error_handler import error_handler, setup_error_handling
 
 
 class MainWindow(QMainWindow):
@@ -41,6 +42,15 @@ class MainWindow(QMainWindow):
         self.settings_manager = SettingsManager()
         self.favorites = []
         self.custom_output_directory = None  # Store custom output directory
+        
+        # Setup error handling
+        setup_error_handling()
+        error_handler.set_error_callback(self.show_error_dialog)
+        
+        # Connect error handler signals for thread-safe error display
+        error_handler.error_occurred.connect(self.show_error_dialog)
+        error_handler.warning_occurred.connect(self.show_warning_dialog)
+        
         self.init_ui()
         self.load_settings()
         self.show_welcome_if_needed()
@@ -240,7 +250,7 @@ class MainWindow(QMainWindow):
         # Options - reorganized with checkboxes on left
         options_layout = QHBoxLayout()
         
-        # Left side - checkboxes
+        # Left side - checkboxes and bitrate
         checkbox_layout = QVBoxLayout()
         
         self.overwrite_check = QCheckBox("Overwrite")
@@ -252,6 +262,19 @@ class MainWindow(QMainWindow):
         self.preserve_stereo_check.setChecked(True)  # Default to preserving stereo
         self.preserve_stereo_check.toggled.connect(self.on_settings_changed)
         checkbox_layout.addWidget(self.preserve_stereo_check)
+        
+        # Bitrate reduction option
+        bitrate_layout = QHBoxLayout()
+        bitrate_layout.addWidget(QLabel("Bitrate:"))
+        self.bitrate_combo = QComboBox()
+        self.bitrate_combo.addItems(["320", "192", "160", "128", "96", "64"])
+        self.bitrate_combo.setCurrentText("320")  # Default to no reduction
+        self.bitrate_combo.setMaximumWidth(80)
+        self.bitrate_combo.currentTextChanged.connect(self.on_bitrate_changed)
+        bitrate_layout.addWidget(self.bitrate_combo)
+        bitrate_layout.addWidget(QLabel("kbps"))
+        bitrate_layout.addWidget(QLabel("Reduce file size (lower = smaller, affects quality)"))
+        checkbox_layout.addLayout(bitrate_layout)
         
         options_layout.addLayout(checkbox_layout)
         
@@ -265,6 +288,10 @@ class MainWindow(QMainWindow):
         stereo_desc = QLabel("Convert to mono if unchecked")
         stereo_desc.setStyleSheet("color: #666666; font-size: 11px;")
         description_layout.addWidget(stereo_desc)
+        
+        bitrate_desc = QLabel("Reduce file size (lower = smaller)")
+        bitrate_desc.setStyleSheet("color: #666666; font-size: 11px;")
+        description_layout.addWidget(bitrate_desc)
         
         options_layout.addLayout(description_layout)
         options_layout.addStretch()  # Push everything to left
@@ -401,7 +428,8 @@ class MainWindow(QMainWindow):
             'min_duration': self.duration_spin.value(),
             'padding': self.padding_spin.value(),
             'overwrite': self.overwrite_check.isChecked(),
-            'preserve_stereo': self.preserve_stereo_check.isChecked()
+            'preserve_stereo': self.preserve_stereo_check.isChecked(),
+            'bitrate': int(self.bitrate_combo.currentText())
         }
         
         # Add custom output directory to settings if set
@@ -456,7 +484,8 @@ class MainWindow(QMainWindow):
                 'min_duration': self.duration_spin.value(),
                 'padding': self.padding_spin.value(),
                 'overwrite': self.overwrite_check.isChecked(),
-                'preserve_stereo': self.preserve_stereo_check.isChecked()
+                'preserve_stereo': self.preserve_stereo_check.isChecked(),
+                'bitrate': int(self.bitrate_combo.currentText())
             }
             
             # Find the root directory that was originally dragged in
@@ -494,10 +523,16 @@ class MainWindow(QMainWindow):
             
     def change_output_directory(self):
         """Change the output directory"""
+        # Get the current output directory to use as starting point
+        current_dir = self._get_output_directory()
+        if not current_dir:
+            # Fallback to home directory if no current directory
+            current_dir = str(Path.home())
+        
         new_dir = QFileDialog.getExistingDirectory(
             self,
             "Select Output Directory",
-            str(Path.home()),
+            current_dir,
             QFileDialog.Option.ShowDirsOnly
         )
         
@@ -519,6 +554,27 @@ class MainWindow(QMainWindow):
         
     def on_settings_changed(self):
         """Handle settings changes that affect output directory"""
+        self.update_output_directory_display()
+        
+    def on_bitrate_changed(self, bitrate_text: str):
+        """Handle bitrate changes and show warning if ffmpeg not available"""
+        try:
+            bitrate = int(bitrate_text)
+            if bitrate < 320:
+                # Check if ffmpeg is available for compression
+                from audio.audio_utils import AudioUtils
+                if not AudioUtils.is_ffmpeg_available():
+                    QMessageBox.warning(
+                        self,
+                        "FFmpeg Not Found",
+                        f"FFmpeg is required for {bitrate}kbps compression but was not found.\n\n"
+                        "Files will be saved at full quality (320kbps).\n\n"
+                        "To enable compression, install FFmpeg:\n"
+                        "brew install ffmpeg"
+                    )
+        except ValueError:
+            pass  # Invalid bitrate text
+        
         self.update_output_directory_display()
         
     def on_output_dir_click(self, event):
@@ -1055,6 +1111,14 @@ class MainWindow(QMainWindow):
                 
                 # Save show welcome preference
                 self.settings_manager.save_show_welcome(welcome_dialog.should_show_welcome())
+                
+    def show_error_dialog(self, title: str, message: str):
+        """Show error dialog using the icon manager"""
+        show_critical(self, title, message)
+        
+    def show_warning_dialog(self, title: str, message: str):
+        """Show warning dialog using the icon manager"""
+        show_warning(self, title, message)
         
     def closeEvent(self, event):
         """Handle window close event"""
@@ -1146,6 +1210,7 @@ class ProcessingThread(QThread):
     progress_updated = pyqtSignal(int)
     file_processed = pyqtSignal(str, bool, str)  # file_path, success, output_path
     error_occurred = pyqtSignal(str)
+    processing_stopped = pyqtSignal(str, list)  # error_message, failed_files
     
     def __init__(self, file_paths: List[str], settings: dict, processor: AudioProcessor):
         super().__init__()
@@ -1158,6 +1223,8 @@ class ProcessingThread(QThread):
         """Run the processing thread"""
         try:
             total_files = len(self.file_paths)
+            failed_files = []
+            critical_error = None
             
             # Clear output directories before processing to overwrite with new content
             custom_output_dir = self.settings.get('custom_output_dir')
@@ -1178,6 +1245,14 @@ class ProcessingThread(QThread):
                     output_path = ""
                     if success:
                         output_path = self.processor._get_output_path(file_path, self.settings, custom_output_dir)
+                    else:
+                        # Track failed files
+                        failed_files.append(file_path)
+                        
+                        # Check if this is a critical error that should stop processing
+                        if self._is_critical_error(file_path):
+                            critical_error = f"Critical error processing {file_path}. Processing stopped."
+                            break
                     
                     # Emit progress signals
                     progress = int((i + 1) / total_files * 100)
@@ -1185,11 +1260,36 @@ class ProcessingThread(QThread):
                     self.file_processed.emit(file_path, success, output_path)
                     
                 except Exception as e:
-                    self.file_processed.emit(file_path, False, "")
+                    failed_files.append(file_path)
                     print(f"Error processing {file_path}: {e}")
+                    
+                    # Check if this is a critical error
+                    if self._is_critical_error(file_path):
+                        critical_error = f"Critical error processing {file_path}: {e}. Processing stopped."
+                        break
+                    
+                    # Emit failure signal
+                    self.file_processed.emit(file_path, False, "")
+                    
+            # If we had a critical error, emit the stop signal
+            if critical_error:
+                self.processing_stopped.emit(critical_error, failed_files)
                     
         except Exception as e:
             self.error_occurred.emit(str(e))
+    
+    def _is_critical_error(self, file_path: str) -> bool:
+        """Determine if an error is critical enough to stop processing"""
+        # Critical errors include:
+        # - Audio format not supported
+        # - File corruption
+        # - Permission issues
+        # - Disk space issues
+        # - FFmpeg/compression failures
+        
+        # For now, we'll consider all errors as potentially critical
+        # This can be refined based on specific error types
+        return True
             
     def stop(self):
         """Stop the processing thread"""

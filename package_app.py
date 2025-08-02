@@ -1,102 +1,142 @@
 #!/usr/bin/env python3
 """
-Package KO Trimmer for distribution
+Simple packaging script for TrimVibe with ffmpeg
 """
 
-import subprocess
-import sys
 import os
+import sys
+import subprocess
+import shutil
 from pathlib import Path
 
-def create_dmg():
-    """Create a DMG for distribution"""
+def install_ffmpeg():
+    """Install ffmpeg using Homebrew if not available"""
     try:
-        print("📦 Creating DMG for distribution...")
-        
-        # Check if create-dmg is available
-        result = subprocess.run(["which", "create-dmg"], capture_output=True, text=True)
-        if result.returncode != 0:
-            print("⚠️  create-dmg not found. Install with: brew install create-dmg")
-            print("📋 Manual DMG creation:")
-            print("   1. Open Disk Utility")
-            print("   2. Create new disk image")
-            print("   3. Drag KO Trimmer.app to the disk image")
-            print("   4. Eject and save as .dmg")
-            return False
-        
-        # Create DMG
-        dmg_name = "KO Trimmer 1.0.0.dmg"
-        app_path = "dist/KO Trimmer.app"
-        
-        cmd = [
-            "create-dmg",
-            "--volname", "KO Trimmer",
-            "--window-pos", "200", "120",
-            "--window-size", "600", "400",
-            "--icon-size", "100",
-            "--app-drop-link", "425", "120",
-            dmg_name,
-            app_path
-        ]
-        
-        print(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        
+        result = subprocess.run(['ffmpeg', '-version'], 
+                              capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
-            print(f"✅ DMG created successfully: {dmg_name}")
+            print("✅ FFmpeg already installed")
             return True
-        else:
-            print("❌ DMG creation failed")
-            print("Error:", result.stderr)
-            return False
-            
+    except:
+        pass
+    
+    print("📦 Installing FFmpeg...")
+    try:
+        subprocess.run(['brew', 'install', 'ffmpeg'], check=True)
+        print("✅ FFmpeg installed successfully")
+        return True
+    except subprocess.CalledProcessError:
+        print("❌ Failed to install FFmpeg with Homebrew")
+        print("Please install manually: brew install ffmpeg")
+        return False
+
+def build_app():
+    """Build the application"""
+    print("🔨 Building TrimVibe application...")
+    
+    # Clean previous builds
+    for path in ['dist', 'build']:
+        if os.path.exists(path):
+            shutil.rmtree(path)
+    
+    # Build command
+    cmd = [
+        'python3', '-m', 'PyInstaller',
+        '--onefile',
+        '--windowed',
+        '--name=TrimVibe',
+        '--add-data=src/ui/images:ui/images',
+        '--hidden-import=PyQt6.QtCore',
+        '--hidden-import=PyQt6.QtGui', 
+        '--hidden-import=PyQt6.QtWidgets',
+        '--hidden-import=PyQt6.QtMultimedia',
+        '--hidden-import=pydub',
+        '--hidden-import=librosa',
+        '--hidden-import=soundfile',
+        '--hidden-import=numpy',
+        '--hidden-import=scipy',
+        '--collect-all=src',
+        'src/main.py'
+    ]
+    
+    try:
+        subprocess.run(cmd, check=True)
+        print("✅ Build successful!")
+        print("📱 App location: dist/TrimVibe")
+        
+        # Copy ffmpeg to dist directory if available
+        ffmpeg_path = shutil.which('ffmpeg')
+        if ffmpeg_path:
+            dist_path = Path('dist')
+            if dist_path.exists():
+                shutil.copy2(ffmpeg_path, dist_path / 'ffmpeg')
+                print("✅ FFmpeg copied to dist directory")
+        
+        return True
+        
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Build failed: {e}")
+        return False
+
+def create_dmg():
+    """Create a DMG installer (macOS only)"""
+    if sys.platform != 'darwin':
+        print("⚠️  DMG creation only available on macOS")
+        return False
+    
+    try:
+        import dmgbuild
+    except ImportError:
+        print("📦 Installing dmgbuild...")
+        subprocess.run([sys.executable, '-m', 'pip', 'install', 'dmgbuild'])
+    
+    print("📦 Creating DMG installer...")
+    
+    # Create DMG settings
+    settings = {
+        'title': 'TrimVibe',
+        'format': 'UDBZ',
+        'size': (400, 300),
+        'files': ['dist/TrimVibe'],
+        'symlinks': {'Applications': '/Applications'},
+        'background': 'src/ui/images/Knockout.png' if os.path.exists('src/ui/images/Knockout.png') else None,
+        'icon_size': 128,
+        'icon_locations': {
+            'TrimVibe': (100, 100),
+            'Applications': (300, 100)
+        }
+    }
+    
+    try:
+        dmgbuild.build_dmg('TrimVibe.dmg', 'TrimVibe', settings)
+        print("✅ DMG created: TrimVibe.dmg")
+        return True
     except Exception as e:
-        print(f"❌ Error creating DMG: {e}")
+        print(f"❌ DMG creation failed: {e}")
         return False
 
 def main():
-    """Package the app for distribution"""
-    
-    print("🚀 KO Trimmer Distribution Package")
+    print("🚀 TrimVibe Packaging Script")
     print("=" * 40)
     
-    # Check if app exists
-    app_path = Path("dist/KO Trimmer.app")
-    if not app_path.exists():
-        print("❌ App not found. Run build_app.py first.")
-        return 1
+    # Check/install ffmpeg
+    if not install_ffmpeg():
+        print("⚠️  Continuing without FFmpeg - bitrate compression will not work")
     
-    print("✅ App found: dist/KO Trimmer.app")
-    
-    # Show app info
-    print("\n📱 App Information:")
-    print(f"   Name: KO Trimmer")
-    print(f"   Version: 1.0.0")
-    print(f"   Bundle ID: com.kotrimmer.app")
-    print(f"   Size: {app_path.stat().st_size / (1024*1024):.1f} MB")
-    
-    # Show distribution options
-    print("\n📦 Distribution Options:")
-    print("1. Direct app bundle: dist/KO Trimmer.app")
-    print("2. Create DMG for easy distribution")
-    
-    choice = input("\nCreate DMG? (y/n): ").lower().strip()
-    
-    if choice in ['y', 'yes']:
-        if create_dmg():
-            print("\n🎉 Distribution package ready!")
-            print("📁 Files created:")
-            print("   - dist/KO Trimmer.app (App bundle)")
-            print("   - KO Trimmer 1.0.0.dmg (Distribution package)")
-        else:
-            print("\n📋 Manual distribution:")
-            print("   - Share the app bundle directly")
-            print("   - Or create DMG manually using Disk Utility")
+    # Build the app
+    if build_app():
+        print("\n🎉 Build completed successfully!")
+        print("📁 Files created:")
+        print("   - dist/TrimVibe (executable)")
+        if os.path.exists('dist/ffmpeg'):
+            print("   - dist/ffmpeg (bundled)")
+        
+        # Create DMG if requested
+        if len(sys.argv) > 1 and sys.argv[1] == '--dmg':
+            create_dmg()
     else:
-        print("\n✅ App bundle ready for distribution!")
-        print("📁 Location: dist/KO Trimmer.app")
-    
-    return 0
+        print("\n❌ Build failed!")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    main() 

@@ -4,6 +4,10 @@ KO Trimmer - Audio Silence Trimmer for KO II Sampler
 Main application entry point
 """
 
+# Suppress pydub ffmpeg warning at startup - MUST be before any other imports
+import warnings
+warnings.filterwarnings("ignore", message="Couldn't find ffmpeg or avconv")
+
 import sys
 import os
 from pathlib import Path

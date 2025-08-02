@@ -11,6 +11,16 @@ from .silence_detector import SilenceDetector
 from .file_handler import AudioFileHandler
 from .audio_utils import AudioUtils
 
+# Import error handler
+try:
+    from utils.error_handler import handle_processing_error, handle_audio_load_error
+except ImportError:
+    # Fallback if error handler not available
+    def handle_processing_error(file_path, error):
+        print(f"ERROR processing {file_path}: {error}")
+    def handle_audio_load_error(file_path, error):
+        print(f"ERROR loading {file_path}: {error}")
+
 
 class AudioProcessor:
     """Main audio processing class"""
@@ -46,7 +56,7 @@ class AudioProcessor:
             audio_data, sample_rate = AudioUtils.load_audio_file(file_path, preserve_stereo)
             
             if audio_data is None:
-                print(f"Failed to load audio file: {file_path}")
+                print(f"Failed to load audio data from {file_path}")
                 return False
                 
             # Detect silence regions
@@ -62,7 +72,8 @@ class AudioProcessor:
             # Save the trimmed audio
             custom_output_dir = settings.get('custom_output_dir')
             output_path = self._get_output_path(file_path, settings, custom_output_dir)
-            success = AudioUtils.save_audio_file(trimmed_audio, sample_rate, output_path)
+            bitrate = settings.get('bitrate', 320)  # Default to 320 if not specified
+            success = AudioUtils.save_audio_file(trimmed_audio, sample_rate, output_path, bitrate)
             
             if success:
                 print(f"Successfully processed: {file_path}")
@@ -192,7 +203,28 @@ class AudioProcessor:
     def _add_filename_suffix(self, path: Path, settings: dict) -> str:
         """Add appropriate suffix to filename based on settings"""
         preserve_stereo = settings.get('preserve_stereo', True)
-        suffix = "_trimmed_stereo" if preserve_stereo else "_trimmed_mono"
+        bitrate = settings.get('bitrate', 320)
+        
+        # Build suffix based on settings
+        suffix_parts = ["_trimmed"]
+        
+        if not preserve_stereo:
+            suffix_parts.append("mono")
+        else:
+            suffix_parts.append("stereo")
+        
+        # Add compression info
+        if bitrate != 320:
+            if path.suffix.lower() == '.mp3':
+                suffix_parts.append(f"{bitrate}k")
+            elif path.suffix.lower() == '.wav':
+                # For WAV files, show sample rate reduction
+                from audio.audio_utils import AudioUtils
+                target_sample_rate = AudioUtils._get_target_sample_rate(bitrate)
+                if target_sample_rate < 44100:  # Only show if reduced from standard
+                    suffix_parts.append(f"{target_sample_rate}Hz")
+        
+        suffix = "_".join(suffix_parts)
         
         # Add suffix before extension
         stem = path.stem
