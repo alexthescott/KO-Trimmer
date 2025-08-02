@@ -9,7 +9,7 @@ from typing import List, Optional, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QListWidget, QListWidgetItem, QFileDialog, QMessageBox,
-    QGroupBox, QMenu, QInputDialog
+    QGroupBox, QMenu, QInputDialog, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
@@ -33,35 +33,18 @@ class FavoritesSidebar(QWidget):
         """Initialize the favorites sidebar UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
         
-        # Set maximum width for the sidebar
+        # Set maximum width for the sidebar and make it expand vertically
         self.setMaximumWidth(250)
         self.setMinimumWidth(200)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         
         # Header
         header_layout = QHBoxLayout()
         
-        title = UIUtils.create_styled_label("Favorites", 14, True, "#2c3e50")
+        title = UIUtils.create_styled_label("Favorites", 14, True, "#ffffff")
         header_layout.addWidget(title)
-        
-        # Add button
-        self.add_btn = QPushButton("+")
-        self.add_btn.setMaximumSize(24, 24)
-        self.add_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border: none;
-                border-radius: 12px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                background-color: #2ecc71;
-            }
-        """)
-        self.add_btn.clicked.connect(self.add_favorite)
-        header_layout.addWidget(self.add_btn)
         
         layout.addLayout(header_layout)
         
@@ -70,6 +53,8 @@ class FavoritesSidebar(QWidget):
         self.favorites_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.favorites_list.customContextMenuRequested.connect(self.show_context_menu)
         self.favorites_list.itemDoubleClicked.connect(self.on_favorite_double_clicked)
+        # Make the list widget expand to fill available space
+        self.favorites_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.favorites_list)
         
         # Empty state
@@ -81,6 +66,9 @@ class FavoritesSidebar(QWidget):
         self.empty_label.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 20px;")
         self.empty_label.setWordWrap(True)
         layout.addWidget(self.empty_label)
+        
+        # Add stretch to push content to the top and extend to bottom
+        layout.addStretch()
         
         # Initially hide the sidebar when no favorites
         self.hide()

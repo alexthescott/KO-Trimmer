@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QCheckBox, QMenu,
     QProgressDialog, QLineEdit, QInputDialog, QMenuBar,
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QApplication
+    QApplication, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData, QTimer
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QAction
@@ -71,39 +71,21 @@ class MainWindow(QMainWindow):
         # Create main layout - horizontal with favorites on left
         main_layout = QHBoxLayout(central_widget)
 
-        # Left panel (vertical): will contain either the sidebar or the add button
+        # Create left panel for favorites sidebar
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
-
+        
+        # Initialize favorites sidebar
         self.favorites_sidebar = FavoritesSidebar()
         self.favorites_sidebar.favorite_selected.connect(self.on_favorite_selected)
         self.favorites_sidebar.favorites_changed.connect(self.on_favorites_changed)
-        from PyQt6.QtWidgets import QSizePolicy
         self.favorites_sidebar.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
         self.favorites_sidebar.favorites_changed.connect(self.on_favorites_visibility_changed)
-
-        self.add_favorite_btn = QPushButton("+ Add Favorite")
-        self.add_favorite_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border: none;
-                border-radius: 12px;
-                font-weight: bold;
-                font-size: 16px;
-                padding: 8px 16px;
-            }
-            QPushButton:hover {
-                background-color: #2ecc71;
-            }
-        """)
-        self.add_favorite_btn.clicked.connect(self.add_favorite_from_main)
-        self.add_favorite_btn.setVisible(False)
+        
+        # Add favorites sidebar to left panel
         left_layout.addWidget(self.favorites_sidebar)
-        left_layout.addWidget(self.add_favorite_btn)
-        left_layout.addStretch()
         main_layout.addWidget(left_panel)
         
         # Right section - Vertical layout for everything else
@@ -136,23 +118,28 @@ class MainWindow(QMainWindow):
         self.right_panel.hide()
         
     def create_menu_bar(self):
-        """Create the menu bar with undo functionality and macOS shortcuts"""
+        """Create the application menu bar"""
         menubar = self.menuBar()
         
         # File menu
         file_menu = menubar.addMenu("File")
         
-        # Close window action (Cmd+W on macOS)
-        close_action = QAction("Close Window", self)
-        close_action.setShortcut("Ctrl+W")  # Will be Cmd+W on macOS
+        # Close Window action
+        close_action = file_menu.addAction("Close Window")
+        close_action.setShortcut("Ctrl+W")  # Will show as Cmd+W on macOS
         close_action.triggered.connect(self.close)
-        file_menu.addAction(close_action)
         
-        # Quit action (Cmd+Q on macOS)
-        quit_action = QAction("Quit", self)
-        quit_action.setShortcut("Ctrl+Q")  # Will be Cmd+Q on macOS
+        # Add Favorite action
+        add_favorite_action = file_menu.addAction("Add Favorite")
+        add_favorite_action.setShortcut("Ctrl+D")  # Will show as Cmd+D on macOS
+        add_favorite_action.triggered.connect(self.add_favorite_from_main)
+        
+        file_menu.addSeparator()
+        
+        # Quit action
+        quit_action = file_menu.addAction("Quit")
+        quit_action.setShortcut("Ctrl+Q")  # Will show as Cmd+Q on macOS
         quit_action.triggered.connect(QApplication.quit)
-        file_menu.addAction(quit_action)
         
         # Edit menu
         edit_menu = menubar.addMenu("Edit")
@@ -1005,7 +992,6 @@ class MainWindow(QMainWindow):
         self.update()
         has_favorites = bool(favorites)
         self.favorites_sidebar.setVisible(has_favorites)
-        self.add_favorite_btn.setVisible(not has_favorites)
 
     def add_favorite_from_main(self):
         """Allows adding a favorite directly from the main window when the sidebar is hidden."""
@@ -1077,12 +1063,15 @@ class MainWindow(QMainWindow):
         
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
-        # Handle Cmd+W (close window) and Cmd+Q (quit app) on macOS
+        # Handle Cmd+W (close window), Cmd+Q (quit app), and Cmd+D (add favorite) on macOS
         if event.key() == Qt.Key.Key_W and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             self.close()
             event.accept()
         elif event.key() == Qt.Key.Key_Q and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             QApplication.quit()
+            event.accept()
+        elif event.key() == Qt.Key.Key_D and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            self.add_favorite_from_main()
             event.accept()
         else:
             super().keyPressEvent(event)
