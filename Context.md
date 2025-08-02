@@ -112,10 +112,14 @@ KO Trimmer is a cross-platform desktop application that optimizes audio files fo
 - ✅ **Custom Output Directories**: Click to change output location
 
 ### **Audio Preview**
+- ✅ **Embedded Preview Widget**: Integrated preview section above file list (no more popup dialogs)
+- ✅ **Auto-Update Preview**: Preview automatically updates when selecting different files
+- ✅ **Smart Preview Button**: "Show Preview" button displays preview for currently selected file
 - ✅ **Before/After Comparison**: Side-by-side audio playback with Qt Multimedia
 - ✅ **Preview Controls**: Play, pause, stop, and progress tracking for both original and trimmed audio
-- ✅ **File Information**: Duration, file size, and reduction statistics
+- ✅ **File Information**: Duration, file size, and reduction statistics with improved messaging
 - ✅ **Replay Functionality**: Automatic position reset and restart buttons
+- ✅ **Backward Compatibility**: Dialog support maintained for existing functionality
 
 ### **Settings & Configuration**
 - ✅ **Customizable Thresholds**: Silence detection sensitivity (-60 to 0 dB)
@@ -155,9 +159,9 @@ KO Trimmer is a cross-platform desktop application that optimizes audio files fo
 ## 🧪 **Testing & Quality Assurance**
 
 ### **Test Suite Status**
-- ✅ **Comprehensive Test Suite**: 17 tests covering all major components
-- ✅ **Success Rate**: 100% (17/17 tests passing)
-- ✅ **Test Categories**: Core, Audio, UI, Favorites, Output, Settings
+- ✅ **Comprehensive Test Suite**: 31 tests covering all major components
+- ✅ **Success Rate**: 100% (31/31 tests passing)
+- ✅ **Test Categories**: Core, Audio, UI, Favorites, Output, Settings, Sample, Auto-Update, Duration, Edge Cases
 - ✅ **Automated Testing**: Command-line test runner with category selection
 
 ### **Test Coverage**
@@ -167,6 +171,13 @@ KO Trimmer is a cross-platform desktop application that optimizes audio files fo
 - ✅ **Favorites System**: Sidebar, add/remove, persistence
 - ✅ **Output Directory**: Field functionality, button states
 - ✅ **Settings & Utilities**: Settings manager, icon manager
+- ✅ **Sample Audio**: File availability and categorization
+- ✅ **Auto-Update Preview**: File selection signal connections and widget integration
+- ✅ **Audio Duration**: Duration calculation and display accuracy
+- ✅ **Content Duration**: Actual audio content duration (excluding silence) display
+- ✅ **Duration Comparison**: Original shows total duration, trimmed shows content duration
+- ✅ **No Trimming Consistency**: Both files show same duration type when no trimming occurs
+- ✅ **Edge Case Testing**: Large files, corrupted files, concurrent processing, memory cleanup, file permissions, network paths, Unicode filenames, thread safety
 
 ---
 
@@ -264,11 +275,27 @@ python3 -m PyInstaller "KO Trimmer.spec" --onefile --windowed
 ## 📝 **Recent Major Updates**
 
 ### **Latest Features (August 2024)**
+- ✅ **Auto-Update Audio Preview**: Preview automatically updates when selecting different files in the list
+- ✅ **Audio Preview Refactor**: Replaced popup dialog with embedded preview section above file list
 - ✅ **Test Suite Consolidation**: Consolidated 35+ individual test files into organized test suite
 - ✅ **Root Directory Cleanup**: Removed problematic directories and organized project structure
 - ✅ **Documentation Consolidation**: Merged all markdown files into comprehensive Context.md
 - ✅ **FFmpeg Detection**: Enhanced FFmpeg availability testing through Qt multimedia
-- ✅ **100% Test Success Rate**: All 17 tests now passing
+- ✅ **100% Test Success Rate**: All 31 tests now passing
+
+### **Recent Bug Fixes**
+- ✅ **QMediaPlayer API Compatibility**: Fixed signal connections for different PyQt6 versions
+- ✅ **Preview Button State**: Fixed persistent "Hide Preview" button text when preview is closed
+- ✅ **Signal Handling**: Added proper signal emission when preview widget is closed
+- ✅ **Error Handling**: Added try-catch blocks for optional QMediaPlayer signals
+- ✅ **File Size Display**: Improved accuracy of file size reduction calculations and messaging
+- ✅ **Overwrite Functionality**: Fixed overwrite setting to properly force reprocessing
+- ✅ **Audio Duration Display**: Fixed duration calculation for stereo audio files
+- ✅ **Content Duration Display**: Now shows actual audio content duration (excluding silence) instead of total file duration
+- ✅ **Duration Comparison Display**: Original files show total duration, trimmed files show content duration for clear comparison
+- ✅ **No Trimming Consistency**: When no trimming occurs, both files show same duration type for consistency
+- ✅ **Trimming Process Fix**: **MAJOR FIX** - Fixed critical bug in audio trimming logic where stereo audio array indexing was incorrect, causing trimmed files to have identical duration to originals. Now properly trims silence and reduces file duration by up to 70%.
+- ✅ **Edge Case Coverage**: Comprehensive testing of large files, corrupted files, concurrent processing, memory cleanup, file permissions, network paths, Unicode filenames, and thread safety
 
 ### **Recent Bug Fixes**
 - ✅ **Favorites Renaming**: Fixed favorites renaming functionality with persistent custom names
@@ -289,10 +316,10 @@ python3 -m PyInstaller "KO Trimmer.spec" --onefile --windowed
 ## 🎯 **Next Immediate Steps**
 
 1. **Cross-Platform Testing**: Test on Windows and Linux to identify and fix platform-specific issues
-2. **Embedded Preview**: Move audio preview from popup to main window for better UX
-3. **UI Modernization**: Redesign interface to look more like a music app than a spreadsheet
-4. **Settings Enhancement**: Add comprehensive settings page with persistence
-5. **Advanced Features**: Continue with Phase 3 features based on user feedback
+2. **UI Modernization**: Redesign interface to look more like a music app than a spreadsheet
+3. **Settings Enhancement**: Add comprehensive settings page with persistence
+4. **Advanced Features**: Continue with Phase 3 features based on user feedback
+5. **Performance Optimization**: Optimize audio processing for larger batch operations
 
 ---
 

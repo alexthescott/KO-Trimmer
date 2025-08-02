@@ -177,7 +177,16 @@ class AudioProcessor:
         # Add padding
         padding_samples = int(settings.get('padding', 50) * 0.001 * sample_rate)  # Convert ms to samples
         start_sample = max(0, start_sample - padding_samples)
-        end_sample = min(len(audio_data), end_sample + padding_samples)
+        
+        # Get the correct length for the audio data
+        if len(audio_data.shape) == 2:
+            # Stereo audio: shape is (channels, samples)
+            audio_length = audio_data.shape[1]
+        else:
+            # Mono audio: shape is (samples,)
+            audio_length = len(audio_data)
+            
+        end_sample = min(audio_length, end_sample + padding_samples)
         
         if start_sample >= end_sample:
             return audio_data
@@ -185,7 +194,7 @@ class AudioProcessor:
         # Handle stereo audio properly
         if len(audio_data.shape) == 2:
             # Stereo audio - trim both channels
-            return audio_data[start_sample:end_sample, :]
+            return audio_data[:, start_sample:end_sample]
         else:
             # Mono audio
             return audio_data[start_sample:end_sample]
@@ -325,6 +334,10 @@ class AudioProcessor:
             bool: True if file is already processed
         """
         try:
+            # If overwrite is enabled, always process
+            if settings.get('overwrite', False):
+                return False
+            
             # Check if the input file itself is already a processed file
             file_path_obj = Path(file_path)
             filename = file_path_obj.name.lower()

@@ -21,7 +21,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QAction
 from audio.processor import AudioProcessor
 from ui.combined_file_widget import CombinedFileWidget
 from ui.progress import ProcessingProgressWidget
-from ui.audio_preview import AudioPreviewDialog
+from ui.audio_preview import AudioPreviewDialog, AudioPreviewWidget
 from ui.favorites_sidebar import FavoritesSidebar
 from ui.welcome_dialog import WelcomeDialog
 from utils.settings_manager import SettingsManager
@@ -113,6 +113,11 @@ class MainWindow(QMainWindow):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         
+        # Audio preview section (initially hidden)
+        self.audio_preview_widget = AudioPreviewWidget()
+        self.audio_preview_widget.preview_closed.connect(self.on_preview_closed)
+        layout.addWidget(self.audio_preview_widget)
+        
         # Combined file section
         file_group = QGroupBox("Files to Process")
         file_layout = QVBoxLayout(file_group)
@@ -125,6 +130,9 @@ class MainWindow(QMainWindow):
         # Get the file list from the combined widget
         self.file_list = self.combined_file_widget.get_file_list()
         self.file_list.customContextMenuRequested.connect(self.show_context_menu)
+        
+        # Connect selection change to auto-update preview
+        self.file_list.selectionModel().selectionChanged.connect(self.on_file_selection_changed)
         
         # File list buttons
         file_buttons_layout = QHBoxLayout()
@@ -141,7 +149,7 @@ class MainWindow(QMainWindow):
         self.clear_btn.clicked.connect(self.clear_files)
         file_buttons_layout.addWidget(self.clear_btn)
         
-        self.preview_btn = QPushButton("Preview Selected")
+        self.preview_btn = QPushButton("Show Preview")
         self.preview_btn.clicked.connect(self.preview_selected)
         file_buttons_layout.addWidget(self.preview_btn)
         
@@ -597,19 +605,63 @@ class MainWindow(QMainWindow):
             )
             return
             
-        # Show the preview dialog
+        # Show the embedded preview widget
         try:
-            # Create a new dialog instance each time to ensure fresh state
-            preview_dialog = AudioPreviewDialog(original_file, output_path, self)
-            preview_dialog.exec()
-            # Clean up the dialog after it's closed
-            preview_dialog.deleteLater()
+            # Load files into the preview widget
+            self.audio_preview_widget.load_files(original_file, output_path)
+            # Show the preview widget
+            self.audio_preview_widget.show()
+            # Update button text
+            self.preview_btn.setText("Hide Preview")
         except Exception as e:
             QMessageBox.critical(
                 self,
                 "Preview Error",
-                f"Error opening preview dialog:\n{str(e)}"
+                f"Error loading preview:\n{str(e)}"
             )
+            
+    def on_preview_closed(self):
+        """Handle preview widget being closed"""
+        # Reset the preview button text
+        self.preview_btn.setText("Show Preview")
+            
+    def on_file_selection_changed(self, selected, deselected):
+        """Handle file selection changes to auto-update preview"""
+        # Only update if preview is currently visible
+        if self.audio_preview_widget.isVisible():
+            # Get the currently selected file
+            selected_rows = self.file_list.selectionModel().selectedRows()
+            
+            if selected_rows:
+                # Get the selected file path
+                row = selected_rows[0].row()
+                path_item = self.file_list.item(row, 1)
+                if path_item:
+                    original_file = path_item.text()
+                    
+                    # Check if the file has been processed
+                    settings = {
+                        'threshold': self.threshold_spin.value(),
+                        'min_duration': self.duration_spin.value(),
+                        'padding': self.padding_spin.value(),
+                        'overwrite': self.overwrite_check.isChecked()
+                    }
+                    
+                    # Get the output path
+                    custom_output_dir = self.custom_output_directory
+                    output_path = self.audio_processor.get_output_path(original_file, settings, custom_output_dir)
+                    
+                    # Check if trimmed file exists
+                    if os.path.exists(output_path):
+                        try:
+                            # Update the preview with the new file
+                            self.audio_preview_widget.load_files(original_file, output_path)
+                        except Exception as e:
+                            print(f"Error updating preview: {e}")
+                    else:
+                        # Hide preview if no trimmed file exists
+                        self.audio_preview_widget.hide()
+                        self.preview_btn.setText("Show Preview")
             
     def show_context_menu(self, position):
         """Show context menu for file list"""

@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run KO Trimmer tests")
     parser.add_argument(
         "--category", "-c",
-        choices=["core", "audio", "ui", "favorites", "output", "settings", "sample", "all"],
+        choices=["core", "audio", "ui", "favorites", "output", "settings", "sample", "autoupdate", "duration", "edgecases", "reduction", "all"],
         default="all",
         help="Test category to run (default: all)"
     )
@@ -70,6 +70,26 @@ def main():
             suite.results.append(suite.run_test(suite.test_icon_manager, "Icon Manager"))
         elif args.category == "sample":
             suite.results.append(suite.run_test(suite.test_sample_audio_availability, "Sample Audio Availability"))
+        elif args.category == "autoupdate":
+            suite.results.append(suite.run_test(suite.test_auto_update_preview, "Auto-Update Preview Functionality"))
+        elif args.category == "duration":
+            suite.results.append(suite.run_test(suite.test_audio_duration_calculation, "Audio Duration Calculation"))
+            suite.results.append(suite.run_test(suite.test_content_duration_display, "Content Duration Display"))
+            suite.results.append(suite.run_test(suite.test_duration_comparison, "Duration Comparison Display"))
+            suite.results.append(suite.run_test(suite.test_no_trimming_duration, "No Trimming Duration Display"))
+        elif args.category == "edgecases":
+            suite.results.append(suite.run_test(suite.test_large_file_handling, "Large File Handling"))
+            suite.results.append(suite.run_test(suite.test_corrupted_audio_file, "Corrupted Audio File"))
+            suite.results.append(suite.run_test(suite.test_concurrent_processing, "Concurrent Processing"))
+            suite.results.append(suite.run_test(suite.test_memory_cleanup, "Memory Cleanup"))
+            suite.results.append(suite.run_test(suite.test_file_permissions, "File Permissions"))
+            suite.results.append(suite.run_test(suite.test_network_path_handling, "Network Path Handling"))
+            suite.results.append(suite.run_test(suite.test_unicode_filename_handling, "Unicode Filename Handling"))
+            suite.results.append(suite.run_test(suite.test_thread_safety, "Thread Safety"))
+        elif args.category == "reduction":
+            suite.results.append(suite.run_test(suite.test_reduction_debug, "Reduction Debug"))
+            suite.results.append(suite.run_test(suite.test_reduction_calculation, "Reduction Calculation"))
+            suite.results.append(suite.run_test(suite.test_reduction_update, "Reduction Update"))
         
         suite.print_results()
 

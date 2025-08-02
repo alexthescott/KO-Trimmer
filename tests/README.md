@@ -38,6 +38,25 @@ The test suite has been consolidated from 35+ individual test files into organiz
 ### 🎵 Sample Audio Tests
 - **Sample Audio Availability** - Tests that sample audio files are available for testing
 
+### 🔄 Auto-Update Preview Tests
+- **Auto-Update Preview Functionality** - Tests the auto-update preview feature
+
+### ⏱️ Audio Duration Tests
+- **Audio Duration Calculation** - Tests that audio duration is calculated and displayed correctly
+- **Content Duration Display** - Tests that actual audio content duration is shown (excluding silence)
+- **Duration Comparison Display** - Tests that original shows total duration and trimmed shows content duration
+- **No Trimming Duration Display** - Tests that both files show same duration type when no trimming occurs
+
+### 🔍 Edge Case Tests
+- **Large File Handling** - Tests handling of large audio files (100MB+)
+- **Corrupted Audio File** - Tests handling of corrupted or invalid audio files
+- **Concurrent Processing** - Tests that multiple processing operations don't interfere
+- **Memory Cleanup** - Tests that memory is properly cleaned up after processing
+- **File Permissions** - Tests handling of files with permission issues
+- **Network Path Handling** - Tests handling of network paths and UNC paths
+- **Unicode Filename Handling** - Tests handling of files with Unicode characters in names
+- **Thread Safety** - Tests thread safety of UI components
+
 ## Running Tests
 
 ### Run All Tests
@@ -71,6 +90,15 @@ python3 tests/run_tests.py --category settings
 
 # Sample audio tests
 python3 tests/run_tests.py --category sample
+
+# Auto-update preview tests
+python3 tests/run_tests.py --category autoupdate
+
+# Audio duration tests
+python3 tests/run_tests.py --category duration
+
+# Edge case tests
+python3 tests/run_tests.py --category edgecases
 ```
 
 ### Available Categories
@@ -81,6 +109,9 @@ python3 tests/run_tests.py --category sample
 - `output` - Output directory functionality
 - `settings` - Settings and utilities
 - `sample` - Sample audio file availability
+- `autoupdate` - Auto-update preview functionality
+- `duration` - Audio duration calculation
+- `edgecases` - Edge case and error handling tests
 - `all` - All tests (default)
 
 ## Test Results
