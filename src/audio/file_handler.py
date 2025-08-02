@@ -35,27 +35,15 @@ class AudioFileHandler:
         try:
             path = Path(file_path)
             
-            # Check if file exists
-            if not path.exists():
+            # Basic validation checks
+            if not path.exists() or not path.is_file():
                 return False
                 
-            # Check if it's a file (not directory)
-            if not path.is_file():
-                return False
-                
-            # Check file extension
-            if path.suffix.lower() not in self.supported_extensions:
-                return False
-                
-            # Check file size (must be > 0)
             if path.stat().st_size == 0:
                 return False
                 
-            # Check MIME type (be more lenient)
-            mime_type, _ = mimetypes.guess_type(file_path)
-            if mime_type and mime_type not in self.audio_mime_types:
-                # Don't fail on MIME type - just warn
-                pass
+            if path.suffix.lower() not in self.supported_extensions:
+                return False
                 
             return True
             
@@ -192,13 +180,12 @@ class AudioFileHandler:
             # Check if parent directory is writable
             parent_dir = path.parent
             if not parent_dir.exists():
-                # Try to create the directory
                 parent_dir.mkdir(parents=True, exist_ok=True)
                 
             if not parent_dir.is_dir():
                 return False
                 
-            # Check if we can write to the directory
+            # Test write permissions
             test_file = parent_dir / ".test_write"
             try:
                 test_file.touch()
@@ -206,7 +193,7 @@ class AudioFileHandler:
             except Exception:
                 return False
                 
-            # If file exists and overwrite is False, return False
+            # Check overwrite permission
             if path.exists() and not overwrite:
                 return False
                 
@@ -245,11 +232,15 @@ class AudioFileHandler:
         Returns:
             Formatted size string
         """
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        elif size_bytes < 1024 * 1024 * 1024:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
-        else:
-            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB" 
+        size_units = [
+            (1024 * 1024 * 1024, "GB"),
+            (1024 * 1024, "MB"),
+            (1024, "KB"),
+            (1, "B")
+        ]
+        
+        for unit_size, unit_name in size_units:
+            if size_bytes >= unit_size:
+                return f"{size_bytes / unit_size:.1f} {unit_name}"
+        
+        return f"{size_bytes} B" 
