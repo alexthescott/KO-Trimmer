@@ -35,6 +35,9 @@ The test suite has been consolidated from 35+ individual test files into organiz
 - **Settings Manager** - Tests application settings
 - **Icon Manager** - Tests icon management utilities
 
+### 🎵 Sample Audio Tests
+- **Sample Audio Availability** - Tests that sample audio files are available for testing
+
 ## Running Tests
 
 ### Run All Tests
@@ -65,6 +68,9 @@ python3 tests/run_tests.py --category output
 
 # Settings and utilities tests
 python3 tests/run_tests.py --category settings
+
+# Sample audio tests
+python3 tests/run_tests.py --category sample
 ```
 
 ### Available Categories
@@ -74,6 +80,7 @@ python3 tests/run_tests.py --category settings
 - `favorites` - Favorites system
 - `output` - Output directory functionality
 - `settings` - Settings and utilities
+- `sample` - Sample audio file availability
 - `all` - All tests (default)
 
 ## Test Results
@@ -110,6 +117,7 @@ The old individual test files have been archived to `tests/archive/` for referen
 
 - All tests include proper Python path setup to import from the `src` directory
 - Tests are designed to be run independently or as a suite
-- Some tests require specific audio files to be present (update paths as needed)
+- Sample audio files are included in `tests/sample_audio/` for realistic testing
+- Audio files are excluded from Git via `.gitignore` to prevent large file uploads
 - Tests provide detailed output for debugging purposes
 - The test suite automatically handles Qt application setup and teardown 

@@ -37,3 +37,12 @@ venv.bak/
 "Drop audio files or folders here*"
 "*wet loop*"
 "*audio files*"
+
+# Test audio files (large files, don't upload to GitHub)
+tests/sample_audio/
+tests/**/*.wav
+tests/**/*.mp3
+tests/**/*.flac
+tests/**/*.aiff
+tests/**/*.m4a
+tests/**/*.ogg

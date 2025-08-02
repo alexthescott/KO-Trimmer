@@ -189,8 +189,20 @@ class TestSuite:
             # Create processor
             processor = AudioProcessor()
             
-            # Test with a dummy file path (actual file not required for basic test)
-            test_file = "test_audio.wav"
+            # Test with sample audio file if available
+            sample_dir = Path(__file__).parent / "sample_audio"
+            if sample_dir.exists():
+                # Look for any audio file in the sample directory
+                audio_files = list(sample_dir.rglob("*.wav")) + list(sample_dir.rglob("*.mp3"))
+                if audio_files:
+                    test_file = str(audio_files[0])
+                    print(f"✅ Found sample audio file: {test_file}")
+                else:
+                    test_file = "test_audio.wav"
+                    print("⚠️  No sample audio files found, using dummy path")
+            else:
+                test_file = "test_audio.wav"
+                print("⚠️  Sample audio directory not found, using dummy path")
             
             # Test that processor can be initialized
             if processor is not None:
@@ -238,6 +250,26 @@ class TestSuite:
             # Test that processor has audio processing capabilities
             if hasattr(processor, 'process_file'):
                 print("✅ Audio processing capabilities available")
+                
+                # Test with actual sample audio if available
+                sample_dir = Path(__file__).parent / "sample_audio"
+                if sample_dir.exists():
+                    # Look for cymbal/hat files specifically
+                    cymbal_files = list(sample_dir.rglob("*cymbal*.wav")) + list(sample_dir.rglob("*hat*.wav"))
+                    if cymbal_files:
+                        test_file = str(cymbal_files[0])
+                        print(f"✅ Found sample cymbal file: {test_file}")
+                    else:
+                        # Fallback to any audio file
+                        audio_files = list(sample_dir.rglob("*.wav")) + list(sample_dir.rglob("*.mp3"))
+                        if audio_files:
+                            test_file = str(audio_files[0])
+                            print(f"✅ Found sample audio file: {test_file}")
+                        else:
+                            print("⚠️  No sample audio files found")
+                else:
+                    print("⚠️  Sample audio directory not found")
+                
                 return True
             else:
                 print("❌ Audio processing capabilities missing")
@@ -521,6 +553,46 @@ class TestSuite:
             print(f"❌ Icon manager test failed: {e}")
             return False
 
+    def test_sample_audio_availability(self) -> bool:
+        """Test that sample audio files are available for testing"""
+        try:
+            print("Testing sample audio availability...")
+            
+            sample_dir = Path(__file__).parent / "sample_audio"
+            
+            if not sample_dir.exists():
+                print("❌ Sample audio directory not found")
+                return False
+            
+            # Check for audio files in the sample directory
+            audio_files = list(sample_dir.rglob("*.wav")) + list(sample_dir.rglob("*.mp3"))
+            
+            if not audio_files:
+                print("❌ No audio files found in sample directory")
+                return False
+            
+            print(f"✅ Found {len(audio_files)} sample audio files")
+            
+            # Check for specific drum kit categories
+            categories = ["kicks", "snares", "hats", "cymbals", "percs", "basses", "synths"]
+            found_categories = []
+            
+            for category in categories:
+                category_files = list(sample_dir.rglob(f"*{category}*"))
+                if category_files:
+                    found_categories.append(category)
+            
+            if found_categories:
+                print(f"✅ Found drum kit categories: {', '.join(found_categories)}")
+            else:
+                print("⚠️  No specific drum kit categories found")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Sample audio availability test failed: {e}")
+            return False
+
     # ============================================================================
     # COMPREHENSIVE TEST RUNNER
     # ============================================================================
@@ -570,6 +642,11 @@ class TestSuite:
         print("-" * 30)
         self.results.append(self.run_test(self.test_settings_manager, "Settings Manager"))
         self.results.append(self.run_test(self.test_icon_manager, "Icon Manager"))
+        
+        # Sample Audio Tests
+        print("\n🎵 SAMPLE AUDIO TESTS")
+        print("-" * 30)
+        self.results.append(self.run_test(self.test_sample_audio_availability, "Sample Audio Availability"))
         
         # Print results
         self.print_results()

@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run KO Trimmer tests")
     parser.add_argument(
         "--category", "-c",
-        choices=["core", "audio", "ui", "favorites", "output", "settings", "all"],
+        choices=["core", "audio", "ui", "favorites", "output", "settings", "sample", "all"],
         default="all",
         help="Test category to run (default: all)"
     )
@@ -68,6 +68,8 @@ def main():
         elif args.category == "settings":
             suite.results.append(suite.run_test(suite.test_settings_manager, "Settings Manager"))
             suite.results.append(suite.run_test(suite.test_icon_manager, "Icon Manager"))
+        elif args.category == "sample":
+            suite.results.append(suite.run_test(suite.test_sample_audio_availability, "Sample Audio Availability"))
         
         suite.print_results()
 
