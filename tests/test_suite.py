@@ -21,6 +21,18 @@ import librosa
 import soundfile as sf
 import numpy as np
 
+# Import our modules
+from ui.main_window import MainWindow
+from ui.drag_drop import DragDropWidget
+from ui.audio_preview import AudioPreviewDialog, AudioPreviewWidget
+from ui.progress import ProcessingProgressWidget
+from ui.favorites_sidebar import FavoritesSidebar
+from audio.processor import AudioProcessor
+from audio.file_handler import AudioFileHandler
+from utils.settings_manager import SettingsManager
+from utils.icon_manager import show_information, show_warning, show_critical, set_dialog_icon, get_app_icon
+from utils.error_handler import error_handler, setup_error_handling
+
 # Test result tracking
 class TestResult:
     def __init__(self, name: str, success: bool, message: str = "", duration: float = 0):
@@ -286,8 +298,6 @@ class TestSuite:
     def test_main_window_creation(self) -> bool:
         """Test main window creation and basic UI setup"""
         try:
-            from ui.main_window import MainWindow
-            
             print("Testing main window creation...")
             
             window = MainWindow()
@@ -307,8 +317,6 @@ class TestSuite:
     def test_drag_drop_widget(self) -> bool:
         """Test drag and drop widget functionality"""
         try:
-            from ui.drag_drop import DragDropWidget
-            
             print("Testing drag drop widget...")
             
             widget = DragDropWidget()
@@ -327,8 +335,6 @@ class TestSuite:
     def test_audio_preview(self) -> bool:
         """Test audio preview functionality"""
         try:
-            from ui.audio_preview import AudioPreviewDialog, AudioPreviewWidget
-            
             print("Testing audio preview...")
             
             # Test with dummy files that have content
@@ -368,8 +374,6 @@ class TestSuite:
     def test_progress_widget(self) -> bool:
         """Test progress widget functionality"""
         try:
-            from ui.progress import ProcessingProgressWidget
-            
             print("Testing progress widget...")
             
             progress = ProcessingProgressWidget()
@@ -392,8 +396,6 @@ class TestSuite:
     def test_favorites_sidebar(self) -> bool:
         """Test favorites sidebar functionality"""
         try:
-            from ui.favorites_sidebar import FavoritesSidebar
-            
             print("Testing favorites sidebar...")
             
             sidebar = FavoritesSidebar()
@@ -444,9 +446,6 @@ class TestSuite:
     def test_favorites_persistence(self) -> bool:
         """Test favorites persistence across sessions"""
         try:
-            from ui.favorites_sidebar import FavoritesSidebar
-            from utils.settings_manager import SettingsManager
-            
             print("Testing favorites persistence...")
             
             manager = SettingsManager()
@@ -481,8 +480,6 @@ class TestSuite:
     def test_output_directory_functionality(self) -> bool:
         """Test output directory functionality"""
         try:
-            from ui.main_window import MainWindow
-            
             print("Testing output directory functionality...")
             
             window = MainWindow()
@@ -502,8 +499,6 @@ class TestSuite:
     def test_output_directory_buttons(self) -> bool:
         """Test output directory button functionality"""
         try:
-            from ui.main_window import MainWindow
-            
             print("Testing output directory buttons...")
             
             window = MainWindow()
@@ -1443,6 +1438,16 @@ class TestSuite:
                     
                     def run(self):
                         try:
+                            # Set up the path for this thread
+                            import sys
+                            import os
+                            from pathlib import Path
+                            
+                            # Add src to path if not already there
+                            src_path = str(Path(__file__).parent.parent / "src")
+                            if src_path not in sys.path:
+                                sys.path.insert(0, src_path)
+                            
                             # This should be safe
                             from ui.audio_preview import AudioPreviewWidget
                             widget = AudioPreviewWidget()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build script for TrimVibe with bundled ffmpeg
+Build script for TrimVibe using ffmpeg-python
 """
 
 import os
@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 
 def check_ffmpeg():
-    """Check if ffmpeg is available"""
+    """Check if ffmpeg is available in system PATH"""
     try:
         result = subprocess.run(['ffmpeg', '-version'], 
                               capture_output=True, text=True, timeout=5)
@@ -18,53 +18,19 @@ def check_ffmpeg():
     except:
         return False
 
-def download_ffmpeg_binary():
-    """Download ffmpeg binary for macOS"""
-    import urllib.request
-    import zipfile
-    
-    # FFmpeg static build for macOS
-    ffmpeg_url = "https://evermeet.cx/ffmpeg/getrelease/zip"
-    ffmpeg_dir = Path("ffmpeg_bundle")
-    ffmpeg_dir.mkdir(exist_ok=True)
-    
-    print("Downloading FFmpeg...")
-    zip_path = ffmpeg_dir / "ffmpeg.zip"
-    
-    try:
-        urllib.request.urlretrieve(ffmpeg_url, zip_path)
-        
-        # Extract
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(ffmpeg_dir)
-        
-        # Find the ffmpeg binary
-        for file in ffmpeg_dir.rglob("ffmpeg"):
-            if file.is_file() and os.access(file, os.X_OK):
-                return file
-        
-        print("Error: Could not find ffmpeg binary in downloaded archive")
-        return None
-        
-    except Exception as e:
-        print(f"Error downloading ffmpeg: {e}")
-        return None
-
 def build_with_pyinstaller():
     """Build the application with PyInstaller"""
     
     # Check if ffmpeg is available
-    ffmpeg_path = None
     if check_ffmpeg():
-        print("FFmpeg found in system PATH")
-        ffmpeg_path = shutil.which('ffmpeg')
+        print("✅ FFmpeg found in system PATH")
     else:
-        print("FFmpeg not found, downloading...")
-        ffmpeg_path = download_ffmpeg_binary()
-    
-    if not ffmpeg_path:
-        print("Warning: Could not find or download ffmpeg")
-        print("Building without ffmpeg - bitrate compression will not work")
+        print("⚠️  FFmpeg not found in system PATH")
+        print("   Users will need to install ffmpeg for bitrate compression")
+        print("   Installation instructions:")
+        print("   • macOS: brew install ffmpeg")
+        print("   • Windows: Download from https://ffmpeg.org/")
+        print("   • Linux: sudo apt install ffmpeg")
     
     # Create PyInstaller spec file
     spec_content = f'''# -*- mode: python ; coding: utf-8 -*-
@@ -74,7 +40,7 @@ block_cipher = None
 a = Analysis(
     ['src/main.py'],
     pathex=[],
-    binaries={[str(ffmpeg_path)] if ffmpeg_path else []},
+    binaries=[],
     datas=[],
     hiddenimports=[
         'pydub',
@@ -86,7 +52,8 @@ a = Analysis(
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.QtWidgets',
-        'PyQt6.QtMultimedia'
+        'PyQt6.QtMultimedia',
+        'ffmpeg'
     ],
     hookspath=[],
     hooksconfig={{}},

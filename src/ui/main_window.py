@@ -19,15 +19,15 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData, QTimer
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QAction
 
-from audio.processor import AudioProcessor
-from ui.combined_file_widget import CombinedFileWidget
-from ui.audio_preview import AudioPreviewDialog, AudioPreviewWidget
-from ui.favorites_sidebar import FavoritesSidebar
-from ui.processing_window import ProcessingWindow
-from ui.welcome_dialog import WelcomeDialog
-from utils.settings_manager import SettingsManager
-from utils.icon_manager import show_information, show_warning, show_critical, set_dialog_icon, get_app_icon
-from utils.error_handler import error_handler, setup_error_handling
+# AudioProcessor will be imported lazily in _deferred_init
+from .combined_file_widget import CombinedFileWidget
+from .audio_preview import AudioPreviewDialog, AudioPreviewWidget
+from .favorites_sidebar import FavoritesSidebar
+from .processing_window import ProcessingWindow
+from .welcome_dialog import WelcomeDialog
+from ..utils.settings_manager import SettingsManager
+from ..utils.icon_manager import show_information, show_warning, show_critical, set_dialog_icon, get_app_icon
+from ..utils.error_handler import error_handler, setup_error_handling
 
 
 class MainWindow(QMainWindow):
@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.audio_processor = AudioProcessor()
+        self.audio_processor = None  # Defer initialization
         self.processing_thread = None
         self.directory_scan_thread = None
         self.processing_window = None
@@ -53,6 +53,18 @@ class MainWindow(QMainWindow):
         
         self.init_ui()
         self.load_settings()
+        
+        # Defer heavy initialization until after window is shown
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, self._deferred_init)
+        
+    def _deferred_init(self):
+        """Initialize heavy components after window is shown"""
+        # Initialize audio processor
+        from ..audio.processor import AudioProcessor
+        self.audio_processor = AudioProcessor()
+        
+        # Show welcome dialog if needed
         self.show_welcome_if_needed()
         
     def init_ui(self):
@@ -263,6 +275,12 @@ class MainWindow(QMainWindow):
         self.preserve_stereo_check.toggled.connect(self.on_settings_changed)
         checkbox_layout.addWidget(self.preserve_stereo_check)
         
+        # Conversion-only mode (skip silence detection)
+        self.conversion_only_check = QCheckBox("Conversion Only (Fast)")
+        self.conversion_only_check.setChecked(False)  # Default to full processing
+        self.conversion_only_check.toggled.connect(self.on_settings_changed)
+        checkbox_layout.addWidget(self.conversion_only_check)
+        
         # Bitrate reduction option
         bitrate_layout = QHBoxLayout()
         bitrate_layout.addWidget(QLabel("Bitrate:"))
@@ -273,7 +291,6 @@ class MainWindow(QMainWindow):
         self.bitrate_combo.currentTextChanged.connect(self.on_bitrate_changed)
         bitrate_layout.addWidget(self.bitrate_combo)
         bitrate_layout.addWidget(QLabel("kbps"))
-        bitrate_layout.addWidget(QLabel("Reduce file size (lower = smaller, affects quality)"))
         checkbox_layout.addLayout(bitrate_layout)
         
         options_layout.addLayout(checkbox_layout)
@@ -288,6 +305,10 @@ class MainWindow(QMainWindow):
         stereo_desc = QLabel("Convert to mono if unchecked")
         stereo_desc.setStyleSheet("color: #666666; font-size: 11px;")
         description_layout.addWidget(stereo_desc)
+        
+        conversion_desc = QLabel("Skip silence detection (10x faster)")
+        conversion_desc.setStyleSheet("color: #666666; font-size: 11px;")
+        description_layout.addWidget(conversion_desc)
         
         bitrate_desc = QLabel("Reduce file size (lower = smaller)")
         bitrate_desc.setStyleSheet("color: #666666; font-size: 11px;")
@@ -368,6 +389,40 @@ class MainWindow(QMainWindow):
         self.update_preview_button_state()
         self.update_clear_button_state()
         
+        # Check for KO II compatibility warnings
+        self._check_ko_ii_compatibility(file_paths)
+        
+    def _check_ko_ii_compatibility(self, file_paths: List[str]):
+        """Check files for KO II compatibility and show warnings"""
+        if self.audio_processor is None:
+            return  # Can't check without processor
+            
+        incompatible_files = []
+        
+        for file_path in file_paths:
+            try:
+                compatibility_info = self.audio_processor.check_ko_ii_compatibility(file_path)
+                if not compatibility_info['compatible']:
+                    incompatible_files.append(compatibility_info)
+            except Exception as e:
+                print(f"Error checking KO II compatibility for {file_path}: {e}")
+                
+        # Show warning if any files are incompatible
+        if incompatible_files:
+            warning_message = "The following files are longer than 20 seconds and may not work properly on the KO II:\n\n"
+            for file_info in incompatible_files:
+                # Handle case where file_info might not have expected keys
+                filename = file_info.get('filename', 'Unknown file')
+                duration = file_info.get('duration_seconds', 0)
+                warning_message += f"• {filename} ({duration:.1f}s)\n"
+            warning_message += "\nThe KO II has a 20-second sample length limitation. Consider trimming these files for best compatibility."
+            
+            QMessageBox.warning(
+                self,
+                "KO II Compatibility Warning",
+                warning_message
+            )
+        
     def clear_files(self):
         """Clear all files from the list"""
         self.combined_file_widget.clear_files()
@@ -429,6 +484,7 @@ class MainWindow(QMainWindow):
             'padding': self.padding_spin.value(),
             'overwrite': self.overwrite_check.isChecked(),
             'preserve_stereo': self.preserve_stereo_check.isChecked(),
+            'conversion_only': self.conversion_only_check.isChecked(),
             'bitrate': int(self.bitrate_combo.currentText())
         }
         
@@ -436,6 +492,18 @@ class MainWindow(QMainWindow):
         if self.custom_output_directory:
             settings['custom_output_dir'] = self.custom_output_directory
         
+        # Check if audio processor is initialized
+        if self.audio_processor is None:
+            QMessageBox.information(
+                self,
+                "Initializing",
+                "Please wait a moment for the application to finish initializing."
+            )
+            return
+            
+        # Initialize the processing session with unified output structure
+        self.audio_processor.start_processing_session(file_paths, settings)
+            
         # Create and show processing window
         self.processing_window = ProcessingWindow(self)
         self.processing_window.processing_finished.connect(self.on_processing_finished)
@@ -445,6 +513,11 @@ class MainWindow(QMainWindow):
         """Handle processing completion from the processing window"""
         # Re-enable the process button
         self.process_btn.setEnabled(True)
+        
+        # Get timing statistics from the audio processor
+        if self.audio_processor:
+            timing_stats = self.audio_processor.end_processing_session()
+            print(f"🎯 Processing completed with timing: {timing_stats}")
         
         # Clean up the processing window reference
         self.processing_window = None
@@ -474,10 +547,12 @@ class MainWindow(QMainWindow):
         if not first_file_item:
             return None
         first_file = first_file_item.text()
-        try:
-            from audio.processor import AudioProcessor
-            processor = AudioProcessor()
+        
+        # Check if audio processor is initialized
+        if self.audio_processor is None:
+            return None
             
+        try:
             # Get settings
             settings = {
                 'threshold': self.threshold_spin.value(),
@@ -489,7 +564,7 @@ class MainWindow(QMainWindow):
             }
             
             # Find the root directory that was originally dragged in
-            root_dir = processor._find_root_directory(first_file)
+            root_dir = self.audio_processor._find_root_directory(first_file)
             if root_dir:
                 # Create the root trimmed directory path
                 root_name = root_dir.name
@@ -498,7 +573,7 @@ class MainWindow(QMainWindow):
                 return str(new_root_path)
             else:
                 # Fallback: get output path for the first file and go up to parent
-                output_path = processor._get_output_path(first_file, settings)
+                output_path = self.audio_processor._get_output_path(first_file, settings)
                 if output_path:
                     from pathlib import Path
                     output_dir = Path(output_path).parent
@@ -557,21 +632,11 @@ class MainWindow(QMainWindow):
         self.update_output_directory_display()
         
     def on_bitrate_changed(self, bitrate_text: str):
-        """Handle bitrate changes and show warning if ffmpeg not available"""
+        """Handle bitrate changes"""
         try:
             bitrate = int(bitrate_text)
-            if bitrate < 320:
-                # Check if ffmpeg is available for compression
-                from audio.audio_utils import AudioUtils
-                if not AudioUtils.is_ffmpeg_available():
-                    QMessageBox.warning(
-                        self,
-                        "FFmpeg Not Found",
-                        f"FFmpeg is required for {bitrate}kbps compression but was not found.\n\n"
-                        "Files will be saved at full quality (320kbps).\n\n"
-                        "To enable compression, install FFmpeg:\n"
-                        "brew install ffmpeg"
-                    )
+            # No need to check FFmpeg availability since we're using ffmpeg-python
+            # which handles FFmpeg installation automatically
         except ValueError:
             pass  # Invalid bitrate text
         
@@ -635,6 +700,13 @@ class MainWindow(QMainWindow):
         
         # Get the output path
         custom_output_dir = self.custom_output_directory
+        if self.audio_processor is None:
+            QMessageBox.information(
+                self,
+                "Initializing",
+                "Please wait a moment for the application to finish initializing."
+            )
+            return
         output_path = self.audio_processor._get_output_path(original_file, settings, custom_output_dir)
         
         # Check if trimmed file exists
@@ -693,6 +765,8 @@ class MainWindow(QMainWindow):
                     
                     # Get the output path
                     custom_output_dir = self.custom_output_directory
+                    if self.audio_processor is None:
+                        return  # Skip if not initialized yet
                     output_path = self.audio_processor._get_output_path(original_file, settings, custom_output_dir)
                     
                     # Check if trimmed file exists
@@ -1061,8 +1135,29 @@ class MainWindow(QMainWindow):
             file_list.rowCount() == 1 and file_list.item(0, 0) and file_list.item(0, 0).flags() == Qt.ItemFlag.NoItemFlags
         )
         
-        # Only show preview button if files exist AND we have processed files (check if audio preview widget is visible)
-        has_processed_files = hasattr(self, 'audio_preview_widget') and self.audio_preview_widget.isVisible()
+        # Check if files have been processed by looking for processed output files
+        has_processed_files = False
+        if has_files and self.audio_processor is not None:
+            try:
+                # Check if any processed files exist
+                for row in range(file_list.rowCount()):
+                    path_item = file_list.item(row, 1)
+                    if path_item and path_item.flags() != Qt.ItemFlag.NoItemFlags:
+                        original_file = path_item.text()
+                        settings = {
+                            'threshold': self.threshold_spin.value(),
+                            'min_duration': self.duration_spin.value(),
+                            'padding': self.padding_spin.value(),
+                            'overwrite': self.overwrite_check.isChecked(),
+                            'preserve_stereo': self.preserve_stereo_check.isChecked(),
+                            'bitrate': int(self.bitrate_combo.currentText())
+                        }
+                        output_path = self.audio_processor._get_output_path(original_file, settings, self.custom_output_directory)
+                        if os.path.exists(output_path):
+                            has_processed_files = True
+                            break
+            except Exception as e:
+                print(f"Error checking processed files: {e}")
         
         self.preview_btn.setVisible(has_files and has_processed_files)
         self.preview_btn.setEnabled(has_files and has_processed_files)
@@ -1212,7 +1307,7 @@ class ProcessingThread(QThread):
     error_occurred = pyqtSignal(str)
     processing_stopped = pyqtSignal(str, list)  # error_message, failed_files
     
-    def __init__(self, file_paths: List[str], settings: dict, processor: AudioProcessor):
+    def __init__(self, file_paths: List[str], settings: dict, processor: 'AudioProcessor'):
         super().__init__()
         self.file_paths = file_paths
         self.settings = settings

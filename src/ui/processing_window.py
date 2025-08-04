@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
 
-from utils.icon_manager import get_app_icon, set_dialog_icon
+from ..utils.icon_manager import get_app_icon, set_dialog_icon
 from .progress import ProcessingProgressWidget
 
 
@@ -246,6 +246,13 @@ class ProcessingWindow(QDialog):
         
     def show_results(self, summary_info: Dict[str, Any]):
         """Show processing results"""
+        # Handle case where summary_info is None
+        if summary_info is None:
+            summary_info = {
+                'error': True,
+                'error_message': 'Processing failed - no summary information available'
+            }
+            
         if summary_info.get('error'):
             error_message = summary_info.get('error_message', 'Unknown error')
             stopped_early = summary_info.get('stopped_early', False)

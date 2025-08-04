@@ -12,6 +12,7 @@ KO Trimmer is a modern, user-friendly audio file batch trimmer and silence detec
 - Dedicated processing window with real-time progress and results
 - Output directory management and overwrite options
 - Modern, responsive PyQt6 UI
+- Uses ffmpeg-python for audio compression (requires system ffmpeg installation)
 
 ## Project Structure
 
@@ -56,6 +57,24 @@ TrimVibe/
 │   ├── archive/ (legacy tests)
 │   └── README.md
 └── ...
+```
+
+## Requirements
+
+### FFmpeg Installation
+For MP3 compression functionality, FFmpeg must be installed on your system:
+
+**macOS:**
+```bash
+brew install ffmpeg
+```
+
+**Windows:**
+Download from [https://ffmpeg.org/](https://ffmpeg.org/)
+
+**Linux:**
+```bash
+sudo apt install ffmpeg
 ```
 
 ## Running the Application

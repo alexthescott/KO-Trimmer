@@ -8,9 +8,17 @@ This module provides audio processing functionality including:
 - Common audio utilities
 """
 
-from .processor import AudioProcessor
-from .silence_detector import SilenceDetector
-from .file_handler import AudioFileHandler
-from .audio_utils import AudioUtils
+# Lazy imports to avoid startup issues
+def get_processor():
+    from .processor import AudioProcessor
+    return AudioProcessor
 
-__all__ = ['AudioProcessor', 'SilenceDetector', 'AudioFileHandler', 'AudioUtils'] 
+def get_silence_detector():
+    from .silence_detector import SilenceDetector
+    return SilenceDetector
+
+def get_file_handler():
+    from .file_handler import AudioFileHandler
+    return AudioFileHandler
+
+__all__ = ['get_processor', 'get_silence_detector', 'get_file_handler'] 

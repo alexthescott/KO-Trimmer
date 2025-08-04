@@ -4,16 +4,12 @@ KO Trimmer - Audio Silence Trimmer for KO II Sampler
 Main application entry point
 """
 
-# Suppress pydub ffmpeg warning at startup - MUST be before any other imports
-import warnings
-warnings.filterwarnings("ignore", message="Couldn't find ffmpeg or avconv")
-
 import sys
 import os
 from pathlib import Path
 
 # Add the src directory to the Python path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
@@ -33,15 +29,12 @@ if getattr(sys, 'frozen', False):
         if src_dir.exists():
             sys.path.insert(0, str(src_dir))
 
-from ui.main_window import MainWindow
-from utils.icon_manager import get_app_icon
+from .ui.main_window import MainWindow
+from .utils.icon_manager import get_app_icon
 
 
 def main():
     """Main application entry point"""
-    import sys
-    import os
-    
     if sys.platform == "darwin":  # macOS
         # Try to set process name
         try:

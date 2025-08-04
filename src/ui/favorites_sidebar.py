@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
 
-from utils.icon_manager import show_information, show_warning
+from ..utils.icon_manager import show_information, show_warning
 from .ui_utils import UIUtils
 
 

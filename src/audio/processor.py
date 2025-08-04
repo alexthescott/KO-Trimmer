@@ -3,17 +3,21 @@ Main audio processor for silence detection and trimming
 """
 
 import os
-import numpy as np
+import time
 from pathlib import Path
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, List
 
+# Import library manager
+from .library_manager import lib_manager
+
+# Import components
 from .silence_detector import SilenceDetector
 from .file_handler import AudioFileHandler
 from .audio_utils import AudioUtils
 
 # Import error handler
 try:
-    from utils.error_handler import handle_processing_error, handle_audio_load_error
+    from ..utils.error_handler import handle_processing_error, handle_audio_load_error
 except ImportError:
     # Fallback if error handler not available
     def handle_processing_error(file_path, error):
@@ -28,6 +32,67 @@ class AudioProcessor:
     def __init__(self):
         self.silence_detector = SilenceDetector()
         self.file_handler = AudioFileHandler()
+        self.invocation_root = None  # Track the root directory at point of invocation
+        self.processed_files = []  # Track processed files for this invocation
+        
+        # Timing variables
+        self.session_start_time = None
+        self.session_end_time = None
+        self.file_start_time = None
+        self.file_end_time = None
+        self.total_files_processed = 0
+        self.total_processing_time = 0.0
+        
+    def start_processing_session(self, file_paths: List[str], settings: Dict[str, Any]):
+        """
+        Initialize a processing session with unified output structure
+        
+        Args:
+            file_paths: List of files to be processed
+            settings: Processing settings
+        """
+        try:
+            # Start timing the session
+            self.session_start_time = time.time()
+            self.total_files_processed = 0
+            self.total_processing_time = 0.0
+            
+            print(f"⏱️  Starting processing session with {len(file_paths)} files...")
+            
+            # Find the common root directory for all files
+            if file_paths:
+                # Use the first file to determine the invocation root
+                first_file = Path(file_paths[0])
+                self.invocation_root = self._find_root_directory(str(first_file))
+                
+                # If no common root found, use the directory of the first file
+                if not self.invocation_root:
+                    self.invocation_root = first_file.parent
+                    
+                # Create the unified output directory
+                if self.invocation_root:
+                    root_name = self.invocation_root.name
+                    new_root_name = f"{root_name}_trimmed"
+                    self.unified_output_dir = self.invocation_root.parent / new_root_name
+                    self.unified_output_dir.mkdir(parents=True, exist_ok=True)
+                else:
+                    # Fallback: create in the same directory as first file
+                    self.unified_output_dir = first_file.parent / "trimmed_output"
+                    self.unified_output_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                # No files provided, reset to None
+                self.invocation_root = None
+                self.unified_output_dir = None
+            
+            # Reset processed files list
+            self.processed_files = []
+            
+        except Exception as e:
+            print(f"Error initializing processing session: {e}")
+            # Fallback to standard behavior
+            self.invocation_root = None
+            self.unified_output_dir = None
+            self.processed_files = []
         
     def process_file(self, file_path: str, settings: Dict[str, Any]) -> bool:
         """
@@ -41,6 +106,9 @@ class AudioProcessor:
             bool: True if processing was successful
         """
         try:
+            # Start timing this file
+            self.file_start_time = time.time()
+            
             # Check if file is already processed
             if self.is_already_processed(file_path, settings):
                 print(f"Skipping already processed file: {file_path}")
@@ -59,15 +127,25 @@ class AudioProcessor:
                 print(f"Failed to load audio data from {file_path}")
                 return False
                 
-            # Detect silence regions
-            silence_regions = self.silence_detector.detect_silence(
-                audio_data, 
-                sample_rate, 
-                settings
-            )
+            # Note: KO II compatibility warnings are now only shown when files are first added to the list,
+            # not during processing to avoid interrupting the processing workflow
+                
+            # Check if conversion-only mode is enabled
+            conversion_only = settings.get('conversion_only', False)
             
-            # Trim audio based on silence detection
-            trimmed_audio = self._trim_audio(audio_data, silence_regions, settings, sample_rate)
+            if conversion_only:
+                # Skip silence detection and trimming - use original audio
+                trimmed_audio = audio_data
+            else:
+                # Detect silence regions
+                silence_regions = self.silence_detector.detect_silence(
+                    audio_data, 
+                    sample_rate, 
+                    settings
+                )
+                
+                # Trim audio based on silence detection
+                trimmed_audio = self._trim_audio(audio_data, silence_regions, settings, sample_rate)
             
             # Save the trimmed audio
             custom_output_dir = settings.get('custom_output_dir')
@@ -76,17 +154,146 @@ class AudioProcessor:
             success = AudioUtils.save_audio_file(trimmed_audio, sample_rate, output_path, bitrate)
             
             if success:
-                print(f"Successfully processed: {file_path}")
+                # End timing and log results
+                self.file_end_time = time.time()
+                file_processing_time = self.file_end_time - self.file_start_time
+                self.total_files_processed += 1
+                self.total_processing_time += file_processing_time
+                
+                print(f"✅ Successfully processed: {file_path} ({file_processing_time:.3f}s)")
                 return True
             else:
-                print(f"Failed to save processed file: {file_path}")
+                print(f"❌ Failed to save processed file: {file_path}")
                 return False
                 
         except Exception as e:
-            print(f"Error processing {file_path}: {e}")
+            print(f"❌ Error processing {file_path}: {e}")
             return False
             
-    def _trim_audio(self, audio_data: np.ndarray, silence_regions: list, settings: Dict[str, Any], sample_rate: int) -> np.ndarray:
+    def process_files_batch(self, file_paths: List[str], settings: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process files in batch mode without UI updates for maximum performance
+        
+        Args:
+            file_paths: List of files to process
+            settings: Processing settings
+            
+        Returns:
+            Dict with batch processing results
+        """
+        start_time = time.time()
+        total_files = len(file_paths)
+        processed_files = 0
+        failed_files = 0
+        errors = []
+        
+        print(f"🚀 Starting batch processing of {total_files} files...")
+        
+        # Initialize processing session
+        self.start_processing_session(file_paths, settings)
+        
+        # Process files in batch without individual timing
+        for i, file_path in enumerate(file_paths, 1):
+            try:
+                # Process file without individual timing
+                success = self._process_file_internal(file_path, settings)
+                
+                if success:
+                    processed_files += 1
+                    # Print progress every 10 files
+                    if i % 10 == 0 or i == total_files:
+                        elapsed = time.time() - start_time
+                        rate = i / elapsed if elapsed > 0 else 0
+                        print(f"  📊 Progress: {i}/{total_files} ({rate:.1f} files/sec)")
+                else:
+                    failed_files += 1
+                    errors.append(f"Failed to process: {file_path}")
+                    
+            except Exception as e:
+                failed_files += 1
+                errors.append(f"Error processing {file_path}: {e}")
+        
+        # End timing
+        end_time = time.time()
+        total_time = end_time - start_time
+        
+        results = {
+            'total_files': total_files,
+            'processed_files': processed_files,
+            'failed_files': failed_files,
+            'total_time': total_time,
+            'avg_time_per_file': total_time / total_files if total_files > 0 else 0,
+            'files_per_second': total_files / total_time if total_time > 0 else 0,
+            'errors': errors
+        }
+        
+        print(f"\n" + "="*60)
+        print(f"📊 BATCH PROCESSING COMPLETE")
+        print(f"="*60)
+        print(f"⏱️  Total time: {total_time:.2f} seconds")
+        print(f"📁 Files processed: {processed_files}/{total_files}")
+        print(f"📈 Average time per file: {results['avg_time_per_file']:.3f} seconds")
+        print(f"🚀 Files per second: {results['files_per_second']:.1f}")
+        print(f"="*60)
+        
+        return results
+    
+    def _process_file_internal(self, file_path: str, settings: Dict[str, Any]) -> bool:
+        """
+        Internal file processing without timing overhead
+        
+        Args:
+            file_path: Path to the audio file
+            settings: Processing settings
+            
+        Returns:
+            bool: True if processing was successful
+        """
+        try:
+            # Check if file is already processed
+            if self.is_already_processed(file_path, settings):
+                return True
+                
+            # Validate file
+            if not self.file_handler.is_valid_audio_file(file_path):
+                return False
+                
+            # Load audio file
+            preserve_stereo = settings.get('preserve_stereo', True)
+            audio_data, sample_rate = AudioUtils.load_audio_file(file_path, preserve_stereo)
+            
+            if audio_data is None:
+                return False
+                
+            # Check if conversion-only mode is enabled
+            conversion_only = settings.get('conversion_only', False)
+            
+            if conversion_only:
+                # Skip silence detection and trimming - use original audio
+                trimmed_audio = audio_data
+            else:
+                # Detect silence regions
+                silence_regions = self.silence_detector.detect_silence(
+                    audio_data, 
+                    sample_rate, 
+                    settings
+                )
+                
+                # Trim audio based on silence detection
+                trimmed_audio = self._trim_audio(audio_data, silence_regions, settings, sample_rate)
+            
+            # Save the trimmed audio
+            custom_output_dir = settings.get('custom_output_dir')
+            output_path = self._get_output_path(file_path, settings, custom_output_dir)
+            bitrate = settings.get('bitrate', 320)  # Default to 320 if not specified
+            success = AudioUtils.save_audio_file(trimmed_audio, sample_rate, output_path, bitrate)
+            
+            return success
+                
+        except Exception as e:
+            return False
+        
+    def _trim_audio(self, audio_data, silence_regions: list, settings: Dict[str, Any], sample_rate: int):
         """
         Trim audio based on silence detection
         
@@ -139,7 +346,11 @@ class AudioProcessor:
             if custom_output_dir:
                 return self._build_custom_output_path(input_path_obj, custom_output_dir, settings)
             
-            # Get the root directory that was originally dragged in
+            # Use unified output structure if available
+            if hasattr(self, 'unified_output_dir') and self.unified_output_dir:
+                return self._build_unified_output_path(input_path_obj, settings)
+            
+            # Fallback to original behavior
             root_dir = self._find_root_directory(input_path)
             
             if root_dir:
@@ -170,6 +381,44 @@ class AudioProcessor:
         output_dir.mkdir(parents=True, exist_ok=True)
         
         return self._add_filename_suffix(output_path, settings)
+    
+    def _build_unified_output_path(self, input_path_obj: Path, settings: dict) -> str:
+        """Build output path using unified output structure"""
+        try:
+            if not hasattr(self, 'unified_output_dir') or not self.unified_output_dir:
+                # Fallback to standard path
+                root_dir = self._find_root_directory(str(input_path_obj))
+                if root_dir:
+                    return self._build_standard_output_path(input_path_obj, root_dir, settings)
+                else:
+                    return self._build_fallback_output_path(input_path_obj, settings)
+            
+            # Get the relative path from the invocation root
+            if self.invocation_root:
+                try:
+                    relative_path = input_path_obj.relative_to(self.invocation_root)
+                    output_path = self.unified_output_dir / relative_path
+                except ValueError:
+                    # If file is not under the invocation root, use just the filename
+                    output_path = self.unified_output_dir / input_path_obj.name
+            else:
+                # Fallback: use just the filename
+                output_path = self.unified_output_dir / input_path_obj.name
+            
+            # Create the output directory
+            output_dir = output_path.parent
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            return self._add_filename_suffix(output_path, settings)
+            
+        except Exception as e:
+            print(f"Error building unified output path: {e}")
+            # Fallback to standard path
+            root_dir = self._find_root_directory(str(input_path_obj))
+            if root_dir:
+                return self._build_standard_output_path(input_path_obj, root_dir, settings)
+            else:
+                return self._build_fallback_output_path(input_path_obj, settings)
     
     def _build_standard_output_path(self, input_path_obj: Path, root_dir: Path, settings: dict) -> str:
         """Build output path for standard processing"""
@@ -219,7 +468,6 @@ class AudioProcessor:
                 suffix_parts.append(f"{bitrate}k")
             elif path.suffix.lower() == '.wav':
                 # For WAV files, show sample rate reduction
-                from audio.audio_utils import AudioUtils
                 target_sample_rate = AudioUtils._get_target_sample_rate(bitrate)
                 if target_sample_rate < 44100:  # Only show if reduced from standard
                     suffix_parts.append(f"{target_sample_rate}Hz")
@@ -365,9 +613,74 @@ class AudioProcessor:
                 'channels': shape_info['channels'],
                 'file_size': file_size,
                 'format': Path(file_path).suffix.lower(),
-                'is_stereo': shape_info['is_stereo']
+                'is_stereo': shape_info['is_stereo'],
+                'ko_ii_compatible': duration <= 20
             }
             
         except Exception as e:
             print(f"Error getting audio info for {file_path}: {e}")
-            return {} 
+            return {}
+            
+    def check_ko_ii_compatibility(self, file_path: str) -> Dict[str, Any]:
+        """
+        Check if a file is compatible with KO II (20-second limit)
+        
+        Args:
+            file_path: Path to the audio file
+            
+        Returns:
+            Dictionary with compatibility information
+        """
+        audio_info = self.get_audio_info(file_path)
+        if not audio_info:
+            return {'compatible': False, 'error': 'Could not read audio file'}
+            
+        duration = audio_info['duration']
+        compatible = duration <= 20
+        
+        return {
+            'compatible': compatible,
+            'duration_seconds': duration,
+            'filename': os.path.basename(file_path),
+            'warning_message': f"File '{os.path.basename(file_path)}' is {duration:.1f} seconds long. "
+                              f"The KO II has a 20-second sample length limitation." if not compatible else None
+        }
+    
+    def end_processing_session(self) -> Dict[str, Any]:
+        """
+        End the processing session and return timing statistics
+        
+        Returns:
+            Dict with timing statistics
+        """
+        if self.session_start_time is None:
+            return {
+                'total_time': 0,
+                'files_processed': 0,
+                'avg_time_per_file': 0,
+                'files_per_second': 0
+            }
+        
+        self.session_end_time = time.time()
+        total_session_time = self.session_end_time - self.session_start_time
+        
+        avg_time_per_file = self.total_processing_time / self.total_files_processed if self.total_files_processed > 0 else 0
+        files_per_second = self.total_files_processed / total_session_time if total_session_time > 0 else 0
+        
+        print(f"\n" + "="*60)
+        print(f"📊 PROCESSING SESSION COMPLETE")
+        print(f"="*60)
+        print(f"⏱️  Total session time: {total_session_time:.2f} seconds")
+        print(f"📁 Files processed: {self.total_files_processed}")
+        print(f"📈 Average time per file: {avg_time_per_file:.3f} seconds")
+        print(f"🚀 Files per second: {files_per_second:.1f}")
+        print(f"⚡ Total processing time: {self.total_processing_time:.2f} seconds")
+        print(f"="*60)
+        
+        return {
+            'total_time': total_session_time,
+            'files_processed': self.total_files_processed,
+            'avg_time_per_file': avg_time_per_file,
+            'files_per_second': files_per_second,
+            'total_processing_time': self.total_processing_time
+        } 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple packaging script for TrimVibe with ffmpeg
+Simple packaging script for TrimVibe using ffmpeg-python
 """
 
 import os
@@ -9,26 +9,24 @@ import subprocess
 import shutil
 from pathlib import Path
 
-def install_ffmpeg():
-    """Install ffmpeg using Homebrew if not available"""
+def check_ffmpeg():
+    """Check if ffmpeg is available in system PATH"""
     try:
-        result = subprocess.run(['ffmpeg', '-version'], 
+        result = subprocess.run(['ffmpeg', '-version'],
                               capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
-            print("✅ FFmpeg already installed")
+            print("✅ FFmpeg found in system PATH")
             return True
     except:
         pass
     
-    print("📦 Installing FFmpeg...")
-    try:
-        subprocess.run(['brew', 'install', 'ffmpeg'], check=True)
-        print("✅ FFmpeg installed successfully")
-        return True
-    except subprocess.CalledProcessError:
-        print("❌ Failed to install FFmpeg with Homebrew")
-        print("Please install manually: brew install ffmpeg")
-        return False
+    print("⚠️  FFmpeg not found in system PATH")
+    print("   Users will need to install ffmpeg for bitrate compression")
+    print("   Installation instructions:")
+    print("   • macOS: brew install ffmpeg")
+    print("   • Windows: Download from https://ffmpeg.org/")
+    print("   • Linux: sudo apt install ffmpeg")
+    return False
 
 def build_app():
     """Build the application"""
@@ -64,13 +62,8 @@ def build_app():
         print("✅ Build successful!")
         print("📱 App location: dist/TrimVibe")
         
-        # Copy ffmpeg to dist directory if available
-        ffmpeg_path = shutil.which('ffmpeg')
-        if ffmpeg_path:
-            dist_path = Path('dist')
-            if dist_path.exists():
-                shutil.copy2(ffmpeg_path, dist_path / 'ffmpeg')
-                print("✅ FFmpeg copied to dist directory")
+        # Check ffmpeg availability
+        check_ffmpeg()
         
         return True
         
@@ -119,17 +112,14 @@ def main():
     print("🚀 TrimVibe Packaging Script")
     print("=" * 40)
     
-    # Check/install ffmpeg
-    if not install_ffmpeg():
-        print("⚠️  Continuing without FFmpeg - bitrate compression will not work")
+    # Check ffmpeg availability
+    check_ffmpeg()
     
     # Build the app
     if build_app():
         print("\n🎉 Build completed successfully!")
         print("📁 Files created:")
         print("   - dist/TrimVibe (executable)")
-        if os.path.exists('dist/ffmpeg'):
-            print("   - dist/ffmpeg (bundled)")
         
         # Create DMG if requested
         if len(sys.argv) > 1 and sys.argv[1] == '--dmg':
