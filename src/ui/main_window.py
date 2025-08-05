@@ -312,11 +312,7 @@ class MainWindow(QMainWindow):
         self.preserve_stereo_check.toggled.connect(self.on_settings_changed)
         checkbox_layout.addWidget(self.preserve_stereo_check)
         
-        # Conversion-only mode (skip silence detection)
-        self.conversion_only_check = QCheckBox("Conversion Only (Fast)")
-        self.conversion_only_check.setChecked(False)  # Default to full processing
-        self.conversion_only_check.toggled.connect(self.on_settings_changed)
-        checkbox_layout.addWidget(self.conversion_only_check)
+
         
         # Bitrate reduction option
         bitrate_layout = QHBoxLayout()
@@ -343,9 +339,7 @@ class MainWindow(QMainWindow):
         stereo_desc.setStyleSheet("color: #666666; font-size: 11px;")
         description_layout.addWidget(stereo_desc)
         
-        conversion_desc = QLabel("Skip silence detection (10x faster)")
-        conversion_desc.setStyleSheet("color: #666666; font-size: 11px;")
-        description_layout.addWidget(conversion_desc)
+
         
         bitrate_desc = QLabel("Reduce file size (lower = smaller)")
         bitrate_desc.setStyleSheet("color: #666666; font-size: 11px;")
@@ -521,7 +515,6 @@ class MainWindow(QMainWindow):
             'padding': self.padding_spin.value(),
             'overwrite': self.overwrite_check.isChecked(),
             'preserve_stereo': self.preserve_stereo_check.isChecked(),
-            'conversion_only': self.conversion_only_check.isChecked(),
             'bitrate': int(self.bitrate_combo.currentText())
         }
         

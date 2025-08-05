@@ -140,22 +140,15 @@ class AudioProcessor:
                     'path': file_path
                 })
                 
-            # Check if conversion-only mode is enabled
-            conversion_only = settings.get('conversion_only', False)
+            # Always detect silence regions and trim
+            silence_regions = self.silence_detector.detect_silence(
+                audio_data, 
+                sample_rate, 
+                settings
+            )
             
-            if conversion_only:
-                # Skip silence detection and trimming - use original audio
-                trimmed_audio = audio_data
-            else:
-                # Detect silence regions
-                silence_regions = self.silence_detector.detect_silence(
-                    audio_data, 
-                    sample_rate, 
-                    settings
-                )
-                
-                # Trim audio based on silence detection
-                trimmed_audio = self._trim_audio(audio_data, silence_regions, settings, sample_rate)
+            # Trim audio based on silence detection
+            trimmed_audio = self._trim_audio(audio_data, silence_regions, settings, sample_rate)
             
             # Save the trimmed audio
             custom_output_dir = settings.get('custom_output_dir')
@@ -283,22 +276,15 @@ class AudioProcessor:
             if audio_data is None:
                 return False
                 
-            # Check if conversion-only mode is enabled
-            conversion_only = settings.get('conversion_only', False)
+            # Always detect silence regions and trim
+            silence_regions = self.silence_detector.detect_silence(
+                audio_data, 
+                sample_rate, 
+                settings
+            )
             
-            if conversion_only:
-                # Skip silence detection and trimming - use original audio
-                trimmed_audio = audio_data
-            else:
-                # Detect silence regions
-                silence_regions = self.silence_detector.detect_silence(
-                    audio_data, 
-                    sample_rate, 
-                    settings
-                )
-                
-                # Trim audio based on silence detection
-                trimmed_audio = self._trim_audio(audio_data, silence_regions, settings, sample_rate)
+            # Trim audio based on silence detection
+            trimmed_audio = self._trim_audio(audio_data, silence_regions, settings, sample_rate)
             
             # Save the trimmed audio
             custom_output_dir = settings.get('custom_output_dir')
