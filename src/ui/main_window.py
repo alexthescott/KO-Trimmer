@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
             
             # Defer heavy initialization until after window is shown
             from PyQt6.QtCore import QTimer
-            QTimer.singleShot(100, self._deferred_init)
+            QTimer.singleShot(0, self._deferred_init)
             
         except Exception as e:
             print(f"Error in MainWindow.__init__: {e}", file=sys.stderr)
