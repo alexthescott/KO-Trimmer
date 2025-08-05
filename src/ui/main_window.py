@@ -6,6 +6,8 @@ import os
 import time
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+import sys
+import traceback
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
@@ -20,14 +22,14 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData, QTimer
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QIcon, QAction
 
 # AudioProcessor will be imported lazily in _deferred_init
-from .combined_file_widget import CombinedFileWidget
-from .audio_preview import AudioPreviewDialog, AudioPreviewWidget
-from .favorites_sidebar import FavoritesSidebar
-from .processing_window import ProcessingWindow
-from .welcome_dialog import WelcomeDialog
-from ..utils.settings_manager import SettingsManager
-from ..utils.icon_manager import show_information, show_warning, show_critical, set_dialog_icon, get_app_icon
-from ..utils.error_handler import error_handler, setup_error_handling
+from src.ui.combined_file_widget import CombinedFileWidget
+from src.ui.audio_preview import AudioPreviewDialog, AudioPreviewWidget
+from src.ui.favorites_sidebar import FavoritesSidebar
+from src.ui.processing_window import ProcessingWindow
+from src.ui.welcome_dialog import WelcomeDialog
+from src.utils.settings_manager import SettingsManager
+from src.utils.icon_manager import show_information, show_warning, show_critical, set_dialog_icon, get_app_icon
+from src.utils.error_handler import error_handler, setup_error_handling
 
 
 class MainWindow(QMainWindow):
@@ -35,37 +37,72 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.audio_processor = None  # Defer initialization
-        self.processing_thread = None
-        self.directory_scan_thread = None
-        self.processing_window = None
-        self.settings_manager = SettingsManager()
-        self.favorites = []
-        self.custom_output_directory = None  # Store custom output directory
-        
-        # Setup error handling
-        setup_error_handling()
-        error_handler.set_error_callback(self.show_error_dialog)
-        
-        # Connect error handler signals for thread-safe error display
-        error_handler.error_occurred.connect(self.show_error_dialog)
-        error_handler.warning_occurred.connect(self.show_warning_dialog)
-        
-        self.init_ui()
-        self.load_settings()
-        
-        # Defer heavy initialization until after window is shown
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(100, self._deferred_init)
+        try:
+            self.audio_processor = None  # Defer initialization
+            self.processing_thread = None
+            self.directory_scan_thread = None
+            self.processing_window = None
+            self.settings_manager = SettingsManager()
+            self.favorites = []
+            self.custom_output_directory = None  # Store custom output directory
+            
+            # Setup error handling
+            setup_error_handling()
+            error_handler.set_error_callback(self.show_error_dialog)
+            
+            # Connect error handler signals for thread-safe error display
+            error_handler.error_occurred.connect(self.show_error_dialog)
+            error_handler.warning_occurred.connect(self.show_warning_dialog)
+            
+            self.init_ui()
+            self.load_settings()
+            
+            # Defer heavy initialization until after window is shown
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, self._deferred_init)
+            
+        except Exception as e:
+            print(f"Error in MainWindow.__init__: {e}", file=sys.stderr)
+            print(f"Traceback: {traceback.format_exc()}", file=sys.stderr)
+            # Try to show error dialog
+            try:
+                from PyQt6.QtWidgets import QMessageBox
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Icon.Critical)
+                msg.setText("Initialization Error")
+                msg.setInformativeText(f"Failed to initialize main window: {e}")
+                msg.setDetailedText(traceback.format_exc())
+                msg.setWindowTitle("KO Trimmer Error")
+                msg.exec()
+            except:
+                pass
+            raise
         
     def _deferred_init(self):
         """Initialize heavy components after window is shown"""
-        # Initialize audio processor
-        from ..audio.processor import AudioProcessor
-        self.audio_processor = AudioProcessor()
-        
-        # Show welcome dialog if needed
-        self.show_welcome_if_needed()
+        try:
+            # Initialize audio processor
+            from src.audio.processor import AudioProcessor
+            self.audio_processor = AudioProcessor()
+            
+            # Show welcome dialog if needed
+            self.show_welcome_if_needed()
+            
+        except Exception as e:
+            print(f"Error in _deferred_init: {e}", file=sys.stderr)
+            print(f"Traceback: {traceback.format_exc()}", file=sys.stderr)
+            # Show error dialog
+            try:
+                from PyQt6.QtWidgets import QMessageBox
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Icon.Critical)
+                msg.setText("Initialization Error")
+                msg.setInformativeText(f"Failed to initialize audio processor: {e}")
+                msg.setDetailedText(traceback.format_exc())
+                msg.setWindowTitle("KO Trimmer Error")
+                msg.exec()
+            except:
+                pass
         
     def init_ui(self):
         """Initialize the user interface"""
@@ -389,8 +426,8 @@ class MainWindow(QMainWindow):
         self.update_preview_button_state()
         self.update_clear_button_state()
         
-        # Check for KO II compatibility warnings
-        self._check_ko_ii_compatibility(file_paths)
+        # Note: KO II compatibility warnings are now shown during processing
+        # to avoid interrupting the file loading workflow
         
     def _check_ko_ii_compatibility(self, file_paths: List[str]):
         """Check files for KO II compatibility and show warnings"""
@@ -510,20 +547,76 @@ class MainWindow(QMainWindow):
         self.processing_window.start_processing(file_paths, settings, self.audio_processor)
         
     def on_processing_finished(self, summary_info: Dict[str, Any]):
-        """Handle processing completion from the processing window"""
-        # Re-enable the process button
-        self.process_btn.setEnabled(True)
-        
-        # Get timing statistics from the audio processor
-        if self.audio_processor:
-            timing_stats = self.audio_processor.end_processing_session()
-            print(f"🎯 Processing completed with timing: {timing_stats}")
-        
-        # Clean up the processing window reference
-        self.processing_window = None
-        
-        # Update preview button state to show it after processing
-        self.update_preview_button_state()
+        """Handle processing completion"""
+        try:
+            # End the processing session and get timing results
+            if self.audio_processor:
+                session_stats = self.audio_processor.end_processing_session()
+                
+                # Show timing results
+                total_time = session_stats.get('total_time', 0)
+                files_processed = session_stats.get('files_processed', 0)
+                avg_time = session_stats.get('avg_time_per_file', 0)
+                files_per_second = session_stats.get('files_per_second', 0)
+                
+                # Show files longer than 20 seconds popup
+                files_longer_than_20s = session_stats.get('files_longer_than_20s', [])
+                if files_longer_than_20s:
+                    warning_message = "The following files are longer than 20 seconds and may not work properly on the KO II:\n\n"
+                    for file_info in files_longer_than_20s:
+                        filename = file_info.get('filename', 'Unknown file')
+                        duration = file_info.get('duration', 0)
+                        warning_message += f"• {filename} ({duration:.1f}s)\n"
+                    warning_message += "\nThese files have been saved with an underscore prefix (_) to indicate they exceed the KO II's 20-second sample length limitation."
+                    
+                    QMessageBox.warning(
+                        self,
+                        "KO II Compatibility Warning",
+                        warning_message
+                    )
+                
+                # Show completion message with timing
+                completion_message = f"Processing complete!\n\n"
+                completion_message += f"Files processed: {files_processed}\n"
+                completion_message += f"Total time: {total_time:.2f} seconds\n"
+                completion_message += f"Average time per file: {avg_time:.3f} seconds\n"
+                completion_message += f"Processing speed: {files_per_second:.1f} files/second"
+                
+                if files_longer_than_20s:
+                    completion_message += f"\n\n⚠️  {len(files_longer_than_20s)} files longer than 20 seconds were processed with underscore prefixes."
+                
+                QMessageBox.information(
+                    self,
+                    "Processing Complete",
+                    completion_message
+                )
+                
+                # Print timing statistics
+                print(f"🎯 Processing completed with timing: {session_stats}")
+            
+            # Re-enable the process button
+            self.process_btn.setEnabled(True)
+            
+            # Clean up the processing window reference
+            self.processing_window = None
+            
+            # Update preview button state to show it after processing
+            self.update_preview_button_state()
+            
+        except Exception as e:
+            print(f"Error in on_processing_finished: {e}", file=sys.stderr)
+            print(f"Traceback: {traceback.format_exc()}", file=sys.stderr)
+            # Show error dialog
+            try:
+                QMessageBox.critical(
+                    self,
+                    "Processing Error",
+                    f"An error occurred while completing processing: {e}"
+                )
+            except:
+                pass
+            # Still re-enable the process button even if there was an error
+            self.process_btn.setEnabled(True)
         
     def _get_output_directory(self):
         """Get the output directory path"""

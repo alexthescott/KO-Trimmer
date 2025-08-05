@@ -32,7 +32,7 @@ class AudioProcessor:
     def __init__(self):
         self.silence_detector = SilenceDetector()
         self.file_handler = AudioFileHandler()
-        self.invocation_root = None  # Track the root directory at point of invocation
+        # Track the root directory at point of invocation
         self.processed_files = []  # Track processed files for this invocation
         
         # Timing variables
@@ -42,6 +42,9 @@ class AudioProcessor:
         self.file_end_time = None
         self.total_files_processed = 0
         self.total_processing_time = 0.0
+        
+        # Track files longer than 20 seconds
+        self.files_longer_than_20s = []
         
     def start_processing_session(self, file_paths: List[str], settings: Dict[str, Any]):
         """
@@ -56,6 +59,9 @@ class AudioProcessor:
             self.session_start_time = time.time()
             self.total_files_processed = 0
             self.total_processing_time = 0.0
+            
+            # Reset tracking for files longer than 20 seconds
+            self.files_longer_than_20s = []
             
             print(f"⏱️  Starting processing session with {len(file_paths)} files...")
             
@@ -79,20 +85,14 @@ class AudioProcessor:
                     # Fallback: create in the same directory as first file
                     self.unified_output_dir = first_file.parent / "trimmed_output"
                     self.unified_output_dir.mkdir(parents=True, exist_ok=True)
-            else:
-                # No files provided, reset to None
-                self.invocation_root = None
-                self.unified_output_dir = None
-            
-            # Reset processed files list
-            self.processed_files = []
-            
+                    
         except Exception as e:
-            print(f"Error initializing processing session: {e}")
-            # Fallback to standard behavior
-            self.invocation_root = None
-            self.unified_output_dir = None
-            self.processed_files = []
+            print(f"Error starting processing session: {e}")
+            # Reset to safe defaults
+            self.session_start_time = time.time()
+            self.total_files_processed = 0
+            self.total_processing_time = 0.0
+            self.files_longer_than_20s = []
         
     def process_file(self, file_path: str, settings: Dict[str, Any]) -> bool:
         """
@@ -127,8 +127,18 @@ class AudioProcessor:
                 print(f"Failed to load audio data from {file_path}")
                 return False
                 
-            # Note: KO II compatibility warnings are now only shown when files are first added to the list,
-            # not during processing to avoid interrupting the processing workflow
+            # Check for KO II compatibility (20-second limit) during processing
+            audio_info = self.get_audio_info(file_path)
+            is_longer_than_20s = False
+            if audio_info and audio_info.get('duration', 0) > 20:
+                is_longer_than_20s = True
+                print(f"⚠️  File longer than 20 seconds: {file_path} ({audio_info['duration']:.1f}s)")
+                # Track this file for the final popup
+                self.files_longer_than_20s.append({
+                    'filename': os.path.basename(file_path),
+                    'duration': audio_info['duration'],
+                    'path': file_path
+                })
                 
             # Check if conversion-only mode is enabled
             conversion_only = settings.get('conversion_only', False)
@@ -150,6 +160,14 @@ class AudioProcessor:
             # Save the trimmed audio
             custom_output_dir = settings.get('custom_output_dir')
             output_path = self._get_output_path(file_path, settings, custom_output_dir)
+            
+            # Add underscore prefix for files longer than 20 seconds
+            if is_longer_than_20s:
+                output_path_obj = Path(output_path)
+                new_filename = f"_{output_path_obj.name}"
+                output_path = str(output_path_obj.parent / new_filename)
+                print(f"📝 Added underscore prefix for long file: {output_path}")
+            
             bitrate = settings.get('bitrate', 320)  # Default to 320 if not specified
             success = AudioUtils.save_audio_file(trimmed_audio, sample_rate, output_path, bitrate)
             
@@ -285,6 +303,17 @@ class AudioProcessor:
             # Save the trimmed audio
             custom_output_dir = settings.get('custom_output_dir')
             output_path = self._get_output_path(file_path, settings, custom_output_dir)
+            
+            # Add underscore prefix for files longer than 20 seconds
+            audio_info = self.get_audio_info(file_path)
+            is_longer_than_20s = False
+            if audio_info and audio_info.get('duration', 0) > 20:
+                is_longer_than_20s = True
+                output_path_obj = Path(output_path)
+                new_filename = f"_{output_path_obj.name}"
+                output_path = str(output_path_obj.parent / new_filename)
+                print(f"📝 Added underscore prefix for long file: {output_path}")
+            
             bitrate = settings.get('bitrate', 320)  # Default to 320 if not specified
             success = AudioUtils.save_audio_file(trimmed_audio, sample_rate, output_path, bitrate)
             
@@ -651,14 +680,15 @@ class AudioProcessor:
         End the processing session and return timing statistics
         
         Returns:
-            Dict with timing statistics
+            Dict with timing statistics and files longer than 20 seconds
         """
         if self.session_start_time is None:
             return {
                 'total_time': 0,
                 'files_processed': 0,
                 'avg_time_per_file': 0,
-                'files_per_second': 0
+                'files_per_second': 0,
+                'files_longer_than_20s': []
             }
         
         self.session_end_time = time.time()
@@ -675,6 +705,13 @@ class AudioProcessor:
         print(f"📈 Average time per file: {avg_time_per_file:.3f} seconds")
         print(f"🚀 Files per second: {files_per_second:.1f}")
         print(f"⚡ Total processing time: {self.total_processing_time:.2f} seconds")
+        
+        # Report files longer than 20 seconds
+        if self.files_longer_than_20s:
+            print(f"⚠️  Files longer than 20 seconds: {len(self.files_longer_than_20s)}")
+            for file_info in self.files_longer_than_20s:
+                print(f"   • {file_info['filename']} ({file_info['duration']:.1f}s)")
+        
         print(f"="*60)
         
         return {
@@ -682,5 +719,6 @@ class AudioProcessor:
             'files_processed': self.total_files_processed,
             'avg_time_per_file': avg_time_per_file,
             'files_per_second': files_per_second,
-            'total_processing_time': self.total_processing_time
+            'total_processing_time': self.total_processing_time,
+            'files_longer_than_20s': self.files_longer_than_20s
         } 

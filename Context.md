@@ -13,85 +13,59 @@ KO Trimmer is a modern, user-friendly batch audio trimmer and silence detector f
 - Output directory management and overwrite options
 - Modern, responsive PyQt6 UI
 
+## macOS App Bundle
+The application has been successfully packaged as a native macOS app bundle (`TrimVibe.app`) with the following features:
+
+### **App Bundle Structure**
+```
+TrimVibe.app/
+├── Contents/
+│   ├── Info.plist          # App metadata and configuration
+│   ├── MacOS/
+│   │   └── TrimVibe        # Main executable (105MB)
+│   └── Resources/
+│       └── Knockout.icns   # App icon
+```
+
+### **Key Features**
+- **Native macOS Integration**: Proper app bundle structure, Dock integration, Finder integration
+- **Audio File Association**: Supports WAV, MP3, AIFF, FLAC, M4A with drag & drop
+- **Self-Contained**: 105MB bundle with all dependencies included
+- **Apple Silicon Optimized**: ARM64 architecture for M1/M2 Macs
+- **FFmpeg Integration**: Uses system-installed FFmpeg for audio compression
+
+### **Technical Specifications**
+- **Size**: 105MB (self-contained)
+- **Architecture**: ARM64 (Apple Silicon)
+- **Dependencies**: All bundled (no external requirements)
+- **Python**: 3.9.6 (bundled)
+- **Qt**: PyQt6 (bundled)
+- **Minimum macOS**: 10.15 (Catalina)
+
+### **Build Process**
+```bash
+# Automatic build
+./create_app_bundle.sh
+
+# Manual build
+python3 build_app.py
+./create_app_bundle.sh
+```
+
+### **Usage**
+- **Double-click**: `TrimVibe.app` in Finder
+- **Command line**: `open TrimVibe.app`
+- **Drag & Drop**: Drag audio files onto app icon
+
+### **Testing**
+```bash
+# Run test suite
+./tests/test_app_bundle.sh
+
+# Manual testing
+open TrimVibe.app
+```
+
 ## Codebase Structure (2024)
 
 ```
-TrimVibe/
-├── build_app.py
-├── package_app.py
-├── requirements.txt
-├── README.md
-├── Context.md
-├── src/
-│   ├── main.py
-│   ├── __init__.py
-│   ├── audio/
-│   │   ├── audio_utils.py
-│   │   ├── file_handler.py
-│   │   ├── processor.py
-│   │   ├── silence_detector.py
-│   │   └── __init__.py
-│   ├── ui/
-│   │   ├── __init__.py
-│   │   ├── audio_player.py
-│   │   ├── audio_preview.py
-│   │   ├── audio_preview_simple.py
-│   │   ├── combined_file_widget.py
-│   │   ├── drag_drop.py
-│   │   ├── favorites_sidebar.py
-│   │   ├── main_window.py
-│   │   ├── processing_window.py
-│   │   ├── progress.py
-│   │   ├── ui_utils.py
-│   │   ├── welcome_dialog.py
-│   │   └── images/
-│   └── utils/
-│       ├── icon_manager.py
-│       └── settings_manager.py
-├── tests/
-│   ├── test_suite_consolidated.py
-│   ├── run_tests.py
-│   ├── user_flow_tests.py
-│   ├── CONSOLIDATION_SUMMARY.md
-│   ├── sample_audio/
-│   ├── archive/ (legacy tests)
-│   └── README.md
-└── ...
-```
-
-## Recent Cleanups & Improvements
-- Removed unused/duplicate files: `main_window_refactored.py`, `processing_manager.py`, `file_panel.py`, `settings_panel.py`
-- Cleaned up `.DS_Store`, `__pycache__`, and `.pyc` files
-- Removed empty/duplicate directories: `nonexistent`, `tests/tests`
-- Legacy tests are archived in `tests/archive/` (safe to delete if not needed)
-- All UI and processing logic is in use and up to date
-- Tests are consolidated, fast, and easy to run
-- Interactive user flow tests for manual QA
-
-## Test Approach
-- **Consolidated Test Suite**: Covers all core, UI, and edge case functionality in a single, maintainable file (`test_suite_consolidated.py`).
-- **Interactive User Flow Tests**: For manual QA, with 30s timeouts for user actions (`user_flow_tests.py`).
-- **Legacy Tests**: Archived in `tests/archive/` for reference only.
-
-## How to Run
-- **App**: `python3 src/main.py`
-- **All tests**: `cd tests && python3 run_tests.py`
-- **Interactive/manual tests**: `python3 user_flow_tests.py`
-
-## Development Notes
-- All UI and processing logic is now in use and up to date
-- All tests are consolidated, fast, and easy to run
-- Interactive user flow tests are available for manual QA
-- Project is now much easier to maintain and extend
-
-## Next Steps
-- Remove `tests/archive/` if legacy tests are no longer needed
-- Update documentation as new features are added
-- Continue to add/maintain tests in `test_suite_consolidated.py` and `user_flow_tests.py`
-
----
-
-**For more details, see:**
-- [README.md](README.md) for project overview and usage
-- [tests/README.md](tests/README.md) for test instructions
-- [tests/CONSOLIDATION_SUMMARY.md](tests/CONSOLIDATION_SUMMARY.md) for test suite consolidation details 

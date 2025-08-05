@@ -4,6 +4,7 @@
 This directory contains all tests for KO Trimmer, including:
 - A consolidated, modern test suite for core, UI, and edge case coverage
 - Interactive user flow tests for manual QA
+- macOS app bundle tests for the packaged application
 - Archived legacy tests (in `archive/`)
 
 ## Test Structure
@@ -13,6 +14,7 @@ tests/
 ├── test_suite_consolidated.py      # Main consolidated test suite
 ├── run_tests.py                    # Test runner (category support)
 ├── user_flow_tests.py              # Interactive/manual user flow tests
+├── test_app_bundle.sh              # macOS app bundle validation tests
 ├── CONSOLIDATION_SUMMARY.md        # Test consolidation summary
 ├── sample_audio/                   # Sample audio files for tests
 ├── archive/                        # Legacy tests (not maintained)
@@ -42,6 +44,15 @@ python3 user_flow_tests.py
 - Follow the printed instructions for each step
 - Interact with the UI as prompted (e.g., click preview, process files, etc.)
 
+### 3. macOS App Bundle Tests
+Test the packaged macOS application:
+```bash
+./test_app_bundle.sh
+```
+- Validates app bundle structure and permissions
+- Tests app launch capability
+- Checks for required files (executable, Info.plist, icon)
+
 ## Cleaned Up & Removed Files
 - Removed unused/duplicate files: `main_window_refactored.py`, `processing_manager.py`, `file_panel.py`, `settings_panel.py`
 - Cleaned up `.DS_Store`, `__pycache__`, and `.pyc` files
@@ -53,6 +64,7 @@ python3 user_flow_tests.py
 - All UI and processing logic is in use and up to date
 - Tests are consolidated, fast, and easy to run
 - Interactive user flow tests for manual QA
+- macOS app bundle validation tests
 
 ## Legacy Tests
 - All old, granular test files are in `archive/` for reference only
@@ -61,6 +73,7 @@ python3 user_flow_tests.py
 ## Contributing to Tests
 - Add new tests to `test_suite_consolidated.py` or `user_flow_tests.py`
 - Run all tests before submitting changes
+- Test the app bundle after making changes to the application
 
 ## See Also
 - [../README.md](../README.md) for project overview and usage

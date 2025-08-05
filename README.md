@@ -3,6 +3,26 @@
 ## Overview
 KO Trimmer is a modern, user-friendly audio file batch trimmer and silence detector. It features a clean UI, favorites sidebar, drag-and-drop, audio preview, and a dedicated processing window for batch operations.
 
+## Quick Start
+
+### **Option 1: macOS App Bundle (Recommended)**
+```bash
+# Double-click in Finder
+open TrimVibe.app
+
+# Or from terminal
+open TrimVibe.app
+```
+
+### **Option 2: Python Application**
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python3 src/main.py
+```
+
 ## Features
 - Batch trim and process audio files (WAV, MP3, FLAC, etc.)
 - Silence detection and configurable trimming
@@ -13,6 +33,80 @@ KO Trimmer is a modern, user-friendly audio file batch trimmer and silence detec
 - Output directory management and overwrite options
 - Modern, responsive PyQt6 UI
 - Uses ffmpeg-python for audio compression (requires system ffmpeg installation)
+
+## How to Use
+
+### **1. Launch the Application**
+- **macOS**: Double-click `TrimVibe.app` or run `open TrimVibe.app`
+- **Python**: Run `python3 src/main.py`
+
+### **2. Add Audio Files**
+- **Drag & Drop**: Drag audio files or folders onto the application
+- **Browse**: Click "Add Files" to select audio files manually
+- **Favorites**: Use the sidebar to quickly access frequently used directories
+
+### **3. Configure Settings**
+- **Threshold**: Set silence detection sensitivity (-60dB to -10dB)
+- **Min Duration**: Minimum silence duration to trigger trimming (0.1s to 5.0s)
+- **Padding**: Add padding around detected silence (0.0s to 2.0s)
+- **Bitrate**: Choose output quality (64kb/s to 320kb/s)
+- **Stereo**: Preserve stereo channels or convert to mono
+
+### **4. Process Files**
+- Click "Process Files" to start batch processing
+- Monitor progress in the dedicated processing window
+- View real-time results and timing statistics
+- Files longer than 20 seconds get an underscore prefix (_) for KO II compatibility
+
+### **5. Preview Results**
+- Select any processed file to preview
+- Compare original vs. processed audio
+- Use play/pause controls and seek through audio
+
+## Requirements
+
+### FFmpeg Installation
+For MP3 compression functionality, FFmpeg must be installed on your system:
+
+**macOS:**
+```bash
+brew install ffmpeg
+```
+
+**Windows:**
+Download from [https://ffmpeg.org/](https://ffmpeg.org/)
+
+**Linux:**
+```bash
+sudo apt install ffmpeg
+```
+
+## macOS App Bundle
+
+The application is available as a native macOS app bundle (`TrimVibe.app`) with these features:
+
+### **Key Benefits**
+- **Self-Contained**: 105MB bundle with all dependencies included
+- **Native Integration**: Proper Dock and Finder integration
+- **Drag & Drop**: Drop audio files directly onto the app icon
+- **Apple Silicon Optimized**: ARM64 architecture for M1/M2 Macs
+- **No Installation**: Just double-click to run
+
+### **App Bundle Features**
+- **Size**: 105MB (self-contained)
+- **Architecture**: ARM64 (Apple Silicon)
+- **Dependencies**: All bundled (no external requirements)
+- **Minimum macOS**: 10.15 (Catalina)
+- **Audio Formats**: WAV, MP3, AIFF, FLAC, M4A
+
+### **Build Process**
+```bash
+# Automatic build
+./create_app_bundle.sh
+
+# Test the app bundle
+./tests/test_app_bundle.sh
+```
 
 ## Project Structure
 
@@ -52,35 +146,12 @@ TrimVibe/
 ├── tests/
 │   ├── test_suite_consolidated.py
 │   ├── run_tests.py
+│   ├── test_app_bundle.sh
 │   ├── CONSOLIDATION_SUMMARY.md
 │   ├── sample_audio/
 │   ├── archive/ (legacy tests)
 │   └── README.md
 └── ...
-```
-
-## Requirements
-
-### FFmpeg Installation
-For MP3 compression functionality, FFmpeg must be installed on your system:
-
-**macOS:**
-```bash
-brew install ffmpeg
-```
-
-**Windows:**
-Download from [https://ffmpeg.org/](https://ffmpeg.org/)
-
-**Linux:**
-```bash
-sudo apt install ffmpeg
-```
-
-## Running the Application
-
-```bash
-python3 src/main.py
 ```
 
 ## Running Tests
@@ -107,6 +178,12 @@ python3 user_flow_tests.py
 - Follow the printed instructions for each step
 - Interact with the UI as prompted (e.g., click preview, process files, etc.)
 
+### App Bundle Tests
+Test the macOS app bundle:
+```bash
+./tests/test_app_bundle.sh
+```
+
 ## Cleaned Up & Removed Files
 - Removed unused/duplicate files: `main_window_refactored.py`, `processing_manager.py`, `file_panel.py`, `settings_panel.py`
 - Cleaned up `.DS_Store`, `__pycache__`, and `.pyc` files
@@ -118,6 +195,7 @@ python3 user_flow_tests.py
 - All UI and processing logic is in use and up to date
 - Tests are consolidated, fast, and easy to run
 - Interactive user flow tests for manual QA
+- Native macOS app bundle for easy distribution
 
 ## Contributing
 - Add new features to `src/`

@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
 
-from ..utils.icon_manager import get_app_icon, set_dialog_icon
+from src.utils.icon_manager import get_app_icon, set_dialog_icon
 from .progress import ProcessingProgressWidget
 
 

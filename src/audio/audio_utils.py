@@ -8,18 +8,13 @@ import logging
 from typing import Tuple, Optional
 import warnings
 
-# Configure logging
+# Configure logging - console only for simplicity and performance
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.ERROR,  # Only ERROR level for performance
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('trimvibe_debug.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
-# Set logging level to ERROR only for performance
-logger.setLevel(logging.ERROR)
 
 from typing import Tuple, Optional, Union
 import subprocess

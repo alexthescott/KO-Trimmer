@@ -12,6 +12,14 @@ build/
 dist/
 *.spec
 
+# macOS App Bundle (large files, don't upload to GitHub)
+TrimVibe.app/
+*.app/
+
+# Build scripts (optional - can be committed if needed)
+create_app_bundle.sh
+test_app_bundle.sh
+
 # Python
 __pycache__/
 *.py[cod]
@@ -46,3 +54,7 @@ tests/**/*.flac
 tests/**/*.aiff
 tests/**/*.m4a
 tests/**/*.ogg
+
+# Log files
+*.log
+trimvibe_debug.log
