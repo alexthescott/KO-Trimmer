@@ -1437,10 +1437,9 @@ class ProcessingThread(QThread):
                         # Track failed files
                         failed_files.append(file_path)
                         
-                        # Check if this is a critical error that should stop processing
-                        if self._is_critical_error(file_path):
-                            critical_error = f"Critical error processing {file_path}. Processing stopped."
-                            break
+                        # For failed processing without exception, we can't determine if it's critical
+                        # So we'll continue processing other files
+                        pass
                     
                     # Emit progress signals
                     progress = int((i + 1) / total_files * 100)
@@ -1452,7 +1451,7 @@ class ProcessingThread(QThread):
                     print(f"Error processing {file_path}: {e}")
                     
                     # Check if this is a critical error
-                    if self._is_critical_error(file_path):
+                    if self._is_critical_error(e, file_path):
                         critical_error = f"Critical error processing {file_path}: {e}. Processing stopped."
                         break
                     
@@ -1466,18 +1465,35 @@ class ProcessingThread(QThread):
         except Exception as e:
             self.error_occurred.emit(str(e))
     
-    def _is_critical_error(self, file_path: str) -> bool:
-        """Determine if an error is critical enough to stop processing"""
-        # Critical errors include:
-        # - Audio format not supported
-        # - File corruption
-        # - Permission issues
-        # - Disk space issues
-        # - FFmpeg/compression failures
+    def _is_critical_error(self, error: Exception, file_path: str = "") -> bool:
+        """Determine if an error is critical enough to stop processing
         
-        # For now, we'll consider all errors as potentially critical
-        # This can be refined based on specific error types
-        return True
+        Critical errors include:
+        - PermissionError
+        - OSError with disk space issues
+        - File corruption (custom exception or message)
+        - Audio format not supported (custom exception or message)
+        - FFmpeg/compression failures (custom exception or message)
+        """
+        # Permission errors
+        if isinstance(error, PermissionError):
+            return True
+            
+        # Disk space issues
+        if isinstance(error, OSError) and ("No space left" in str(error) or "disk full" in str(error).lower()):
+            return True
+            
+        # File corruption or format issues (simple message check)
+        error_msg = str(error).lower()
+        if ("corrupt" in error_msg or 
+            "not supported" in error_msg or 
+            "ffmpeg" in error_msg or 
+            "compression" in error_msg or
+            "format" in error_msg and "not" in error_msg):
+            return True
+            
+        # Otherwise, not critical
+        return False
             
     def stop(self):
         """Stop the processing thread"""
