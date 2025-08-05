@@ -1,200 +1,206 @@
-# KO Trimmer - Audio Silence Trimmer for KO II Sampler
+# KO Trimmer
 
-A cross-platform desktop application designed to help users optimize audio files for the Teenage Engineering KO II sampler by automatically trimming silence from audio samples. This maximizes the limited 64MB memory capacity of the KO II by removing unnecessary silent portions.
+## Overview
+KO Trimmer is a modern, user-friendly audio file batch trimmer and silence detector. It features a clean UI, favorites sidebar, drag-and-drop, audio preview, and a dedicated processing window for batch operations.
+
+## Quick Start
+
+### **Option 1: macOS App Bundle (Recommended)**
+```bash
+# Double-click in Finder
+open TrimVibe.app
+
+# Or from terminal
+open TrimVibe.app
+```
+
+### **Option 2: Python Application**
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python3 src/main.py
+```
 
 ## Features
+- Batch trim and process audio files (WAV, MP3, FLAC, etc.)
+- Silence detection and configurable trimming
+- Favorites sidebar for quick access to directories
+- Drag-and-drop file/folder support
+- Audio preview with play/pause and duration comparison
+- Dedicated processing window with real-time progress and results
+- Output directory management and overwrite options
+- Modern, responsive PyQt6 UI
+- Uses ffmpeg-python for audio compression (requires system ffmpeg installation)
 
-- **Cross-platform**: Works on Windows, macOS, and Linux
-- **Drag & Drop Interface**: Intuitive file/folder import system
-- **Silence Detection**: Advanced algorithms using librosa and numpy
-- **Batch Processing**: Handle multiple files simultaneously
-- **Export Options**: Overwrite original files or save to new directory
-- **Audio Format Support**: WAV, MP3, FLAC, AIFF, M4A, OGG, and more
-- **Customizable Settings**: Adjust silence detection thresholds and parameters
-- **Stereo Preservation**: Choose to preserve stereo channels or convert to mono
-- **Smart Directory Naming**: Output directories include stereo/mono information
-- **Audio Preview**: Compare original and trimmed audio files side-by-side
-- **Preview Controls**: Play, pause, stop, and progress tracking for both versions
+## How to Use
 
-## Installation
+### **1. Launch the Application**
+- **macOS**: Double-click `TrimVibe.app` or run `open TrimVibe.app`
+- **Python**: Run `python3 src/main.py`
 
-### Prerequisites
+### **2. Add Audio Files**
+- **Drag & Drop**: Drag audio files or folders onto the application
+- **Browse**: Click "Add Files" to select audio files manually
+- **Favorites**: Use the sidebar to quickly access frequently used directories
 
-- Python 3.8 or higher
-- FFmpeg (for additional audio format support)
+### **3. Configure Settings**
+- **Threshold**: Set silence detection sensitivity (-60dB to -10dB)
+- **Min Duration**: Minimum silence duration to trigger trimming (0.1s to 5.0s)
+- **Padding**: Add padding around detected silence (0.0s to 2.0s)
+- **Bitrate**: Choose output quality (64kb/s to 320kb/s)
+- **Stereo**: Preserve stereo channels or convert to mono
 
-### Install FFmpeg
+### **4. Process Files**
+- Click "Process Files" to start batch processing
+- Monitor progress in the dedicated processing window
+- View real-time results and timing statistics
+- Files longer than 20 seconds get an underscore prefix (_) for KO II compatibility
+
+### **5. Preview Results**
+- Select any processed file to preview
+- Compare original vs. processed audio
+- Use play/pause controls and seek through audio
+
+## Requirements
+
+### FFmpeg Installation
+For MP3 compression functionality, FFmpeg must be installed on your system:
 
 **macOS:**
 ```bash
 brew install ffmpeg
 ```
 
-**Ubuntu/Debian:**
+**Windows:**
+Download from [https://ffmpeg.org/](https://ffmpeg.org/)
+
+**Linux:**
 ```bash
-sudo apt update
 sudo apt install ffmpeg
 ```
 
-**Windows:**
-Download from [FFmpeg website](https://ffmpeg.org/download.html) or install via Chocolatey:
+## macOS App Bundle
+
+The application is available as a native macOS app bundle (`TrimVibe.app`) with these features:
+
+### **Key Benefits**
+- **Self-Contained**: 105MB bundle with all dependencies included
+- **Native Integration**: Proper Dock and Finder integration
+- **Drag & Drop**: Drop audio files directly onto the app icon
+- **Apple Silicon Optimized**: ARM64 architecture for M1/M2 Macs
+- **No Installation**: Just double-click to run
+
+### **App Bundle Features**
+- **Size**: 105MB (self-contained)
+- **Architecture**: ARM64 (Apple Silicon)
+- **Dependencies**: All bundled (no external requirements)
+- **Minimum macOS**: 10.15 (Catalina)
+- **Audio Formats**: WAV, MP3, AIFF, FLAC, M4A
+
+### **Build Process**
 ```bash
-choco install ffmpeg
+# Automatic build
+./create_app_bundle.sh
+
+# Test the app bundle
+./tests/test_app_bundle.sh
 ```
 
-### Install KO Trimmer
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/ko-trimmer.git
-cd ko-trimmer
-```
-
-2. Create a virtual environment (recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-## Usage
-
-### Running the Application
-
-```bash
-python src/main.py
-```
-
-### Basic Workflow
-
-1. **Add Files**: Drag and drop audio files or folders onto the application, or use the "Add Files" / "Add Folder" buttons
-2. **Configure Settings**: Adjust silence detection parameters:
-   - **Silence Threshold**: dB level below which audio is considered silence (-60 to 0 dB)
-   - **Min Silence Duration**: Minimum duration of silence to detect (100-10000 ms)
-   - **Padding**: Additional padding around detected audio (0-1000 ms)
-3. **Process Files**: Click "Process Files" to start trimming
-4. **Preview Results**: Select a processed file and click "Preview Selected" to compare original vs trimmed audio
-5. **Export Options**: Choose to overwrite original files or save to a new "trimmed" directory
-6. **Output Files**: All processed files are saved with "_trimmed" suffix (e.g., "kick01.wav_trimmed")
-7. **Directory Naming**: Output directories include stereo/mono information (e.g., "drumkit_trimmed_stereo" or "drumkit_trimmed_mono")
-
-### Settings Explained
-
-- **Silence Threshold**: Lower values (-50 to -60 dB) are more sensitive to quiet sounds
-- **Min Silence Duration**: Longer durations (1000+ ms) only detect longer silence periods
-- **Padding**: Adds extra time around detected audio to preserve natural sound
-- **Preserve Stereo Channels**: When checked, maintains original stereo/mono configuration; when unchecked, converts stereo to mono
-
-### Audio Preview
-
-The audio preview feature allows you to compare original and trimmed audio files:
-
-- **Side-by-Side Comparison**: Play both original and trimmed versions simultaneously
-- **Progress Tracking**: Real-time progress bars show playback position
-- **Duration Display**: Shows current time and total duration for both files
-- **File Information**: Displays file sizes and reduction statistics
-- **Auto-Replay**: Automatically resets to beginning when playback ends
-- **Restart Buttons**: Dedicated "🔄 Restart" buttons for instant replay
-- **Context Menu**: Right-click on files in the list for quick preview access
-
-## Audio Processing
-
-KO Trimmer uses advanced audio processing techniques:
-
-- **librosa**: For audio analysis and feature extraction (preserves stereo channels)
-- **pydub**: For high-level audio manipulation (preserves stereo channels)
-- **soundfile**: For efficient audio file I/O
-- **numpy/scipy**: For numerical computing and signal processing
-- **Stereo Preservation**: Maintains original stereo channels throughout processing (stereo stays stereo, mono stays mono)
-
-### Supported Formats
-
-- **Input**: WAV, MP3, FLAC, AIFF, M4A, OGG, WMA, AAC
-- **Output**: WAV, MP3, FLAC, AIFF, M4A, OGG
-
-## Development
-
-### Project Structure
+## Project Structure
 
 ```
-KO Trimmer/
+TrimVibe/
+├── build_app.py
+├── package_app.py
+├── requirements.txt
+├── README.md
+├── Context.md
 ├── src/
-│   ├── main.py              # Application entry point
-│   ├── ui/                  # Qt UI components
-│   │   ├── main_window.py   # Main application window
-│   │   ├── drag_drop.py     # Drag & drop functionality
-│   │   ├── progress.py      # Progress indicators
-│   │   └── images/          # Application assets
-│   │       ├── Knockout.png # Application icon
-│   │       └── Knockout.svg # Vector icon source
-│   ├── audio/               # Audio processing modules
-│   │   ├── processor.py     # Main audio processing logic
-│   │   ├── silence_detector.py  # Silence detection algorithms
-│   │   └── file_handler.py  # File I/O operations
-│   └── utils/               # Utility functions
-├── tests/                   # Test files
-├── requirements.txt          # Python dependencies
-└── README.md                # This file
+│   ├── main.py
+│   ├── __init__.py
+│   ├── audio/
+│   │   ├── audio_utils.py
+│   │   ├── file_handler.py
+│   │   ├── processor.py
+│   │   ├── silence_detector.py
+│   │   └── __init__.py
+│   ├── ui/
+│   │   ├── __init__.py
+│   │   ├── audio_player.py
+│   │   ├── audio_preview.py
+│   │   ├── audio_preview_simple.py
+│   │   ├── combined_file_widget.py
+│   │   ├── drag_drop.py
+│   │   ├── favorites_sidebar.py
+│   │   ├── main_window.py
+│   │   ├── processing_window.py
+│   │   ├── progress.py
+│   │   ├── ui_utils.py
+│   │   ├── welcome_dialog.py
+│   │   └── images/
+│   └── utils/
+│       ├── icon_manager.py
+│       └── settings_manager.py
+├── tests/
+│   ├── test_suite_consolidated.py
+│   ├── run_tests.py
+│   ├── test_app_bundle.sh
+│   ├── CONSOLIDATION_SUMMARY.md
+│   ├── sample_audio/
+│   ├── archive/ (legacy tests)
+│   └── README.md
+└── ...
 ```
 
-### Running Tests
+## Running Tests
 
+### Consolidated Test Suite
+Run all core, UI, and edge case tests:
 ```bash
-pytest tests/
+cd tests
+python3 run_tests.py
 ```
 
-### Building Distribution
-
+Run a specific category:
 ```bash
-# Install PyInstaller
-pip install pyinstaller
-
-# Build macOS app (recommended for proper app name and icon)
-python3 -m PyInstaller --onefile --windowed --name="KO Trimmer" --icon=src/ui/images/Knockout.png --add-data=src/ui/images:ui/images --hidden-import=src.ui.main_window --hidden-import=src.ui.drag_drop --hidden-import=src.ui.progress --hidden-import=src.ui.dialogs --hidden-import=src.audio.processor --hidden-import=src.audio.silence_detector --hidden-import=src.audio.file_handler --collect-all=src src/main.py
-
-# Or use the build script
-python3 build_app.py
+python3 run_tests.py --category ui
+python3 run_tests.py --category processing
+python3 run_tests.py --category layout
 ```
 
-## Technology Stack
+### Interactive User Flow Tests
+For manual/interactive UI validation (with 30s timeouts for user actions):
+```bash
+python3 user_flow_tests.py
+```
+- Follow the printed instructions for each step
+- Interact with the UI as prompted (e.g., click preview, process files, etc.)
 
-- **Frontend**: PyQt6 for cross-platform GUI
-- **Audio Processing**: librosa, pydub, soundfile, numpy, scipy
-- **Language**: Python 3.8+
-- **Platform**: Windows, macOS, Linux
+### App Bundle Tests
+Test the macOS app bundle:
+```bash
+./tests/test_app_bundle.sh
+```
+
+## Cleaned Up & Removed Files
+- Removed unused/duplicate files: `main_window_refactored.py`, `processing_manager.py`, `file_panel.py`, `settings_panel.py`
+- Cleaned up `.DS_Store`, `__pycache__`, and `.pyc` files
+- Removed empty/duplicate directories: `nonexistent`, `tests/tests`
+- Legacy tests are archived in `tests/archive/` (safe to delete if not needed)
+
+## Key Improvements
+- Modern, maintainable codebase
+- All UI and processing logic is in use and up to date
+- Tests are consolidated, fast, and easy to run
+- Interactive user flow tests for manual QA
+- Native macOS app bundle for easy distribution
 
 ## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit your changes: `git commit -am 'Add feature'`
-4. Push to the branch: `git push origin feature-name`
-5. Submit a pull request
+- Add new features to `src/`
+- Add or update tests in `tests/`
+- Run `python3 run_tests.py` and `python3 user_flow_tests.py` before submitting changes
 
 ## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Teenage Engineering for the KO II sampler
-- The Python audio processing community
-- Qt for the excellent cross-platform GUI framework
-
-## Support
-
-For issues and feature requests, please create an issue on GitHub.
-
-## Roadmap
-
-- [ ] Audio preview functionality
-- [ ] Waveform visualization
-- [ ] Advanced silence detection algorithms
-- [ ] Batch processing queue management
-- [ ] Export format selection
-- [ ] Metadata preservation
-- [ ] KO II specific optimization settings 
+MIT 

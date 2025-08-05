@@ -14,7 +14,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
 
-from utils.icon_manager import show_information
+from src.utils.icon_manager import show_information
+from .ui_utils import UIUtils
 
 
 class WelcomeDialog(QDialog):
@@ -51,26 +52,26 @@ class WelcomeDialog(QDialog):
             header_layout.addWidget(icon_label)
         
         # Welcome text
-        welcome_text = QLabel("Welcome to KO Trimmer!")
-        welcome_text.setStyleSheet("font-size: 24px; font-weight: bold; color: #2c3e50;")
+        welcome_text = UIUtils.create_styled_label("Welcome to KO Trimmer!", 24, True, "#2c3e50")
         header_layout.addWidget(welcome_text)
         header_layout.addStretch()
         
         layout.addLayout(header_layout)
         
         # Description
-        description = QLabel(
+        description = UIUtils.create_styled_label(
             "KO Trimmer helps you optimize audio samples for the Teenage Engineering KO II sampler "
             "by automatically trimming silence from your audio files. This maximizes the limited "
             "64MB memory capacity of the KO II.\n\n"
-            "Let's set up your favorite directories for quick access!"
+            "Let's set up your favorite directories for quick access!",
+            14, False, "#34495e"
         )
         description.setWordWrap(True)
         description.setStyleSheet("font-size: 14px; color: #34495e; margin: 10px;")
         layout.addWidget(description)
         
         # Favorites section
-        favorites_group = QGroupBox("Favorite Directories")
+        favorites_group = UIUtils.create_group_box("Favorite Directories")
         favorites_layout = QVBoxLayout(favorites_group)
         
         # Favorites list
@@ -81,11 +82,11 @@ class WelcomeDialog(QDialog):
         # Favorites buttons
         favorites_buttons_layout = QHBoxLayout()
         
-        self.add_favorite_btn = QPushButton("Add Directory")
+        self.add_favorite_btn = UIUtils.create_styled_button("Add Directory")
         self.add_favorite_btn.clicked.connect(self.add_favorite_directory)
         favorites_buttons_layout.addWidget(self.add_favorite_btn)
         
-        self.remove_favorite_btn = QPushButton("Remove Selected")
+        self.remove_favorite_btn = UIUtils.create_styled_button("Remove Selected")
         self.remove_favorite_btn.clicked.connect(self.remove_favorite_directory)
         favorites_buttons_layout.addWidget(self.remove_favorite_btn)
         
@@ -93,7 +94,7 @@ class WelcomeDialog(QDialog):
         layout.addWidget(favorites_group)
         
         # Quick start section
-        quick_start_group = QGroupBox("Quick Start")
+        quick_start_group = UIUtils.create_group_box("Quick Start")
         quick_start_layout = QVBoxLayout(quick_start_group)
         
         quick_start_text = QTextEdit()
@@ -124,26 +125,13 @@ class WelcomeDialog(QDialog):
         # Action buttons
         action_layout = QHBoxLayout()
         
-        self.skip_btn = QPushButton("Skip for Now")
+        self.skip_btn = UIUtils.create_styled_button("Skip for Now")
         self.skip_btn.clicked.connect(self.skip_setup)
         action_layout.addWidget(self.skip_btn)
         
         action_layout.addStretch()
         
-        self.get_started_btn = QPushButton("Get Started!")
-        self.get_started_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2ecc71;
-            }
-        """)
+        self.get_started_btn = UIUtils.create_styled_button("Get Started!", primary=True)
         self.get_started_btn.clicked.connect(self.accept)
         action_layout.addWidget(self.get_started_btn)
         
@@ -168,7 +156,7 @@ class WelcomeDialog(QDialog):
             
             # Add to list
             item = QListWidgetItem()
-            display_name = self._create_display_name(directory)
+            display_name = UIUtils.create_display_name(directory)
             item.setText(display_name)
             item.setToolTip(directory)
             item.setData(Qt.ItemDataRole.UserRole, directory)
@@ -207,35 +195,11 @@ class WelcomeDialog(QDialog):
                 # Use custom display name if available, otherwise generate one
                 display_name = favorite.get("display_name", "")
                 if not display_name:
-                    display_name = self._create_display_name(path)
+                    display_name = UIUtils.create_display_name(path)
                 item.setText(display_name)
                 item.setToolTip(path)
                 item.setData(Qt.ItemDataRole.UserRole, path)
                 self.favorites_list.addItem(item)
-    
-    def _create_display_name(self, directory: str) -> str:
-        """Create a descriptive display name for a directory"""
-        path_obj = Path(directory)
-        
-        # If it's in the user's home directory, show a relative path
-        try:
-            relative_path = path_obj.relative_to(Path.home())
-            if len(str(relative_path).split('/')) <= 2:
-                # For shallow paths, show the full relative path
-                return f"📁 {relative_path}"
-            else:
-                # For deeper paths, show parent/name
-                parts = str(relative_path).split('/')
-                if len(parts) >= 2:
-                    return f"📁 {parts[-2]}/{parts[-1]}"
-                else:
-                    return f"📁 {path_obj.name}"
-        except ValueError:
-            # If not in home directory, show parent/name
-            try:
-                return f"📁 {path_obj.parent.name}/{path_obj.name}"
-            except:
-                return f"📁 {path_obj.name}"
     
     def should_show_welcome(self) -> bool:
         """Check if welcome screen should be shown on startup"""

@@ -6,9 +6,26 @@ import os
 from pathlib import Path
 from typing import List
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTableWidget, QTableWidgetItem
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QTableWidget, QTableWidgetItem, QFileDialog
 from PyQt6.QtCore import Qt, pyqtSignal, QMimeData
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QPalette, QColor
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QMouseEvent
+
+from .ui_utils import UIUtils
+
+
+class ClickableTableWidget(QTableWidget):
+    """Custom table widget that handles clicks when in placeholder state"""
+    
+    directory_picker_requested = pyqtSignal()  # Signal when directory picker should be shown
+    
+    def mousePressEvent(self, event: QMouseEvent):
+        """Override mouse press event to handle clicks when in placeholder state"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Check if we're in the placeholder state (no actual files)
+            if self.rowCount() == 1 and self.item(0, 0) and self.item(0, 0).flags() == Qt.ItemFlag.NoItemFlags:
+                self.directory_picker_requested.emit()
+                return  # Don't call parent, handle the event
+        super().mousePressEvent(event)
 
 
 class CombinedFileWidget(QFrame):
@@ -30,13 +47,16 @@ class CombinedFileWidget(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         
-        # Create file table
-        self.file_list = QTableWidget()
+        # Create custom file table
+        self.file_list = ClickableTableWidget()
         self.file_list.setColumnCount(2)
         self.file_list.setHorizontalHeaderLabels(["Filename", "Path"])
         self.file_list.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.file_list.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
         self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        
+        # Connect the directory picker signal
+        self.file_list.directory_picker_requested.connect(self.show_directory_picker)
         
         # Set column widths
         self.file_list.setColumnWidth(0, 200)  # Filename column
@@ -47,10 +67,11 @@ class CombinedFileWidget(QFrame):
         self.file_list.horizontalHeader().setSectionsMovable(False)
         
         # Create placeholder label
-        self.placeholder_label = QLabel("Drop audio files or folders here, or click 'Add Files' / 'Add Folder' buttons")
+        self.placeholder_label = UIUtils.create_styled_label(
+            "Drop audio files or folders here, or click to select a folder", 
+            9, False, "#666666"
+        )
         self.placeholder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.placeholder_label.setFont(QFont("Arial", 9, QFont.Weight.Normal))
-        self.placeholder_label.setStyleSheet("color: #666666; padding: 2px;")
         
         # Add placeholder to table widget
         self.file_list.setRowCount(1)
@@ -60,36 +81,7 @@ class CombinedFileWidget(QFrame):
         self.file_list.setSpan(0, 0, 1, 2)  # Span across both columns
         
         # Set table widget styling
-        self.file_list.setStyleSheet("""
-            QTableWidget {
-                background-color: transparent;
-                border: none;
-                color: #333333;
-                font-family: "Monaco", "Menlo", "Consolas", monospace;
-                font-size: 10px;
-                gridline-color: transparent;
-            }
-            QTableWidget::item {
-                padding: 1px;
-                border: none;
-                background-color: transparent;
-                color: #333333;
-            }
-            QTableWidget::item:selected {
-                background-color: #0078d4;
-                color: #ffffff;
-            }
-            QTableWidget::item:hover {
-                background-color: #f0f0f0;
-                color: #333333;
-            }
-            QHeaderView::section {
-                background-color: transparent;
-                border: none;
-                color: #666666;
-                font-size: 9px;
-            }
-        """)
+        self.file_list.setStyleSheet(UIUtils.create_table_style())
         
         # Initially hide headers since we start with placeholder
         self.file_list.horizontalHeader().setVisible(False)
@@ -102,26 +94,7 @@ class CombinedFileWidget(QFrame):
         
     def update_style(self, is_drag_over: bool):
         """Update the widget styling based on drag state"""
-        if is_drag_over:
-            self.setStyleSheet("""
-                QFrame {
-                    border: 2px dashed #0078d4;
-                    background-color: #f0f8ff;
-                    border-radius: 8px;
-                }
-            """)
-        else:
-            self.setStyleSheet("""
-                QFrame {
-                    border: 2px dashed #cccccc;
-                    background-color: #fafafa;
-                    border-radius: 8px;
-                }
-                QFrame:hover {
-                    border-color: #0078d4;
-                    background-color: #f0f8ff;
-                }
-            """)
+        self.setStyleSheet(UIUtils.create_drag_drop_style(is_drag_over))
             
     def dragEnterEvent(self, event: QDragEnterEvent):
         """Handle drag enter events"""
@@ -149,32 +122,16 @@ class CombinedFileWidget(QFrame):
                 
                 if os.path.isfile(local_path):
                     # Single file
-                    if self.is_audio_file(Path(local_path)):
+                    if UIUtils.is_audio_file(Path(local_path)):
                         file_paths.append(local_path)
                 elif os.path.isdir(local_path):
                     # Directory - find all audio files
-                    audio_files = self.find_audio_files(Path(local_path))
+                    audio_files = UIUtils.find_audio_files(Path(local_path))
                     file_paths.extend(audio_files)
             
             if file_paths:
                 self.files_dropped.emit(file_paths)
                 
-    def is_audio_file(self, file_path: Path) -> bool:
-        """Check if file is an audio file"""
-        audio_extensions = {'.wav', '.mp3', '.flac', '.aiff', '.m4a', '.ogg'}
-        return file_path.suffix.lower() in audio_extensions
-        
-    def find_audio_files(self, directory: Path) -> List[str]:
-        """Find all audio files in a directory"""
-        audio_extensions = {'.wav', '.mp3', '.flac', '.aiff', '.m4a', '.ogg'}
-        audio_files = []
-        
-        for file_path in directory.rglob("*"):
-            if file_path.is_file() and file_path.suffix.lower() in audio_extensions:
-                audio_files.append(str(file_path))
-                
-        return audio_files
-        
     def add_files(self, file_paths: List[str]):
         """Add files to the list"""
         # Remove placeholder if it exists
@@ -227,3 +184,26 @@ class CombinedFileWidget(QFrame):
     def get_file_list(self):
         """Get the file list widget for external access"""
         return self.file_list 
+
+    def show_directory_picker(self):
+        """Show a directory picker dialog"""
+        from PyQt6.QtWidgets import QApplication
+        directory = QFileDialog.getExistingDirectory(
+            QApplication.activeWindow(),
+            "Select Folder with Audio Files",
+            str(Path.home()),
+            QFileDialog.Option.ShowDirsOnly
+        )
+        
+        if directory:
+            # Find all audio files in the selected directory
+            audio_files = UIUtils.find_audio_files(Path(directory))
+            if audio_files:
+                self.files_dropped.emit(audio_files)
+            else:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    QApplication.activeWindow(),
+                    "No Audio Files Found",
+                    f"No audio files found in the selected directory:\n{directory}"
+                ) 

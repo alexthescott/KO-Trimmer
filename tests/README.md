@@ -1,123 +1,80 @@
-# KO Trimmer Tests
+# KO Trimmer Test Suite
 
-This directory contains a consolidated test suite for the KO Trimmer application.
+## Overview
+This directory contains all tests for KO Trimmer, including:
+- A consolidated, modern test suite for core, UI, and edge case coverage
+- Interactive user flow tests for manual QA
+- macOS app bundle tests for the packaged application
+- Archived legacy tests (in `archive/`)
 
 ## Test Structure
 
-The test suite has been consolidated from 35+ individual test files into organized categories:
-
-### 🔧 Core Application Tests
-- **Module Imports** - Tests all required dependencies
-- **Application Startup** - Tests application initialization
-- **FFmpeg Availability** - Checks audio processing dependencies
-
-### 🎵 Audio Processing Tests
-- **Single File Processing** - Tests audio pipeline functionality
-- **Stereo Preservation** - Tests stereo audio handling
-- **Cymbal Processing** - Tests cymbal crash processing
-
-### 🖥️ UI Component Tests
-- **Main Window Creation** - Tests main UI setup
-- **Drag Drop Widget** - Tests file drag and drop functionality
-- **Audio Preview** - Tests audio preview component
-- **Progress Widget** - Tests progress tracking
-
-### ⭐ Favorites System Tests
-- **Favorites Sidebar** - Tests favorites UI component
-- **Favorites Add/Remove** - Tests adding/removing favorites
-- **Favorites Persistence** - Tests favorites storage across sessions
-
-### 📁 Output Directory Tests
-- **Output Directory Field** - Tests output directory UI
-- **Output Directory Buttons** - Tests directory selection buttons
-
-### ⚙️ Settings and Utilities Tests
-- **Settings Manager** - Tests application settings
-- **Icon Manager** - Tests icon management utilities
-
-### 🎵 Sample Audio Tests
-- **Sample Audio Availability** - Tests that sample audio files are available for testing
+```
+tests/
+├── test_suite_consolidated.py      # Main consolidated test suite
+├── run_tests.py                    # Test runner (category support)
+├── user_flow_tests.py              # Interactive/manual user flow tests
+├── test_app_bundle.sh              # macOS app bundle validation tests
+├── CONSOLIDATION_SUMMARY.md        # Test consolidation summary
+├── sample_audio/                   # Sample audio files for tests
+├── archive/                        # Legacy tests (not maintained)
+└── README.md                       # This file
+```
 
 ## Running Tests
 
-### Run All Tests
+### 1. Consolidated Test Suite
+Run all core, UI, and edge case tests:
 ```bash
-# From project root
-python3 tests/test_suite.py
-
-# Or use the test runner
-python3 tests/run_tests.py
+python3 run_tests.py
 ```
 
-### Run Specific Test Categories
+Run a specific category:
 ```bash
-# Core application tests
-python3 tests/run_tests.py --category core
-
-# Audio processing tests
-python3 tests/run_tests.py --category audio
-
-# UI component tests
-python3 tests/run_tests.py --category ui
-
-# Favorites system tests
-python3 tests/run_tests.py --category favorites
-
-# Output directory tests
-python3 tests/run_tests.py --category output
-
-# Settings and utilities tests
-python3 tests/run_tests.py --category settings
-
-# Sample audio tests
-python3 tests/run_tests.py --category sample
+python3 run_tests.py --category ui
+python3 run_tests.py --category processing
+python3 run_tests.py --category layout
 ```
 
-### Available Categories
-- `core` - Core application functionality
-- `audio` - Audio processing features
-- `ui` - User interface components
-- `favorites` - Favorites system
-- `output` - Output directory functionality
-- `settings` - Settings and utilities
-- `sample` - Sample audio file availability
-- `all` - All tests (default)
+### 2. Interactive User Flow Tests
+For manual/interactive UI validation (with 30s timeouts for user actions):
+```bash
+python3 user_flow_tests.py
+```
+- Follow the printed instructions for each step
+- Interact with the UI as prompted (e.g., click preview, process files, etc.)
 
-## Test Results
+### 3. macOS App Bundle Tests
+Test the packaged macOS application:
+```bash
+./test_app_bundle.sh
+```
+- Validates app bundle structure and permissions
+- Tests app launch capability
+- Checks for required files (executable, Info.plist, icon)
 
-The test suite provides detailed results including:
-- ✅ Pass/Fail status for each test
-- ⏱️ Test execution time
-- 📊 Success rate percentage
-- ❌ Detailed error messages for failed tests
+## Cleaned Up & Removed Files
+- Removed unused/duplicate files: `main_window_refactored.py`, `processing_manager.py`, `file_panel.py`, `settings_panel.py`
+- Cleaned up `.DS_Store`, `__pycache__`, and `.pyc` files
+- Removed empty/duplicate directories: `nonexistent`, `tests/tests`
+- Legacy tests are archived in `archive/` (safe to delete if not needed)
 
-## Test Files
+## Key Improvements
+- Modern, maintainable test suite
+- All UI and processing logic is in use and up to date
+- Tests are consolidated, fast, and easy to run
+- Interactive user flow tests for manual QA
+- macOS app bundle validation tests
 
-### Current Test Files
-- **`test_suite.py`** - Comprehensive test suite with all test categories
-- **`run_tests.py`** - Command-line test runner with category selection
-- **`README.md`** - This documentation
+## Legacy Tests
+- All old, granular test files are in `archive/` for reference only
+- These are not maintained and can be deleted if not needed
 
-### Archived Files
-- **`archive/`** - Directory containing all old individual test files
-- **`archive_old_tests.py`** - Script to archive old test files
+## Contributing to Tests
+- Add new tests to `test_suite_consolidated.py` or `user_flow_tests.py`
+- Run all tests before submitting changes
+- Test the app bundle after making changes to the application
 
-## Migration from Old Tests
-
-The old individual test files have been archived to `tests/archive/` for reference. The new consolidated test suite covers all the functionality from the original tests but in a more organized and maintainable structure.
-
-## Test Purposes
-
-- **Debugging**: Use specific test categories to isolate issues
-- **Feature Validation**: Verify new features work correctly
-- **Regression Testing**: Ensure changes don't break existing functionality
-- **Development**: Use as examples for understanding component interactions
-
-## Notes
-
-- All tests include proper Python path setup to import from the `src` directory
-- Tests are designed to be run independently or as a suite
-- Sample audio files are included in `tests/sample_audio/` for realistic testing
-- Audio files are excluded from Git via `.gitignore` to prevent large file uploads
-- Tests provide detailed output for debugging purposes
-- The test suite automatically handles Qt application setup and teardown 
+## See Also
+- [../README.md](../README.md) for project overview and usage
+- [CONSOLIDATION_SUMMARY.md](CONSOLIDATION_SUMMARY.md) for details on test suite consolidation 

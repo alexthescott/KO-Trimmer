@@ -2,9 +2,13 @@
 Silence detection algorithms for audio processing
 """
 
-import numpy as np
 from typing import List, Dict, Any
-import librosa
+
+# Import library manager
+from .library_manager import lib_manager
+
+# Import audio utils
+from .audio_utils import AudioUtils
 
 
 class SilenceDetector:
@@ -13,7 +17,7 @@ class SilenceDetector:
     def __init__(self):
         self.supported_formats = {'.wav', '.mp3', '.flac', '.aiff', '.m4a', '.ogg'}
         
-    def detect_silence(self, audio_data: np.ndarray, sample_rate: int, settings: Dict[str, Any]) -> List[Dict[str, int]]:
+    def detect_silence(self, audio_data, sample_rate: int, settings: Dict[str, Any]) -> List[Dict[str, int]]:
         """
         Detect silence regions in audio data
         
@@ -35,11 +39,11 @@ class SilenceDetector:
         # Convert minimum duration from ms to samples
         min_duration_samples = int(min_duration_ms * sample_rate / 1000)
         
-        # Calculate audio energy
-        energy = self.calculate_energy(audio_data)
+        # Calculate audio energy using utility function
+        energy = AudioUtils.calculate_energy_envelope(audio_data)
         
         # Find silence regions
-        silence_regions = self.find_silence_regions(
+        silence_regions = self._find_silence_regions(
             energy, 
             threshold_linear, 
             min_duration_samples
@@ -47,58 +51,7 @@ class SilenceDetector:
         
         return silence_regions
         
-    def calculate_energy(self, audio_data: np.ndarray) -> np.ndarray:
-        """
-        Calculate energy envelope of audio data
-        
-        Args:
-            audio_data: Audio data as numpy array (mono or stereo)
-            
-        Returns:
-            Energy envelope as numpy array
-        """
-        # Use librosa's RMS energy calculation
-        frame_length = 2048
-        hop_length = 512
-        
-        # Handle stereo audio by calculating RMS across both channels
-        if len(audio_data.shape) == 2:
-            # Stereo audio - calculate RMS across both channels
-            rms = librosa.feature.rms(
-                y=audio_data, 
-                frame_length=frame_length, 
-                hop_length=hop_length
-            )
-            # Take the maximum RMS across channels for more sensitive detection
-            rms = np.max(rms, axis=0).flatten()
-        else:
-            # Mono audio
-            rms = librosa.feature.rms(
-                y=audio_data, 
-                frame_length=frame_length, 
-                hop_length=hop_length
-            )[0]
-        
-        # Interpolate to match original audio length
-        if len(audio_data.shape) == 2:
-            # Stereo audio - use the number of samples (second dimension)
-            original_length = audio_data.shape[1]
-        else:
-            # Mono audio
-            original_length = len(audio_data)
-            
-        rms_length = len(rms)
-        
-        # Create time points for interpolation
-        rms_times = np.linspace(0, original_length, rms_length)
-        original_times = np.arange(original_length)
-        
-        # Interpolate RMS values to match original audio length
-        energy = np.interp(original_times, rms_times, rms)
-        
-        return energy
-        
-    def find_silence_regions(self, energy: np.ndarray, threshold: float, min_duration_samples: int) -> List[Dict[str, int]]:
+    def _find_silence_regions(self, energy, threshold: float, min_duration_samples: int) -> List[Dict[str, int]]:
         """
         Find silence regions based on energy threshold
         
@@ -110,22 +63,82 @@ class SilenceDetector:
         Returns:
             List of silence regions
         """
+        # Check if we're in a bundled environment
+        import sys
+        is_bundled = hasattr(sys, '_MEIPASS')
+        
+        if is_bundled:
+            # Use simple Python implementation for bundled environment
+            return self._find_silence_regions_simple(energy, threshold, min_duration_samples)
+        else:
+            # Use numpy implementation for development environment
+            # Find samples below threshold
+            silence_mask = energy < threshold
+            
+            np = lib_manager.numpy()
+            # Find transitions between silence and non-silence
+            transitions = np.diff(silence_mask.astype(int))
+            
+            # Find start and end indices of silence regions
+            silence_starts = np.where(transitions == 1)[0] + 1
+            silence_ends = np.where(transitions == -1)[0]
+            
+            # Handle edge cases
+            if silence_mask[0]:
+                silence_starts = np.concatenate([[0], silence_starts])
+            if silence_mask[-1]:
+                silence_ends = np.concatenate([silence_ends, [len(energy) - 1]])
+                
+            # Create silence regions
+            silence_regions = []
+            for start, end in zip(silence_starts, silence_ends):
+                duration = end - start + 1
+                
+                if duration >= min_duration_samples:
+                    silence_regions.append({
+                        'start': start,
+                        'end': end,
+                        'duration': duration
+                    })
+                    
+            return silence_regions
+    
+    def _find_silence_regions_simple(self, energy, threshold: float, min_duration_samples: int) -> List[Dict[str, int]]:
+        """
+        Find silence regions using simple Python implementation for bundled environment
+        
+        Args:
+            energy: Energy envelope as list
+            threshold: Energy threshold (linear scale)
+            min_duration_samples: Minimum silence duration in samples
+            
+        Returns:
+            List of silence regions
+        """
         # Find samples below threshold
-        silence_mask = energy < threshold
+        silence_mask = [e < threshold for e in energy]
         
         # Find transitions between silence and non-silence
-        transitions = np.diff(silence_mask.astype(int))
+        transitions = []
+        for i in range(1, len(silence_mask)):
+            transitions.append(silence_mask[i] - silence_mask[i-1])
         
         # Find start and end indices of silence regions
-        silence_starts = np.where(transitions == 1)[0] + 1
-        silence_ends = np.where(transitions == -1)[0]
+        silence_starts = []
+        silence_ends = []
+        
+        for i, transition in enumerate(transitions):
+            if transition == 1:  # Silence starts
+                silence_starts.append(i + 1)
+            elif transition == -1:  # Silence ends
+                silence_ends.append(i)
         
         # Handle edge cases
-        if silence_mask[0]:
-            silence_starts = np.concatenate([[0], silence_starts])
-        if silence_mask[-1]:
-            silence_ends = np.concatenate([silence_ends, [len(energy) - 1]])
-            
+        if silence_mask[0]:  # Starts with silence
+            silence_starts.insert(0, 0)
+        if silence_mask[-1]:  # Ends with silence
+            silence_ends.append(len(energy) - 1)
+        
         # Create silence regions
         silence_regions = []
         for start, end in zip(silence_starts, silence_ends):
@@ -140,7 +153,7 @@ class SilenceDetector:
                 
         return silence_regions
         
-    def detect_leading_trailing_silence(self, audio_data: np.ndarray, sample_rate: int, settings: Dict[str, Any]) -> Dict[str, int]:
+    def detect_leading_trailing_silence(self, audio_data, sample_rate: int, settings: Dict[str, Any]) -> Dict[str, int]:
         """
         Detect leading and trailing silence specifically
         
@@ -156,7 +169,8 @@ class SilenceDetector:
         silence_regions = self.detect_silence(audio_data, sample_rate, settings)
         
         if not silence_regions:
-            return {'start': 0, 'end': len(audio_data) - 1}
+            shape_info = AudioUtils.get_audio_shape_info(audio_data)
+            return {'start': 0, 'end': shape_info['duration_samples'] - 1}
             
         # Find the first and last non-silent regions
         # The first silence region ends where audio starts
@@ -169,7 +183,7 @@ class SilenceDetector:
             'end': audio_end
         }
         
-    def analyze_audio_characteristics(self, audio_data: np.ndarray, sample_rate: int) -> Dict[str, Any]:
+    def analyze_audio_characteristics(self, audio_data, sample_rate: int) -> Dict[str, Any]:
         """
         Analyze audio characteristics for better silence detection
         
@@ -181,13 +195,16 @@ class SilenceDetector:
             Dictionary with audio characteristics
         """
         # Calculate basic statistics
-        if len(audio_data.shape) == 2:
+        shape_info = AudioUtils.get_audio_shape_info(audio_data)
+        
+        np = lib_manager.numpy()
+        if shape_info['is_stereo']:
             # Stereo audio - use mean across channels
             rms = np.sqrt(np.mean(audio_data**2))
             peak = np.max(np.abs(audio_data))
             
             # Calculate spectral centroid (brightness) for stereo
-            spectral_centroid = librosa.feature.spectral_centroid(y=audio_data, sr=sample_rate)[0]
+            spectral_centroid = lib_manager.librosa().feature.spectral_centroid(y=audio_data, sr=sample_rate)[0]
             avg_spectral_centroid = np.mean(spectral_centroid)
         else:
             # Mono audio
@@ -195,17 +212,17 @@ class SilenceDetector:
             peak = np.max(np.abs(audio_data))
             
             # Calculate spectral centroid (brightness)
-            spectral_centroid = librosa.feature.spectral_centroid(y=audio_data, sr=sample_rate)[0]
+            spectral_centroid = lib_manager.librosa().feature.spectral_centroid(y=audio_data, sr=sample_rate)[0]
             avg_spectral_centroid = np.mean(spectral_centroid)
         
         # Calculate zero crossing rate
-        if len(audio_data.shape) == 2:
+        if shape_info['is_stereo']:
             # For stereo, calculate zero crossing rate for each channel and take mean
-            zero_crossing_rate = librosa.feature.zero_crossing_rate(audio_data)[0]
+            zero_crossing_rate = lib_manager.librosa().feature.zero_crossing_rate(audio_data)[0]
             avg_zero_crossing_rate = np.mean(zero_crossing_rate)
         else:
             # For mono
-            zero_crossing_rate = librosa.feature.zero_crossing_rate(audio_data)[0]
+            zero_crossing_rate = lib_manager.librosa().feature.zero_crossing_rate(audio_data)[0]
             avg_zero_crossing_rate = np.mean(zero_crossing_rate)
         
         return {
@@ -216,7 +233,7 @@ class SilenceDetector:
             'zero_crossing_rate': avg_zero_crossing_rate
         }
         
-    def adaptive_threshold(self, audio_data: np.ndarray, sample_rate: int, base_threshold_db: float) -> float:
+    def adaptive_threshold(self, audio_data, sample_rate: int, base_threshold_db: float) -> float:
         """
         Calculate adaptive threshold based on audio characteristics
         

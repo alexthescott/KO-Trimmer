@@ -68,7 +68,8 @@ class SettingsManager:
             'min_duration': 1000,
             'padding': 20,
             'overwrite': False,
-            'preserve_stereo': True
+            'preserve_stereo': True,
+            'bitrate': 320
         }
         return self.settings.value("processing_settings", default_settings, type=dict)
         

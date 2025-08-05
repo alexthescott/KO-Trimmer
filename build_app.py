@@ -1,122 +1,151 @@
 #!/usr/bin/env python3
 """
-Build KO Trimmer as a proper macOS application
+Build script for TrimVibe using ffmpeg-python
 """
 
-import subprocess
-import sys
 import os
+import sys
+import subprocess
+import shutil
 from pathlib import Path
 
-def build_macos_app():
-    """Build KO Trimmer as a macOS app bundle"""
-    
-    print("Building KO Trimmer as macOS app...")
-    
-    # Clean previous builds
-    print("Cleaning previous builds...")
-    subprocess.run(["rm", "-rf", "dist", "build"], capture_output=True)
-    
-    # Build the app with explicit module inclusion
-    cmd = [
-        "python3", "-m", "PyInstaller",
-        "--onefile",  # Use onefile for proper app bundle
-        "--windowed",
-        "--name=KO Trimmer",
-        "--icon=src/ui/images/Knockout.png",
-        "--add-data=src/ui/images:ui/images",
-        "--hidden-import=src.ui.main_window",
-        "--hidden-import=src.ui.drag_drop",
-        "--hidden-import=src.ui.progress",
-        "--hidden-import=src.ui.dialogs",
-        "--hidden-import=src.audio.processor",
-        "--hidden-import=src.audio.silence_detector",
-        "--hidden-import=src.audio.file_handler",
-        "--collect-all=src",
-        "--osx-bundle-identifier=com.kotrimmer.app",
-        "src/main.py"
-    ]
-    
-    print(f"Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    
-    if result.returncode == 0:
-        print("✅ Build successful!")
-        print("📱 App location: dist/KO Trimmer.app")
-        print("🚀 You can now run: open 'dist/KO Trimmer.app'")
-        
-        # Add additional macOS metadata
-        enhance_app_bundle()
-        
-    else:
-        print("❌ Build failed!")
-        print("Error:", result.stderr)
-
-def enhance_app_bundle():
-    """Add additional macOS app bundle enhancements"""
+def check_ffmpeg():
+    """Check if ffmpeg is available in system PATH"""
     try:
-        app_path = "dist/KO Trimmer.app"
-        info_plist_path = f"{app_path}/Contents/Info.plist"
-        
-        print("🔧 Enhancing app bundle with macOS metadata...")
-        
-        # Read current Info.plist
-        with open(info_plist_path, 'r') as f:
-            content = f.read()
-        
-        # Add additional macOS-specific keys
-        enhanced_content = content.replace(
-            '<key>NSHighResolutionCapable</key>',
-            '''<key>NSHighResolutionCapable</key>
-        <true/>
-        <key>CFBundleVersion</key>
-        <string>1.0.0</string>
-        <key>CFBundleShortVersionString</key>
-        <string>1.0.0</string>
-        <key>LSMinimumSystemVersion</key>
-        <string>10.15</string>
-        <key>NSPrincipalClass</key>
-        <string>NSApplication</string>
-        <key>NSRequiresAquaSystemAppearance</key>
-        <false/>
-        <key>LSApplicationCategoryType</key>
-        <string>public.app-category.music</string>
-        <key>CFBundleDocumentTypes</key>
-        <array>
-            <dict>
-                <key>CFBundleTypeName</key>
-                <string>Audio Files</string>
-                <key>CFBundleTypeExtensions</key>
-                <array>
-                    <string>wav</string>
-                    <string>mp3</string>
-                    <string>flac</string>
-                    <string>aiff</string>
-                    <string>m4a</string>
-                    <string>ogg</string>
-                </array>
-                <key>CFBundleTypeRole</key>
-                <string>Viewer</string>
-                <key>LSHandlerRank</key>
-                <string>Owner</string>
-            </dict>
-        </array>'''
-        )
-        
-        # Write enhanced Info.plist
-        with open(info_plist_path, 'w') as f:
-            f.write(enhanced_content)
-        
-        print("✅ App bundle enhanced with macOS metadata!")
-        print("📋 Features added:")
-        print("   - Proper version information")
-        print("   - Audio file type associations")
-        print("   - Music app category")
-        print("   - macOS 10.15+ compatibility")
-        print("   - Dark mode support")
-        
-    except Exception as e:
-        print(f"⚠️  Could not enhance app bundle: {e}")
+        result = subprocess.run(['ffmpeg', '-version'], 
+                              capture_output=True, text=True, timeout=5)
+        return result.returncode == 0
+    except:
+        return False
+
+def build_with_pyinstaller():
+    """Build the application with PyInstaller"""
+    
+    # Check if ffmpeg is available
+    if check_ffmpeg():
+        print("✅ FFmpeg found in system PATH")
+    else:
+        print("⚠️  FFmpeg not found in system PATH")
+        print("   Users will need to install ffmpeg for bitrate compression")
+        print("   Installation instructions:")
+        print("   • macOS: brew install ffmpeg")
+        print("   • Windows: Download from https://ffmpeg.org/")
+        print("   • Linux: sudo apt install ffmpeg")
+    
+    # Create PyInstaller spec file
+    spec_content = f'''# -*- mode: python ; coding: utf-8 -*-
+
+block_cipher = None
+
+a = Analysis(
+    ['src/main.py'],
+    pathex=[],
+    binaries=[],
+    datas=[],
+    hiddenimports=[
+        'pydub',
+        'librosa',
+        'soundfile',
+        'numpy',
+        'scipy',
+        'PyQt6',
+        'PyQt6.QtCore',
+        'PyQt6.QtGui',
+        'PyQt6.QtWidgets',
+        'PyQt6.QtMultimedia',
+        'ffmpeg'
+    ],
+    hookspath=[],
+    hooksconfig={{}},
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='TrimVibe',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon='src/ui/images/Knockout.icns' if os.path.exists('src/ui/images/Knockout.icns') else None,
+)
+'''
+    
+    # Write spec file
+    with open('TrimVibe.spec', 'w') as f:
+        f.write(spec_content)
+    
+    # Run PyInstaller
+    print("Building application with PyInstaller...")
+    subprocess.run([
+        'pyinstaller',
+        '--clean',
+        'TrimVibe.spec'
+    ])
+    
+    print("Build complete! Executable is in dist/TrimVibe")
+
+def build_with_cx_Freeze():
+    """Alternative build method using cx_Freeze"""
+    
+    setup_content = '''
+from cx_Freeze import setup, Executable
+import sys
+
+# Dependencies are automatically detected, but it might need fine tuning.
+build_exe_options = {
+    "packages": [
+        "os", "sys", "numpy", "librosa", "soundfile", "pydub", 
+        "PyQt6", "scipy", "pathlib", "typing"
+    ],
+    "excludes": [],
+    "include_files": []
+}
+
+# GUI applications require a different base on Windows
+base = None
+if sys.platform == "win32":
+    base = "Win32GUI"
+
+setup(
+    name="TrimVibe",
+    version="1.0",
+    description="Audio Silence Trimmer",
+    options={"build_exe": build_exe_options},
+    executables=[Executable("src/main.py", base=base, target_name="TrimVibe")]
+)
+'''
+    
+    with open('setup_cx_freeze.py', 'w') as f:
+        f.write(setup_content)
+    
+    subprocess.run(['python', 'setup_cx_freeze.py', 'build'])
 
 if __name__ == "__main__":
-    build_macos_app() 
+    print("TrimVibe Build Script")
+    print("=====================")
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "cx_freeze":
+        build_with_cx_Freeze()
+    else:
+        build_with_pyinstaller() 
