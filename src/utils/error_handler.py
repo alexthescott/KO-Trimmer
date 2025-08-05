@@ -4,6 +4,7 @@ Error handling utilities for TrimVibe
 
 import sys
 import traceback
+import functools
 from typing import Optional, Callable
 from PyQt6.QtWidgets import QMessageBox, QApplication
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -38,7 +39,7 @@ class ErrorHandler(QObject):
                 from PyQt6.QtCore import QTimer
                 # Use QTimer to defer the callback to the main thread
                 timer = QTimer()
-                timer.singleShot(0, lambda: self._error_callback(title, message))
+                timer.singleShot(0, functools.partial(self._error_callback, title, message))
             except:
                 # Fallback to direct call if timer fails
                 self._error_callback(title, message)
@@ -50,7 +51,7 @@ class ErrorHandler(QObject):
                     # Use QTimer to defer dialog to main thread
                     from PyQt6.QtCore import QTimer
                     timer = QTimer()
-                    timer.singleShot(0, lambda: QMessageBox.critical(None, title, message))
+                    timer.singleShot(0, functools.partial(QMessageBox.critical, None, title, message))
             except:
                 pass  # Don't crash if UI isn't available
                 
@@ -68,7 +69,7 @@ class ErrorHandler(QObject):
             try:
                 from PyQt6.QtCore import QTimer
                 timer = QTimer()
-                timer.singleShot(0, lambda: self._error_callback(title, message))
+                timer.singleShot(0, functools.partial(self._error_callback, title, message))
             except:
                 # Fallback to direct call if timer fails
                 self._error_callback(title, message)
@@ -80,7 +81,7 @@ class ErrorHandler(QObject):
                     # Use QTimer to defer dialog to main thread
                     from PyQt6.QtCore import QTimer
                     timer = QTimer()
-                    timer.singleShot(0, lambda: QMessageBox.warning(None, title, message))
+                    timer.singleShot(0, functools.partial(QMessageBox.warning, None, title, message))
             except:
                 pass  # Don't crash if UI isn't available
 
