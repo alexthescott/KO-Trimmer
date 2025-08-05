@@ -155,8 +155,6 @@ class ProcessingWindow(QDialog):
         self.settings = settings
         self.audio_processor = audio_processor
         
-
-        
         # Start progress widget
         self.progress_widget.start_processing()
         
