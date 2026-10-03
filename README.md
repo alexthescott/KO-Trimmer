@@ -3,7 +3,10 @@
 ## Overview
 KO Trimmer is a modern, user-friendly audio file batch trimmer and silence detector. It features a clean UI, favorites sidebar, drag-and-drop, audio preview, and a dedicated processing window for batch operations.
 
-## Quick Start
+## Web App (Progressive Web App)
+There's also a browser-based version in [`web/`](web/) — install it from Chrome, no download or FFmpeg required, everything runs locally in your browser. See [`web/README.md`](web/README.md) for development and deployment instructions. The desktop app below remains available separately.
+
+## Quick Start (Desktop App)
 
 ### **Option 1: macOS App Bundle (Recommended)**
 ```bash
