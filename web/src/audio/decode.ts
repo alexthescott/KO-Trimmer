@@ -1,6 +1,7 @@
 let sharedContext: AudioContext | null = null;
 
-function getSharedContext(): AudioContext {
+/** Shared by decode and preview playback (audio/player.ts). */
+export function getSharedContext(): AudioContext {
   if (!sharedContext) sharedContext = new AudioContext();
   return sharedContext;
 }

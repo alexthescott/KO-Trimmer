@@ -39,6 +39,17 @@ class AppState {
     appEvents.emit('files-changed', { files: this.files });
   }
 
+  /** Removes one file and returns the id that should become selected next, if any. */
+  removeFile(id: string): string | undefined {
+    const idx = this.files.findIndex((f) => f.id === id);
+    if (idx < 0) return undefined;
+    const removed = this.files[idx];
+    if (removed.resultBlobUrl) URL.revokeObjectURL(removed.resultBlobUrl);
+    this.files = this.files.filter((f) => f.id !== id);
+    appEvents.emit('files-changed', { files: this.files });
+    return (this.files[idx] ?? this.files[idx - 1])?.id;
+  }
+
   updateFile(id: string, patch: Partial<FileEntry>): void {
     this.files = this.files.map((f) => (f.id === id ? { ...f, ...patch } : f));
     appEvents.emit('files-changed', { files: this.files });

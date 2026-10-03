@@ -17,7 +17,7 @@ export class SettingsPanel {
     const anyHandleBacked = appState.files.some((f: FileEntry) => canOverwrite(f.fileHandle));
 
     const el = h('div', { class: 'settings-grid' }, [
-      field('Silence Threshold (dB)', numberInput('threshold', s.thresholdDb, SETTINGS_RANGES.thresholdDb, (v) =>
+      field('Silence Threshold', sliderInput('threshold', s.thresholdDb, SETTINGS_RANGES.thresholdDb, (v) => `${v} dB`, (v) =>
         appState.updateSettings({ thresholdDb: v }),
       )),
       field('Min Silence Duration (ms)', numberInput('minDuration', s.minDurationMs, SETTINGS_RANGES.minDurationMs, (v) =>
@@ -28,7 +28,7 @@ export class SettingsPanel {
       )),
       field(
         'Speed-up (tape-style — raises pitch)',
-        numberInput('speed', s.speedMultiplier, SETTINGS_RANGES.speedMultiplier, (v) =>
+        sliderInput('speed', s.speedMultiplier, SETTINGS_RANGES.speedMultiplier, (v) => `${v.toFixed(2)}x`, (v) =>
           appState.updateSettings({ speedMultiplier: v }),
         ),
       ),
@@ -45,7 +45,7 @@ export class SettingsPanel {
       overwriteCheckboxRow(s.overwrite, anyHandleBacked),
     ]);
 
-    this.element.replaceChildren(h('h3', {}, ['Silence Detection Settings']), el, checkboxes);
+    this.element.replaceChildren(h('h3', {}, ['Settings']), el, checkboxes);
   }
 
   refresh(): void {
@@ -76,6 +76,31 @@ function numberInput(
     onChange(v);
   });
   return input;
+}
+
+/** Range slider with a monospace readout; fires on every input tick so trim handles track it live. */
+function sliderInput(
+  id: string,
+  value: number,
+  range: { min: number; max: number; step: number },
+  format: (value: number) => string,
+  onChange: (value: number) => void,
+): HTMLElement {
+  const input = h('input', {
+    type: 'range',
+    id,
+    min: range.min,
+    max: range.max,
+    step: range.step,
+    value: String(value),
+  }) as HTMLInputElement;
+  const readout = h('span', { class: 'readout' }, [format(value)]);
+  input.addEventListener('input', () => {
+    const v = Number(input.value);
+    readout.textContent = format(v);
+    onChange(v);
+  });
+  return h('div', { class: 'slider-row' }, [input, readout]);
 }
 
 function bitrateSelect(value: number, onChange: (v: (typeof BITRATE_OPTIONS)[number]) => void): HTMLElement {

@@ -44,6 +44,8 @@ export interface FileEntry {
   outputName?: string;
   stats?: ProcessStats;
   stage?: ProcessingStage;
+  /** Manually dragged trim points in source samples (end exclusive); overrides auto-detect. */
+  manualTrim?: { start: number; end: number };
 }
 
 export interface FavoriteDirectory {

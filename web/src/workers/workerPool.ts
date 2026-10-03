@@ -9,6 +9,7 @@ export interface QueuedJob {
   baseName: string;
   settings: ProcessingSettings;
   originalBytes: number;
+  manualTrim?: { start: number; end: number };
 }
 
 export interface JobResult {
@@ -139,6 +140,7 @@ export class WorkerPool {
         baseName: entry.job.baseName,
         settings: entry.job.settings,
         originalBytes: entry.job.originalBytes,
+        manualTrim: entry.job.manualTrim,
       },
       { transfer: entry.job.channels.map((c) => c.buffer) },
     );

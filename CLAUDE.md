@@ -44,17 +44,21 @@ matching this repo's Pages project-page URL.
 web/src/
   app/        state.ts (single source of truth for files/settings/favorites),
               events.ts (typed pub/sub), processBatch.ts (orchestrates a batch run),
-              fileEntries.ts, types.ts
+              decodedCache.ts (3-entry LRU of decoded audio for the editor),
+              batchEstimate.ts (sampled whole-batch size estimate), fileEntries.ts, types.ts
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
-              sampleRateResample, wavEncoder, mp3Encoder, naming, pipeline.ts
-              (orchestrates the fixed stage order below)
+              sampleRateResample, wavEncoder, mp3Encoder, naming, estimate.ts
+              (output-size prediction), pipeline.ts (orchestrates the fixed stage
+              order below; also exports computeAutoTrimBounds + renderPreview, the
+              shared code paths the editor and estimator use), player.ts (preview
+              playback, main thread only)
   fs/         File System Access API: capabilities, directoryPicker, dragDropEntries,
               favoritesStore (IndexedDB via idb-keyval), outputWriter (FS Access sink +
               ZIP/fflate fallback sink), overwriteWriter (true in-place overwrite)
   workers/    processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
               (pooled, AbortController-based cancellation)
-  ui/         views/ (Welcome, Main, Processing, PreviewPanel) + components/
-              (DropZone, FileTable, SettingsPanel, FavoritesSidebar, ResultsSummary)
+  ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
+              WaveformEditor, SettingsPanel, FavoritesSidebar, ResultsSummary)
   settings/   settingsManager.ts — localStorage, mirrors desktop's old QSettings defaults
   pwa/        registerSW.ts (vite-plugin-pwa)
 web/tests/unit/   Vitest specs for every pure audio/ module — run these first when
@@ -103,12 +107,35 @@ commit(s) for the full plan this was built from:
    *after* trim + speed-up, since that's what actually ends up on the hardware
    (`audio/pipeline.ts` → `audio/naming.ts`).
 4. **New feature, not in desktop at all: speed-up.** A simple tape-style
-   resample (`audio/speedResample.ts`, 1.0x–2.0x, default off) that shortens duration
+   resample (`audio/speedResample.ts`, 1.0x–3.0x, default off) that shortens duration
    and raises pitch, as an additional size-reduction lever alongside bitrate/sample-rate
-   reduction.
+   reduction. At ≥1.5x it averages `round(speed)` centred taps per output sample (box
+   anti-alias, as in the JUCE port's average-then-decimate, but linear-phase).
 5. **MP3 bitrate encoding is pure-JS** (`@breezystack/lamejs`, runs in the worker)
    instead of shelling out to a system FFmpeg binary — this is what makes the whole app
    installable with zero native dependencies.
+
+### Features ported from the JUCE "KOTrimmer" rewrite
+
+A native JUCE/C++ rewrite targeting the KO II existed outside this repo; its UX was
+folded into the web app rather than maintained separately:
+
+- **Waveform editor** (`ui/components/WaveformEditor.ts`): before/after canvases,
+  draggable green/red trim handles, wheel zoom around cursor, shift/horizontal-wheel
+  pan, double-click a handle to revert to auto, double-click the waveform to reset zoom.
+- **Per-file manual trim overrides**: `FileEntry.manualTrim` (source samples, end
+  exclusive) is passed through the worker to `runPipeline`, which uses it in place of
+  auto-detection. Settings changes only move handles on files without an override.
+- **Live preview playback before processing** (`audio/player.ts`), with playhead;
+  Space plays/stops, Delete/Backspace removes the selected file (with confirm).
+- **Size estimates**: per-file in the editor, whole-batch next to Process (decodes up to
+  20 files, extrapolates by bytes for the rest).
+- **Overwrite confirmation** dialog before any in-place overwrite.
+- **KO II visual theme** (cream `#F5F0E8` / orange `#FF6B2B`, flat hairline chrome,
+  uppercase labels, monospace readouts) — tokens in `ui/styles/app.css` `:root`.
+
+The JUCE app's detector (first/last sample above a peak threshold) was deliberately
+*not* ported — the web energy-envelope detector is kept.
 
 ### Settings defaults
 
@@ -122,7 +149,7 @@ practice — the real default users saw was -50 dB.
 | Silence threshold | -60 to 0 dB | -50 dB |
 | Min silence duration | 100–10000 ms | 1000 ms |
 | Padding | 0–1000 ms | 20 ms |
-| Speed-up | 1.0x–2.0x | 1.0x (off) |
+| Speed-up | 1.0x–3.0x | 1.0x (off) |
 | Bitrate | 320/192/160/128/96/64 kbps | 320 (no reduction) |
 | Preserve stereo | — | on |
 | Overwrite | — | off |
@@ -152,6 +179,7 @@ pre-existing, and not worth cleaning up given the app is legacy.
   unit suite (they need a real browser / File System Access API). No browser automation
   tool has been available in this environment to date — manual Chrome QA is still owed
   before trusting changes there blind. Checklist: install flow, offline reload,
-  drag-drop folder recursion, large-batch Stop behavior, preview playback, output
+  drag-drop folder recursion, large-batch Stop behavior, preview playback, waveform
+  editor handles/zoom and manual-trim reaching batch output, output
   byte-correctness (`ffprobe` for actual sample rate / MP3 bitrate), overwrite
   correctness, ZIP fallback, favorites permission persistence across a relaunch.

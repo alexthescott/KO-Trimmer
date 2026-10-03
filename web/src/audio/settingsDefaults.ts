@@ -19,7 +19,7 @@ export const SETTINGS_RANGES = {
   thresholdDb: { min: -60, max: 0, step: 1 },
   minDurationMs: { min: 100, max: 10000, step: 50 },
   paddingMs: { min: 0, max: 1000, step: 10 },
-  speedMultiplier: { min: 1.0, max: 2.0, step: 0.05 },
+  speedMultiplier: { min: 1.0, max: 3.0, step: 0.05 },
 } as const;
 
 export const BITRATE_OPTIONS = [320, 192, 160, 128, 96, 64] as const;

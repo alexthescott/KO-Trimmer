@@ -78,6 +78,7 @@ export async function processBatch(
         baseName,
         settings,
         originalBytes: file.size,
+        manualTrim: file.manualTrim,
       });
 
       if (result.aborted) {

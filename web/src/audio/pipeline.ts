@@ -1,7 +1,7 @@
 import type { ProcessingSettings, ProcessStats } from '../app/types';
 import { computeEnergyEnvelope } from './energyEnvelope';
 import { detectSilenceRegions } from './silenceDetector';
-import { computeTrimBounds, sliceChannels } from './trim';
+import { computeTrimBounds, sliceChannels, type TrimBounds } from './trim';
 import { downmixToMono } from './mono';
 import { speedUp } from './speedResample';
 import { getTargetSampleRate, resampleToRate } from './sampleRateResample';
@@ -16,6 +16,8 @@ export interface PipelineInput {
   baseName: string;
   settings: ProcessingSettings;
   originalBytes: number;
+  /** User-dragged trim points (source samples, end exclusive); overrides auto-detection. */
+  manualTrim?: { start: number; end: number };
   onStage?: (stage: 'trim' | 'downmix' | 'speedup' | 'resample' | 'encode') => void;
   isCancelled?: () => boolean;
 }
@@ -26,6 +28,52 @@ export interface PipelineOutput {
   outputExtension: string;
   stats: ProcessStats;
   warning?: string;
+}
+
+/**
+ * Auto-detected trim bounds — the single code path shared by the worker
+ * pipeline, the waveform editor's handles, and the batch size estimate.
+ */
+export function computeAutoTrimBounds(
+  channels: Float32Array[],
+  sampleRate: number,
+  settings: Pick<ProcessingSettings, 'thresholdDb' | 'minDurationMs' | 'paddingMs'>,
+): TrimBounds {
+  const energy = computeEnergyEnvelope(channels);
+  const regions = detectSilenceRegions(energy, sampleRate, settings.thresholdDb, settings.minDurationMs);
+  return computeTrimBounds(channels[0]?.length ?? 0, regions, sampleRate, settings.paddingMs);
+}
+
+export function clampManualTrim(trim: { start: number; end: number }, totalLength: number): TrimBounds {
+  const start = Math.max(0, Math.min(totalLength, Math.round(trim.start)));
+  const end = Math.max(start, Math.min(totalLength, Math.round(trim.end)));
+  if (end - start <= 0) {
+    return { start: 0, end: totalLength, warning: 'Manual trim selected no audio — not trimmed.' };
+  }
+  return { start, end };
+}
+
+/**
+ * The audible part of the pipeline (trim -> mono -> speed -> WAV
+ * sample-rate reduction) without encoding, for the waveform editor's
+ * live "Play Processed" preview before a batch is run.
+ */
+export async function renderPreview(
+  channels: Float32Array[],
+  sampleRate: number,
+  bounds: TrimBounds,
+  extension: string,
+  settings: ProcessingSettings,
+): Promise<{ channels: Float32Array[]; sampleRate: number }> {
+  let out = sliceChannels(channels, bounds);
+  if (!settings.preserveStereo) out = downmixToMono(out);
+  if (settings.speedMultiplier > 1.0) out = speedUp(out, settings.speedMultiplier);
+  let rate = sampleRate;
+  if (extension !== 'mp3' && settings.bitrateKbps < 320 && (out[0]?.length ?? 0) > 0) {
+    rate = getTargetSampleRate(settings.bitrateKbps);
+    out = await resampleToRate(out, sampleRate, rate);
+  }
+  return { channels: out, sampleRate: rate };
 }
 
 /**
@@ -41,19 +89,9 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   const originalDurationSec = (input.channels[0]?.length ?? 0) / input.sampleRate;
 
   input.onStage?.('trim');
-  const energy = computeEnergyEnvelope(input.channels);
-  const regions = detectSilenceRegions(
-    energy,
-    input.sampleRate,
-    settings.thresholdDb,
-    settings.minDurationMs,
-  );
-  const bounds = computeTrimBounds(
-    input.channels[0]?.length ?? 0,
-    regions,
-    input.sampleRate,
-    settings.paddingMs,
-  );
+  const bounds = input.manualTrim
+    ? clampManualTrim(input.manualTrim, input.channels[0]?.length ?? 0)
+    : computeAutoTrimBounds(input.channels, input.sampleRate, settings);
   let channels = sliceChannels(input.channels, bounds);
 
   input.onStage?.('downmix');

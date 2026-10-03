@@ -10,6 +10,7 @@ export interface ProcessJobRequest {
   baseName: string;
   settings: ProcessingSettings;
   originalBytes: number;
+  manualTrim?: { start: number; end: number };
 }
 
 export type WorkerInMessage = ProcessJobRequest;

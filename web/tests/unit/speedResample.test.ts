@@ -15,12 +15,37 @@ describe('speedUp', () => {
   });
 
   it('interpolates values along a linear ramp', () => {
-    // ramp(i) = i, speeding up 2x should sample at even indices: 0, 2, 4, ...
+    // ramp(i) = i; the centred anti-alias filter is linear-phase, so interior
+    // samples land exactly on even indices: 2, 4, 6, ... (edges are clamped).
     const ramp = Float32Array.from({ length: 10 }, (_, i) => i);
     const [out] = speedUp([ramp], 2.0);
     expect(out.length).toBe(5);
-    for (let i = 0; i < out.length; i++) {
+    for (let i = 1; i < out.length; i++) {
       expect(out[i]).toBeCloseTo(i * 2, 5);
+    }
+  });
+
+  it('interpolates without filtering below 1.5x', () => {
+    const ramp = Float32Array.from({ length: 20 }, (_, i) => i);
+    const [out] = speedUp([ramp], 1.25);
+    expect(out.length).toBe(16);
+    for (let i = 0; i < out.length; i++) {
+      expect(out[i]).toBeCloseTo(i * 1.25, 5);
+    }
+  });
+
+  it('supports 3x', () => {
+    const channel = new Float32Array(900).fill(0.5);
+    const [out] = speedUp([channel], 3.0);
+    expect(out.length).toBe(300);
+    expect(out[150]).toBeCloseTo(0.5, 5);
+  });
+
+  it('attenuates source-Nyquist content at 2x instead of aliasing it to DC', () => {
+    const nyquist = Float32Array.from({ length: 1000 }, (_, i) => (i % 2 === 0 ? 1 : -1));
+    const [out] = speedUp([nyquist], 2.0);
+    for (let i = 1; i < out.length; i++) {
+      expect(Math.abs(out[i])).toBeLessThan(1e-6);
     }
   });
 
