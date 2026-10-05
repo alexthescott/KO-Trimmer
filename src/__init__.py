@@ -1,1 +1,0 @@
-# KO Trimmer - Audio Silence Trimmer for KO II Sampler 

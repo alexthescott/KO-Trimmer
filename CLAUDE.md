@@ -6,42 +6,31 @@ trims silence from the start/end of samples, with optional mono downmix, bitrate
 sample-rate reduction, and tape-style speed-up — all aimed at shrinking sample size to
 fit tight device memory limits.
 
-## Status: web-first
+## Overview
 
-**`web/` is the primary, actively-developed app.** It's a Progressive Web App —
-installable from Chrome, works offline, and does all audio decode/trim/resample/encode
-and all file reading/writing locally in the browser. No server, no install, no FFmpeg
-dependency.
-
-**`src/` (the original PyQt6 desktop app) is legacy.** It still works and its source is
-the reference implementation the web app was ported from, but it is not where new
-feature work happens. See "Legacy desktop app" below before touching it.
-
-## Web app (`web/`)
-
-Vanilla TypeScript + Vite, no UI framework runtime. Lives entirely under `web/` —
-self-contained `package.json`, own `node_modules`, own `.gitignore`.
+Progressive Web App — installable from Chrome, works offline, and does all audio
+decode/trim/resample/encode and all file reading/writing locally in the browser. No
+server, no install, no FFmpeg dependency. Vanilla TypeScript + Vite, no UI framework
+runtime; lives at the repo root.
 
 ```bash
-cd web
 npm install
 npm run dev        # local dev server
 npm test           # unit tests (Vitest) — run before any audio/DSP change
-npm run build      # tsc --noEmit && vite build -> web/dist
+npm run build      # tsc --noEmit && vite build -> dist/
 npm run preview    # serve the production build locally
-npm run icons      # regenerate PWA icons from ../src/ui/images/Knockout.svg
+npm run icons      # regenerate PWA icons from assets/Knockout.svg
 ```
 
-Deploys automatically: pushing changes under `web/` to `main` triggers
-`.github/workflows/deploy-pwa.yml`, which runs `npm test` + `npm run build` and deploys
-`web/dist` to GitHub Pages. One-time repo setting required: Settings → Pages → source =
-"GitHub Actions". Production base path is `/KO-Trimmer/` (`web/vite.config.ts`),
-matching this repo's Pages project-page URL.
+Deploys automatically: pushing to `main` triggers `.github/workflows/deploy-pwa.yml`,
+which runs `npm test` + `npm run build` and deploys `dist/` to GitHub Pages. One-time
+repo setting required: Settings → Pages → source = "GitHub Actions". Production base
+path is `/KO-Trimmer/` (`vite.config.ts`), matching this repo's Pages project-page URL.
 
 ### Architecture
 
 ```
-web/src/
+src/
   app/        state.ts (single source of truth for files/settings/favorites),
               events.ts (typed pub/sub), processBatch.ts (orchestrates a batch run),
               decodedCache.ts (3-entry LRU of decoded audio for the editor),
@@ -59,10 +48,11 @@ web/src/
               (pooled, AbortController-based cancellation)
   ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
               WaveformEditor, SettingsPanel, FavoritesSidebar, ResultsSummary)
-  settings/   settingsManager.ts — localStorage, mirrors desktop's old QSettings defaults
+  settings/   settingsManager.ts — localStorage persistence
   pwa/        registerSW.ts (vite-plugin-pwa)
-web/tests/unit/   Vitest specs for every pure audio/ module — run these first when
+tests/unit/       Vitest specs for every pure audio/ module — run these first when
                   touching DSP logic; they encode the exact algorithms below.
+scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.svg)
 ```
 
 **Processing pipeline (fixed order, `audio/pipeline.ts`):**
@@ -80,40 +70,27 @@ Access API) — true overwrite, directory-handle output writing, persisted favor
 checkbox disabled with an explanatory tooltip rather than silently no-opping.
 
 **Default output location:** the File System Access API gives a directory handle no way
-to reach its own parent, so a true sibling `<root>_trimmed/` folder (like desktop made)
-isn't reachable. Default is a `<root>_trimmed` subfolder created *inside* the picked
-root instead (`fs/directoryPicker.ts: resolveDefaultOutputRoot`); an explicit "Choose
-output folder…" button lets the user pick a true sibling manually. The recursive folder
+to reach its own parent, so a true sibling `<root>_trimmed/` folder isn't reachable.
+Default is a `<root>_trimmed` subfolder created *inside* the picked root instead
+(`fs/directoryPicker.ts: resolveDefaultOutputRoot`); an explicit "Choose output folder…"
+button lets the user pick a true sibling manually. The recursive folder
 walk skips any directory named `*_trimmed` to avoid reprocessing its own output.
 
-### Deliberate behavior changes vs. the desktop app
+### Key behaviors (encoded in unit tests — don't regress)
 
-These were explicit decisions, not oversights — see `git log` on the initial PWA
-commit(s) for the full plan this was built from:
-
-1. **Trim both leading AND trailing silence.** Desktop's `processor.py::_trim_audio`
-   only ever trimmed trailing silence from the first detected silence block onward —
-   leading silence was never touched. `web/src/audio/trim.ts::computeTrimBounds` fixes
-   this: it anchors leading trim to a region starting at sample 0, trailing trim to a
-   region ending at the last sample, and leaves every internal region untouched.
-2. **"Overwrite" actually overwrites.** Desktop's Overwrite checkbox
-   (`processor.py::is_already_processed`) only ever forced reprocessing of
-   already-processed outputs — it never touched the original source file, despite the
-   label. `web/src/fs/overwriteWriter.ts` writes directly back to the source file's
-   `FileSystemFileHandle` when enabled and the source supports it (disabled with a
-   tooltip otherwise).
-3. **KO-II >20s check uses final processed duration**, not the original input duration.
-   Desktop checked the untrimmed input file's length; the web port checks the duration
-   *after* trim + speed-up, since that's what actually ends up on the hardware
-   (`audio/pipeline.ts` → `audio/naming.ts`).
-4. **New feature, not in desktop at all: speed-up.** A simple tape-style
-   resample (`audio/speedResample.ts`, 1.0x–3.0x, default off) that shortens duration
-   and raises pitch, as an additional size-reduction lever alongside bitrate/sample-rate
-   reduction. At ≥1.5x it averages `round(speed)` centred taps per output sample (box
-   anti-alias, as in the JUCE port's average-then-decimate, but linear-phase).
-5. **MP3 bitrate encoding is pure-JS** (`@breezystack/lamejs`, runs in the worker)
-   instead of shelling out to a system FFmpeg binary — this is what makes the whole app
-   installable with zero native dependencies.
+1. **Trim both leading AND trailing silence.** `audio/trim.ts::computeTrimBounds`
+   anchors leading trim to a region starting at sample 0, trailing trim to a region
+   ending at the last sample, and leaves every internal region untouched.
+2. **"Overwrite" actually overwrites** the source file: `fs/overwriteWriter.ts` writes
+   directly back to the source `FileSystemFileHandle` when enabled and supported
+   (disabled with a tooltip otherwise).
+3. **KO-II >20s check uses final processed duration** (after trim + speed-up), since
+   that's what ends up on the hardware (`audio/pipeline.ts` → `audio/naming.ts`).
+4. **Speed-up**: tape-style resample (`audio/speedResample.ts`, 1.0x–3.0x, default off)
+   that shortens duration and raises pitch. At ≥1.5x it averages `round(speed)` centred
+   taps per output sample (linear-phase box anti-alias).
+5. **MP3 encoding is pure-JS** (`@breezystack/lamejs`, runs in the worker) — zero
+   native dependencies.
 
 ### Features ported from the JUCE "KOTrimmer" rewrite
 
@@ -139,10 +116,7 @@ The JUCE app's detector (first/last sample above a peak threshold) was deliberat
 
 ### Settings defaults
 
-Canonical source: `web/src/audio/settingsDefaults.ts`. These intentionally mirror the
-desktop app's actual shipped widget defaults (`src/ui/main_window.py`), **not**
-`settings_manager.py`'s own default dict (`threshold: -40`), which was dead/unused in
-practice — the real default users saw was -50 dB.
+Canonical source: `src/audio/settingsDefaults.ts`.
 
 | Setting | Range | Default |
 |---|---|---|
@@ -154,28 +128,13 @@ practice — the real default users saw was -50 dB.
 | Preserve stereo | — | on |
 | Overwrite | — | off |
 
-## Legacy desktop app (`src/`)
-
-PyQt6 app, still functional, kept as reference and for anyone not on Chrome/a modern
-browser. Build tooling (`build_app.py`, `package_app.py`, `KO Trimmer.spec`) is
-no longer the primary distribution path — the web app replaced the need for a packaged
-desktop binary. Don't invest further in desktop packaging/build scripts; if you're
-fixing a bug here, check whether it's a bug the web port already fixed (see list above)
-before porting the old behavior back.
-
-The desktop app's naming is inconsistent across files (old "TrimVibe" name lingers in
-`build_app.py`, `package_app.py`, `README.md`, `.gitignore`; only `KO Trimmer.spec` and
-the app bundle identifier `com.kotrimmer.app` use the current name) — this is known,
-pre-existing, and not worth cleaning up given the app is legacy.
-
 ## Working in this repo
 
-- Changes under `web/**` trigger the Pages deploy workflow on push to `main` — be
-  deliberate about what lands on `main` vs. a branch.
-- When touching any `web/src/audio/*` module, run `npm test` in `web/` first — the unit
-  suite encodes the exact algorithms (including the three behavior fixes above) and is
-  fast (<1s).
-- `web/src/fs/`, service worker behavior, and actual playback are **not** covered by the
+- Every push to `main` triggers the Pages deploy workflow — be deliberate about what
+  lands on `main` vs. a branch.
+- When touching any `src/audio/*` module, run `npm test` first — the unit suite encodes
+  the exact algorithms (including the key behaviors above) and is fast (<1s).
+- `src/fs/`, service worker behavior, and actual playback are **not** covered by the
   unit suite (they need a real browser / File System Access API). No browser automation
   tool has been available in this environment to date — manual Chrome QA is still owed
   before trusting changes there blind. Checklist: install flow, offline reload,

@@ -1,60 +1,17 @@
-# macOS system files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Build directories
-build/
+# Dependencies & build output
+node_modules/
 dist/
-*.spec
+*.local
 
-# macOS App Bundle (large files, don't upload to GitHub)
-TrimVibe.app/
-*.app/
-
-# Build scripts (optional - can be committed if needed)
-create_app_bundle.sh
-test_app_bundle.sh
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv/
-ENV/
-env.bak/
-venv.bak/
+# macOS
+.DS_Store
+._*
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
 *~
 
-# Application-specific
-# Prevent accidental drag-and-drop directories
-"Drop audio files or folders here*"
-"*wet loop*"
-"*audio files*"
-
-# Test audio files (large files, don't upload to GitHub)
-tests/sample_audio/
-tests/**/*.wav
-tests/**/*.mp3
-tests/**/*.flac
-tests/**/*.aiff
-tests/**/*.m4a
-tests/**/*.ogg
-
-# Log files
+# Logs
 *.log
-trimvibe_debug.log

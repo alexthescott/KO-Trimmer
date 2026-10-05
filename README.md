@@ -5,15 +5,13 @@ Batch silence-trimmer for beatmakers with limited sample storage on hardware dev
 start and end of every sample in a folder, with optional mono downmix, bitrate/sample-rate
 reduction, and tape-style speed-up to squeeze samples into tight device memory.
 
-## Web App
-
 **Use it at [alexthescott.github.io/KO-Trimmer](https://alexthescott.github.io/KO-Trimmer/)** —
 installable from Chrome, works offline, no download or FFmpeg required. All audio
 processing and file reading/writing happens locally in your browser.
 
 ![KO Trimmer web app — file list and waveform editor](docs/screenshots/main.png)
 
-### How to use
+## How to use
 
 1. **Add samples.** Drop audio files or a folder onto the app, or click to choose a folder.
    Every supported sample in it (including subfolders) is queued. Favorite folders can be
@@ -39,35 +37,36 @@ processing get an underscore (`_`) prefix for KO II compatibility.
 
 See [`web/README.md`](web/README.md) for development and deployment instructions.
 
-## Legacy Desktop App
+## Development
 
-The original PyQt6 desktop app in `src/` still works but is no longer actively developed —
-the web app replaces it. It requires a system FFmpeg install (`brew install ffmpeg` on macOS,
-`sudo apt install ffmpeg` on Linux, or [ffmpeg.org](https://ffmpeg.org/) on Windows) for MP3
-output.
+Vanilla TypeScript + Vite, no UI framework.
 
 ```bash
-pip install -r requirements.txt
-python3 src/main.py
+npm install
+npm run dev        # local dev server
+npm test           # unit tests (Vitest)
+npm run build      # typecheck + production build to dist/
+npm run preview    # serve dist/ locally at the /KO-Trimmer/ base path
+npm run icons      # regenerate PWA icons from assets/Knockout.svg
 ```
 
-Drag audio files or folders onto the window, adjust threshold (-60 to 0 dB), minimum silence
-duration (100–10000 ms), padding (0–1000 ms), bitrate, and stereo, then click
-**Process Files**. Note the desktop app only trims trailing silence; the web app trims both
-ends.
+Unit tests cover the pure DSP logic (energy envelope, silence detection, leading+trailing
+trim, naming rules, speed-up resampling, size estimates, and an MP3 encoder smoke test).
+Browser-only behavior (File System Access API, drag-drop, service worker, playback) isn't
+covered. Run `npm test` before changing anything under `src/audio/`.
 
-Desktop tests:
+### Deploy
 
-```bash
-cd tests
-python3 run_tests.py                       # all
-python3 run_tests.py --category processing # or ui / layout
-```
+Pushing to `main` triggers `.github/workflows/deploy-pwa.yml`, which tests, builds, and
+deploys `dist/` to GitHub Pages. One-time setup: Settings → Pages → source = "GitHub
+Actions". The production base path is `/KO-Trimmer/` (`vite.config.ts`); change `base` to
+`/` if moving to a custom domain.
 
-## Contributing
+### Browser support
 
-New feature work goes in `web/`. Run `npm test` in `web/` before changing anything under
-`web/src/audio/`.
+Full functionality (true in-place overwrite, writing output directly into a folder,
+persisted favorite folders) requires Chrome's File System Access API. Other browsers get a
+degraded-but-functional tier: a `<input webkitdirectory>` folder picker and a ZIP download.
 
 ## License
 
