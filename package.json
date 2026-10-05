@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
+    "client-zip": "^2.5.1",
     "fflate": "^0.8.3"
   },
   "devDependencies": {

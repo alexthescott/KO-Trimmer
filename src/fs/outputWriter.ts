@@ -1,4 +1,6 @@
 import { Zip, ZipPassThrough } from 'fflate';
+import { makeZip } from 'client-zip';
+import { AsyncQueue } from './asyncQueue';
 import { ensureReadWrite } from './permissions';
 
 export interface OutputSink {
@@ -42,15 +44,67 @@ export class FsAccessOutputSink implements OutputSink {
   }
 }
 
+/** OPFS file names for disk-backed ZIPs; stale ones from earlier batches are deleted at the next batch. */
+const DISK_ZIP_PREFIX = 'batch-output-';
+
 /**
- * ZIP parts roll over at this size. Keeps every archive well under fflate's
+ * One ZIP of the whole batch, streamed to the Origin Private File System as
+ * each output completes and downloaded from disk at the end — for browsers
+ * without FS Access but with OPFS (Firefox, Safari). Any size, flat memory:
+ * outputs are written as they arrive (store-only, ZIP64 past 4 GB via
+ * client-zip) and never held together in RAM or a single buffer.
+ */
+export class DiskZipOutputSink implements OutputSink {
+  private queue = new AsyncQueue<{ name: string; input: Uint8Array; lastModified: Date }>();
+  private paths = new Set<string>();
+  private written: Promise<void>;
+
+  /** Undefined when OPFS isn't available (e.g. Firefox private windows) — use ZipOutputSink instead. */
+  static async create(downloadName: string): Promise<DiskZipOutputSink | undefined> {
+    try {
+      const dir = await navigator.storage.getDirectory();
+      for await (const name of dir.keys()) {
+        if (name.startsWith(DISK_ZIP_PREFIX)) await dir.removeEntry(name).catch(() => {});
+      }
+      const handle = await dir.getFileHandle(`${DISK_ZIP_PREFIX}${Date.now()}.zip`, { create: true });
+      return new DiskZipOutputSink(handle, await handle.createWritable(), downloadName);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private constructor(
+    private handle: FileSystemFileHandle,
+    writable: FileSystemWritableFileStream,
+    private downloadName: string,
+  ) {
+    this.written = makeZip(this.queue).pipeTo(writable);
+    // A failed disk write (quota, I/O) must fail pending write() calls rather than hang them.
+    this.written.catch((err) => this.queue.fail(err));
+  }
+
+  async write(relativePath: string, bytes: Uint8Array): Promise<void> {
+    await this.queue.push({ name: uniquePath(relativePath, this.paths), input: bytes, lastModified: new Date() });
+  }
+
+  async finalize(): Promise<void> {
+    this.queue.close();
+    await this.written;
+    if (this.paths.size === 0) return;
+    download(await this.handle.getFile(), this.downloadName);
+  }
+}
+
+/**
+ * Fallback when OPFS is unavailable. ZIP parts roll over at this size. Keeps every archive well under fflate's
  * non-ZIP64 4 GB limit and Firefox's 2 GB-per-buffer limits, and lets each
  * part download (and its memory go) while the batch is still running.
  */
 const ZIP_PART_LIMIT_BYTES = 1024 ** 3;
 
 /**
- * Streams outputs into ZIPs as they complete, for browsers without FS Access.
+ * In-memory fallback for browsers with neither FS Access nor OPFS: streams
+ * outputs into ZIPs as they complete.
  * Entries are stored uncompressed — audio barely deflates — and appended at
  * write time, so there's no long main-thread block at the end of a big batch.
  * A batch over ZIP_PART_LIMIT_BYTES downloads as "<name>-part1.zip", "-part2", …

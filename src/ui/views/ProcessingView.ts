@@ -4,7 +4,7 @@ import { appEvents } from '../../app/events';
 import { FileTable } from '../components/FileTable';
 import { renderResultsSummary } from '../components/ResultsSummary';
 import { processBatch, type BatchSummary } from '../../app/processBatch';
-import { FsAccessOutputSink, ZipOutputSink, type OutputSink } from '../../fs/outputWriter';
+import { DiskZipOutputSink, FsAccessOutputSink, ZipOutputSink, type OutputSink } from '../../fs/outputWriter';
 import type { FileEntry } from '../../app/types';
 import { TRIMMED_SUFFIX } from '../../fs/dragDropEntries';
 
@@ -91,25 +91,25 @@ export class ProcessingView {
     this.statusLabel.textContent = 'Stopping…';
   }
 
-  private buildOutputSink(): OutputSink {
+  private async buildOutputSink(): Promise<OutputSink> {
     if (appState.outputRootHandle) {
       return new FsAccessOutputSink(appState.outputRootHandle);
     }
     const zipName = `${appState.rootName ?? 'sample-trimmer-output'}${TRIMMED_SUFFIX}.zip`;
-    return new ZipOutputSink(zipName);
+    return (await DiskZipOutputSink.create(zipName)) ?? new ZipOutputSink(zipName);
   }
 
   private describeOutput(): string {
     if (appState.outputRootHandle) {
       return `Written to "${appState.outputRootHandle.name}/"`;
     }
-    return 'Downloaded as a ZIP file (split into ~1 GB parts when larger)';
+    return 'Downloaded as a ZIP file';
   }
 
   private async run(files: FileEntry[]): Promise<void> {
-    const sink = this.buildOutputSink();
     let summary: BatchSummary;
     try {
+      const sink = await this.buildOutputSink();
       summary = await processBatch(files, appState.settings, sink, this.controller.signal);
     } catch (err) {
       this.statusLabel.textContent = `Processing failed: ${err instanceof Error ? err.message : String(err)}`;

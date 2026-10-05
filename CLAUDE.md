@@ -52,7 +52,8 @@ src/
   fs/         File System Access API: capabilities, directoryPicker
               (pickWritableDirectory), dragDropEntries (TRIMMED_SUFFIX), permissions
               (ensureReadWrite),
-              outputWriter (FS Access sink + ZIP/fflate fallback sink),
+              outputWriter (FS Access sink; OPFS-backed ZIP sink; in-memory
+              split-ZIP fallback), asyncQueue (backpressured producer→stream),
               overwriteWriter (true in-place overwrite; canOverwrite)
   workers/    protocol.ts (message types built on PipelineRequest/PipelineOutput),
               processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
@@ -112,7 +113,12 @@ preview/source peak to predict it, the table tags it `32f · avoids clip`.
 **File-system capability tiers** (`fs/capabilities.ts`): **Full** (Chrome, File System
 Access API) — true overwrite, directory-handle output writing.
 **Degraded** (other browsers) — `<input webkitdirectory>` + ZIP download, overwrite
-checkbox disabled with an explanatory tooltip rather than silently no-opping.
+checkbox disabled with an explanatory tooltip rather than silently no-opping. The ZIP
+is one archive of the whole batch, streamed store-only to the Origin Private File
+System as outputs complete (`DiskZipOutputSink`, client-zip, ZIP64 past 4 GB) and
+downloaded from disk — so batch size isn't bounded by RAM or Firefox's 2 GB Blob-part
+limit. Without OPFS (e.g. Firefox private windows) it falls back to in-memory fflate
+ZIPs split into ~1 GB parts (`ZipOutputSink`).
 
 **Default output location:** the File System Access API gives a directory handle no way
 to reach its own parent, so a true sibling `<root>_trimmed/` folder isn't reachable.
