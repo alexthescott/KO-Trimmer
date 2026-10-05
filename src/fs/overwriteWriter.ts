@@ -2,6 +2,7 @@ import type { FileEntry } from '../app/types';
 import { extensionOf } from '../app/fileNames';
 import { outputContainerFor } from '../audio/outputContainer';
 import { ensureReadWrite } from './permissions';
+import { writeFile } from './writeFile';
 
 /**
  * True "Overwrite" support: writes directly back to the exact source
@@ -14,9 +15,7 @@ export async function overwriteSourceFile(
   if (!(await ensureReadWrite(fileHandle))) {
     throw new Error('Write permission to overwrite the original file was not granted.');
   }
-  const writable = await fileHandle.createWritable();
-  await writable.write(bytes as Uint8Array<ArrayBuffer>);
-  await writable.close();
+  await writeFile(fileHandle, bytes);
 }
 
 /**

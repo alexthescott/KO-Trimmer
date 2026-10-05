@@ -2,6 +2,8 @@ import { Zip, ZipPassThrough } from 'fflate';
 import { makeZip } from 'client-zip';
 import { AsyncQueue } from './asyncQueue';
 import { ensureReadWrite } from './permissions';
+import { ArchivePaths } from './archivePaths';
+import { writeFile } from './writeFile';
 
 export interface OutputSink {
   write(relativePath: string, bytes: Uint8Array): Promise<void>;
@@ -33,10 +35,7 @@ export class FsAccessOutputSink implements OutputSink {
     for (const part of parts) {
       dir = await dir.getDirectoryHandle(part, { create: true });
     }
-    const fileHandle = await dir.getFileHandle(fileName, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(bytes as Uint8Array<ArrayBuffer>);
-    await writable.close();
+    await writeFile(await dir.getFileHandle(fileName, { create: true }), bytes);
   }
 
   async finalize(): Promise<void> {
@@ -56,7 +55,7 @@ const DISK_ZIP_PREFIX = 'batch-output-';
  */
 export class DiskZipOutputSink implements OutputSink {
   private queue = new AsyncQueue<{ name: string; input: Uint8Array; lastModified: Date }>();
-  private paths = new Set<string>();
+  private paths = new ArchivePaths();
   private written: Promise<void>;
 
   /** Undefined when OPFS isn't available (e.g. Firefox private windows) — use ZipOutputSink instead. */
@@ -84,21 +83,21 @@ export class DiskZipOutputSink implements OutputSink {
   }
 
   async write(relativePath: string, bytes: Uint8Array): Promise<void> {
-    await this.queue.push({ name: uniquePath(relativePath, this.paths), input: bytes, lastModified: new Date() });
+    await this.queue.push({ name: this.paths.claim(relativePath), input: bytes, lastModified: new Date() });
   }
 
   async finalize(): Promise<void> {
     this.queue.close();
     await this.written;
-    if (this.paths.size === 0) return;
+    if (this.paths.isEmpty) return;
     download(await this.handle.getFile(), this.downloadName);
   }
 }
 
 /**
- * Fallback when OPFS is unavailable. ZIP parts roll over at this size. Keeps every archive well under fflate's
- * non-ZIP64 4 GB limit and Firefox's 2 GB-per-buffer limits, and lets each
- * part download (and its memory go) while the batch is still running.
+ * ZipOutputSink starts a new part past this size: well under fflate's
+ * non-ZIP64 4 GB limit and Firefox's 2 GB-per-buffer limit, and each part
+ * downloads (freeing its memory) while the batch is still running.
  */
 const ZIP_PART_LIMIT_BYTES = 1024 ** 3;
 
@@ -112,30 +111,36 @@ const ZIP_PART_LIMIT_BYTES = 1024 ** 3;
 export class ZipOutputSink implements OutputSink {
   private part?: ZipPart;
   private partsDownloaded = 0;
-  private paths = new Set<string>();
-  private downloadName: string;
+  private paths = new ArchivePaths();
+  private stem: string;
 
   constructor(downloadName: string) {
-    this.downloadName = downloadName;
+    this.stem = downloadName.replace(/\.zip$/i, '');
   }
 
   async write(relativePath: string, bytes: Uint8Array): Promise<void> {
-    if (this.part && this.part.bytes + bytes.length > ZIP_PART_LIMIT_BYTES) this.downloadPart(false);
+    if (this.part && this.part.bytes + bytes.length > ZIP_PART_LIMIT_BYTES) {
+      this.downloadPart(this.part, this.numberedPartName());
+    }
     this.part ??= new ZipPart();
-    this.part.add(uniquePath(relativePath, this.paths), bytes);
+    this.part.add(this.paths.claim(relativePath), bytes);
   }
 
+  /** A batch that never rolled over downloads as one unnumbered ZIP. */
   async finalize(): Promise<void> {
-    this.downloadPart(true);
+    if (!this.part) return;
+    this.downloadPart(this.part, this.partsDownloaded === 0 ? `${this.stem}.zip` : this.numberedPartName());
   }
 
-  private downloadPart(isLast: boolean): void {
-    if (!this.part) return;
-    const blob = this.part.end();
+  private numberedPartName(): string {
+    return `${this.stem}-part${this.partsDownloaded + 1}.zip`;
+  }
+
+  private downloadPart(part: ZipPart, fileName: string): void {
+    const blob = part.end();
     this.part = undefined;
-    const stem = this.downloadName.replace(/\.zip$/i, '');
-    const single = isLast && this.partsDownloaded === 0;
-    download(blob, single ? `${stem}.zip` : `${stem}-part${++this.partsDownloaded}.zip`);
+    this.partsDownloaded++;
+    download(blob, fileName);
   }
 }
 
@@ -172,14 +177,4 @@ function download(blob: Blob, fileName: string): void {
   anchor.click();
   // Revoking straight away can cancel a large download before it starts (Firefox).
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
-
-/** A path not yet in `taken` (and records it): "a.wav", then "a (2).wav", … — entries can't be replaced once streamed. */
-function uniquePath(path: string, taken: Set<string>): string {
-  let candidate = path;
-  const dot = path.lastIndexOf('.');
-  const [stem, ext] = dot > path.lastIndexOf('/') ? [path.slice(0, dot), path.slice(dot)] : [path, ''];
-  for (let n = 2; taken.has(candidate); n++) candidate = `${stem} (${n})${ext}`;
-  taken.add(candidate);
-  return candidate;
 }
