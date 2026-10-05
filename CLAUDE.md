@@ -37,7 +37,8 @@ src/
               batchEstimate.ts (progressive per-file + whole-batch size estimate),
               fileEntries.ts, types.ts
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
-              sampleRateResample, wavEncoder, mp3Encoder, naming, estimate.ts
+              sampleRateResample, wavEncoder, mp3Encoder, naming, sampleFormat.ts
+              (source bit-depth header parsing + output format), estimate.ts
               (output-size prediction), pipeline.ts (orchestrates the fixed stage
               order below; also exports computeAutoTrimBounds + renderPreview, the
               shared code paths the editor and estimator use), player.ts (preview
@@ -65,6 +66,14 @@ sample-rate/bitrate reduction → encode (worker thread). Decode is isolated per
 **Output container:** always `.wav` or `.mp3`, matching input when the input is mp3,
 else `.wav` — there's no browser encoder for flac/aiff/m4a/ogg, so anything else decodes
 fine but re-encodes as lossless WAV.
+
+**Bit depth:** `decodeAudioData` always yields float32, so the source bit depth is read
+from the file header (`audio/sampleFormat.ts`: WAV incl. EXTENSIBLE/RF64, AIFF/AIFC,
+FLAC; first 64 KB, probed once in `app/fileEntries.ts` → `FileEntry.sourceFormat`). WAV
+output is 16-bit PCM by default; "Preserve Bit Depth" keeps the source format
+(8/16/24/32-bit int or 32-bit float). Conversions are surfaced in the editor size line,
+a `32f→16` tag in the file table, and the results summary; integer output of a float
+source peaking above 0 dBFS gets a clip warning.
 
 **File-system capability tiers** (`fs/capabilities.ts`): **Full** (Chrome, File System
 Access API) — true overwrite, directory-handle output writing, persisted favorites.
@@ -132,6 +141,7 @@ Canonical source: `src/audio/settingsDefaults.ts`.
 | Speed-up | 1.0x–3.0x | 1.0x (off) |
 | Bitrate | 320/192/160/128/96/64 kbps | 320 (no reduction) |
 | Preserve stereo | — | on |
+| Preserve bit depth | — | off (16-bit WAV) |
 | Overwrite | — | off |
 
 ## Working in this repo

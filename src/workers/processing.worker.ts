@@ -20,6 +20,7 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage | { type: 'cancel'; 
       baseName: msg.baseName,
       settings: msg.settings,
       originalBytes: msg.originalBytes,
+      sourceFormat: msg.sourceFormat,
       manualTrim: msg.manualTrim,
       isCancelled: () => cancelledJobIds.has(jobId),
       onStage: (stage) => {

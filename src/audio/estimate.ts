@@ -1,5 +1,7 @@
 import type { BitrateKbps, ProcessingSettings } from '../app/types';
 import { getTargetSampleRate } from './sampleRateResample';
+import { resolveOutputFormat, type SampleFormat } from './sampleFormat';
+import { wavHeaderBytes } from './wavEncoder';
 
 export interface EstimateInput {
   /** Frames kept after trim, at the source sample rate. */
@@ -7,13 +9,16 @@ export interface EstimateInput {
   sourceChannels: number;
   sourceSampleRate: number;
   extension: string;
-  settings: Pick<ProcessingSettings, 'speedMultiplier' | 'preserveStereo' | 'bitrateKbps'>;
+  /** Source bit depth from the file header, if known. */
+  sourceFormat?: SampleFormat;
+  settings: Pick<ProcessingSettings, 'speedMultiplier' | 'preserveStereo' | 'bitrateKbps'> &
+    Partial<Pick<ProcessingSettings, 'preserveBitDepth'>>;
 }
 
 /**
  * Predicts output bytes with the same rules runPipeline applies after the
  * trim: mono downmix, speed-up length rounding, WAV sample-rate reduction
- * as a bitrate proxy, then 16-bit PCM WAV (44-byte header) or CBR MP3.
+ * as a bitrate proxy, then WAV at the resolved output bit depth or CBR MP3.
  * Ported from the JUCE KOTrimmer's estimateOutputSize.
  */
 export function estimateOutputBytes(input: EstimateInput): number {
@@ -39,7 +44,8 @@ export function estimateOutputBytes(input: EstimateInput): number {
     }
   }
 
-  return 44 + frames * channels * 2;
+  const format = resolveOutputFormat(input.sourceFormat, settings.preserveBitDepth ?? false);
+  return wavHeaderBytes(format) + frames * channels * (format.bits / 8);
 }
 
 export interface BatchEstimateSample {

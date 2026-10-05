@@ -7,6 +7,7 @@ import type { DecodedAudio } from '../../audio/decode';
 import type { TrimBounds } from '../../audio/trim';
 import { computeAutoTrimBounds, renderPreview } from '../../audio/pipeline';
 import { estimateOutputBytes } from '../../audio/estimate';
+import { clipWarning, formatLabel, peakAbs, resolveOutputFormat, sameFormat } from '../../audio/sampleFormat';
 import { playChannels, stopPlayback, type PlaybackHandle } from '../../audio/player';
 
 const PEAK_BLOCK = 256;
@@ -46,7 +47,7 @@ export class WaveformEditor {
   private viewStart = 0;
   private viewEnd = 0;
 
-  private processed?: { channels: Float32Array[]; sampleRate: number; peaks: Peaks };
+  private processed?: { channels: Float32Array[]; sampleRate: number; peaks: Peaks; peak: number };
   private previewPromise?: Promise<void>;
   private previewTimer?: number;
   private previewToken = 0;
@@ -257,7 +258,8 @@ export class WaveformEditor {
       appState.settings,
     );
     if (token !== this.previewToken) return;
-    this.processed = { ...result, peaks: computePeaks(result.channels) };
+    this.processed = { ...result, peaks: computePeaks(result.channels), peak: peakAbs(result.channels) };
+    this.updateReadouts();
     this.draw();
   }
 
@@ -326,7 +328,11 @@ export class WaveformEditor {
     const sr = this.audio.sampleRate;
     const kept = this.trim.end - this.trim.start;
     const mode = this.hasManual ? 'MANUAL' : 'AUTO';
-    const warning = !this.hasManual && this.autoBounds?.warning ? ` · ${this.autoBounds.warning}` : '';
+    const outputFormat =
+      this.extension === 'mp3' ? undefined : resolveOutputFormat(this.file.sourceFormat, appState.settings.preserveBitDepth);
+    const clip = outputFormat && this.processed ? clipWarning(this.processed.peak, outputFormat) : undefined;
+    const warning =
+      (!this.hasManual && this.autoBounds?.warning ? ` · ${this.autoBounds.warning}` : '') + (clip ? ` · ${clip}` : '');
     this.trimInfoEl.textContent =
       `${mode} · START ${formatDuration(this.trim.start / sr)} · END ${formatDuration(this.trim.end / sr)} · ` +
       `LENGTH ${formatDuration(kept / sr)} of ${formatDuration(this.length / sr)}${warning}`;
@@ -336,10 +342,18 @@ export class WaveformEditor {
       sourceChannels: this.audio.channels.length,
       sourceSampleRate: sr,
       extension: this.extension,
+      sourceFormat: this.file.sourceFormat,
       settings: appState.settings,
     });
     const pct = Math.round((1 - estimate / Math.max(1, this.file.size)) * 100);
-    this.sizeEl.textContent = `${formatBytes(this.file.size)} → ~${formatBytes(estimate)} (${pct >= 0 ? '−' : '+'}${Math.abs(pct)}%)`;
+    const source = this.file.sourceFormat;
+    const depth =
+      source && outputFormat
+        ? sameFormat(source, outputFormat)
+          ? ` · ${formatLabel(source)}${appState.settings.preserveBitDepth ? ' (kept)' : ''}`
+          : ` · ${formatLabel(source)} → ${formatLabel(outputFormat)}`
+        : '';
+    this.sizeEl.textContent = `${formatBytes(this.file.size)} → ~${formatBytes(estimate)} (${pct >= 0 ? '−' : '+'}${Math.abs(pct)}%)${depth}`;
   }
 
   // ---- zoom / pan / drag --------------------------------------------------

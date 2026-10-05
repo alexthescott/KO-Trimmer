@@ -5,6 +5,7 @@ export const DEFAULT_SETTINGS: ProcessingSettings = {
   minDurationMs: 10,
   paddingMs: 20,
   preserveStereo: true,
+  preserveBitDepth: false,
   bitrateKbps: 320,
   speedMultiplier: 1.0,
   overwrite: false,

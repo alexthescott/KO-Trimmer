@@ -1,3 +1,5 @@
+import type { SampleFormat } from '../audio/sampleFormat';
+
 export type BitrateKbps = 320 | 192 | 160 | 128 | 96 | 64;
 
 export interface ProcessingSettings {
@@ -5,6 +7,8 @@ export interface ProcessingSettings {
   minDurationMs: number;
   paddingMs: number;
   preserveStereo: boolean;
+  /** Keep the source's bit depth (e.g. 32-bit float) instead of writing 16-bit WAV. */
+  preserveBitDepth: boolean;
   bitrateKbps: BitrateKbps;
   speedMultiplier: number;
   overwrite: boolean;
@@ -26,6 +30,9 @@ export interface ProcessStats {
   originalDurationSec: number;
   outputDurationSec: number;
   longerThan20s: boolean;
+  /** Set for WAV output when the source bit depth is known. */
+  sourceFormat?: SampleFormat;
+  outputFormat?: SampleFormat;
 }
 
 export interface FileEntry {
@@ -44,6 +51,8 @@ export interface FileEntry {
   outputName?: string;
   stats?: ProcessStats;
   stage?: ProcessingStage;
+  /** Bit depth read from the file header; undefined for lossy/unknown formats. */
+  sourceFormat?: SampleFormat;
   /** Manually dragged trim points in source samples (end exclusive); overrides auto-detect. */
   manualTrim?: { start: number; end: number };
 }

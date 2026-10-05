@@ -1,5 +1,6 @@
 import type { ProcessingSettings, ProcessingStage, ProcessStats } from '../app/types';
 import type { WorkerOutMessage } from './protocol';
+import type { SampleFormat } from '../audio/sampleFormat';
 
 export interface QueuedJob {
   fileId: string;
@@ -9,6 +10,7 @@ export interface QueuedJob {
   baseName: string;
   settings: ProcessingSettings;
   originalBytes: number;
+  sourceFormat?: SampleFormat;
   manualTrim?: { start: number; end: number };
 }
 
@@ -139,6 +141,7 @@ export class WorkerPool {
         baseName: entry.job.baseName,
         settings: entry.job.settings,
         originalBytes: entry.job.originalBytes,
+        sourceFormat: entry.job.sourceFormat,
         manualTrim: entry.job.manualTrim,
       },
       { transfer: entry.job.channels.map((c) => c.buffer) },

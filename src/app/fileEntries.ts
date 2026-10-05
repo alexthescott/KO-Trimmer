@@ -1,5 +1,6 @@
 import type { DroppedEntry } from '../fs/dragDropEntries';
 import type { FileEntry } from './types';
+import { FORMAT_PROBE_BYTES, parseSampleFormat } from '../audio/sampleFormat';
 
 export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[]> {
   const result: FileEntry[] = [];
@@ -15,6 +16,7 @@ export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[
       fileHandle: entry.fileHandle,
       file,
       status: 'queued',
+      sourceFormat: await probeSampleFormat(file),
     });
   }
   return result;
@@ -24,4 +26,13 @@ export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[
 export function deriveRootName(entries: DroppedEntry[]): string | undefined {
   const withSlash = entries.find((e) => e.relativePath.includes('/'));
   return withSlash?.relativePath.split('/')[0];
+}
+
+/** Reads just the header bytes; a probe failure only means no bit-depth info. */
+async function probeSampleFormat(file: File) {
+  try {
+    return parseSampleFormat(new Uint8Array(await file.slice(0, FORMAT_PROBE_BYTES).arrayBuffer()));
+  } catch {
+    return undefined;
+  }
 }

@@ -1,4 +1,5 @@
 import type { ProcessingSettings, ProcessingStage, ProcessStats } from '../app/types';
+import type { SampleFormat } from '../audio/sampleFormat';
 
 export interface ProcessJobRequest {
   type: 'process';
@@ -10,6 +11,7 @@ export interface ProcessJobRequest {
   baseName: string;
   settings: ProcessingSettings;
   originalBytes: number;
+  sourceFormat?: SampleFormat;
   manualTrim?: { start: number; end: number };
 }
 

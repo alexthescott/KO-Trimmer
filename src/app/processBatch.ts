@@ -4,6 +4,7 @@ import { decodeAudioFile } from '../audio/decode';
 import { WorkerPool } from '../workers/workerPool';
 import type { OutputSink } from '../fs/outputWriter';
 import { overwriteSourceFile, canOverwrite } from '../fs/overwriteWriter';
+import { formatLabel, sameFormat } from '../audio/sampleFormat';
 
 export interface BatchSummary {
   processedCount: number;
@@ -12,6 +13,8 @@ export interface BatchSummary {
   originalBytes: number;
   outputBytes: number;
   longerThan20sNames: string[];
+  /** e.g. { "32-bit float → 16-bit": 14 } */
+  formatConversions: Record<string, number>;
   aborted: boolean;
 }
 
@@ -46,6 +49,7 @@ export async function processBatch(
     originalBytes: 0,
     outputBytes: 0,
     longerThan20sNames: [],
+    formatConversions: {},
     aborted: false,
   };
 
@@ -78,6 +82,7 @@ export async function processBatch(
         baseName,
         settings,
         originalBytes: file.size,
+        sourceFormat: file.sourceFormat,
         manualTrim: file.manualTrim,
       });
 
@@ -112,6 +117,11 @@ export async function processBatch(
       summary.originalBytes += result.stats.originalBytes;
       summary.outputBytes += result.stats.outputBytes;
       if (result.stats.longerThan20s) summary.longerThan20sNames.push(result.outputName);
+      const { sourceFormat, outputFormat } = result.stats;
+      if (sourceFormat && outputFormat && !sameFormat(sourceFormat, outputFormat)) {
+        const key = `${formatLabel(sourceFormat)} → ${formatLabel(outputFormat)}`;
+        summary.formatConversions[key] = (summary.formatConversions[key] ?? 0) + 1;
+      }
     } catch (err) {
       if (signal.aborted) {
         appState.updateFile(file.id, { status: 'skipped' });

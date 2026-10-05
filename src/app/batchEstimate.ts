@@ -81,6 +81,7 @@ export class BatchEstimator {
         sourceChannels: info.channels,
         sourceSampleRate: info.sampleRate,
         extension: extensionOf(file.name),
+        sourceFormat: file.sourceFormat,
         settings,
       });
       samples.push({ originalBytes: file.size, estimatedBytes });

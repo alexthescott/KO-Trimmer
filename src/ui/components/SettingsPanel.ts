@@ -42,6 +42,12 @@ export class SettingsPanel {
         'Unchecked converts to mono.',
         (checked) => appState.updateSettings({ preserveStereo: checked }),
       ),
+      checkboxRow(
+        'Preserve Bit Depth',
+        s.preserveBitDepth,
+        'Unchecked writes 16-bit WAV (smallest). Checked keeps the source format, e.g. 32-bit float — check your device supports it.',
+        (checked) => appState.updateSettings({ preserveBitDepth: checked }),
+      ),
       overwriteCheckboxRow(s.overwrite, anyHandleBacked),
     ]);
 

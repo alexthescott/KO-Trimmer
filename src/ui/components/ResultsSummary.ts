@@ -30,6 +30,9 @@ export function renderResultsSummary(
       ]),
     );
   }
+  for (const [conversion, count] of Object.entries(summary.formatConversions)) {
+    rows.push(h('p', {}, [`${count} file${count === 1 ? '' : 's'} converted ${conversion}`]));
+  }
   rows.push(h('p', { class: 'muted' }, [outputDescription]));
 
   if (summary.longerThan20sNames.length > 0) {

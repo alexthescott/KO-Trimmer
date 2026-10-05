@@ -8,6 +8,7 @@ import { getTargetSampleRate, resampleToRate } from './sampleRateResample';
 import { encodeWav } from './wavEncoder';
 import { encodeMp3 } from './mp3Encoder';
 import { buildOutputFilename } from './naming';
+import { clipWarning, peakAbs, resolveOutputFormat, type SampleFormat } from './sampleFormat';
 
 export interface PipelineInput {
   channels: Float32Array[];
@@ -16,6 +17,8 @@ export interface PipelineInput {
   baseName: string;
   settings: ProcessingSettings;
   originalBytes: number;
+  /** Source bit depth from the file header, if known. */
+  sourceFormat?: SampleFormat;
   /** User-dragged trim points (source samples, end exclusive); overrides auto-detection. */
   manualTrim?: { start: number; end: number };
   onStage?: (stage: 'trim' | 'downmix' | 'speedup' | 'resample' | 'encode') => void;
@@ -116,10 +119,12 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   }
 
   input.onStage?.('encode');
+  const outputFormat = outputExtension === 'wav' ? resolveOutputFormat(input.sourceFormat, settings.preserveBitDepth) : undefined;
+  const clip = outputFormat ? clipWarning(peakAbs(channels), outputFormat) : undefined;
   const bytes =
     outputExtension === 'mp3'
       ? encodeMp3(channels, sampleRate, settings.bitrateKbps, input.isCancelled)
-      : encodeWav(channels, sampleRate);
+      : encodeWav(channels, sampleRate, outputFormat);
 
   const finalDurationSec = (channels[0]?.length ?? 0) / sampleRate;
   const outputName = buildOutputFilename({
@@ -137,7 +142,10 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     originalDurationSec,
     outputDurationSec: finalDurationSec,
     longerThan20s: finalDurationSec > 20,
+    sourceFormat: outputFormat && input.sourceFormat,
+    outputFormat,
   };
 
-  return { bytes, outputName, outputExtension, stats, warning: bounds.warning };
+  const warning = [bounds.warning, clip].filter(Boolean).join(' · ') || undefined;
+  return { bytes, outputName, outputExtension, stats, warning };
 }

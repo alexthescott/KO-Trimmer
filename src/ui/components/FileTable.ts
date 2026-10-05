@@ -1,5 +1,7 @@
 import { h, formatBytes } from '../dom';
 import type { FileEntry } from '../../app/types';
+import { appState } from '../../app/state';
+import { formatLabel, formatShortLabel, resolveOutputFormat, sameFormat } from '../../audio/sampleFormat';
 
 const STAGE_LABEL: Record<string, string> = {
   decode: 'Decoding…',
@@ -85,7 +87,11 @@ export class FileTable {
       const sizeCell = h('td', { class: 'readout size-cell' }, [sizeText(file, this.estimates.get(file.id))]);
       this.sizeCells.set(file.id, sizeCell);
       const row = h('tr', { class: file.id === this.selectedId ? 'selected' : '' }, [
-        h('td', {}, [file.relativePath, file.manualTrim ? h('span', { class: 'tag' }, ['manual trim']) : null]),
+        h('td', {}, [
+          file.relativePath,
+          file.manualTrim ? h('span', { class: 'tag' }, ['manual trim']) : null,
+          bitDepthTag(file),
+        ]),
         sizeCell,
         h('td', { class: `status status-${file.status}` }, [statusText(file)]),
         removeCell,
@@ -137,4 +143,15 @@ function sizeText(file: FileEntry, estimate: number | undefined): string {
   if (file.status === 'done' && file.stats) return `${original} → ${formatBytes(file.stats.outputBytes)}`;
   if (estimate !== undefined) return `${original} → ~${formatBytes(estimate)}`;
   return `${original} → —`;
+}
+
+/** Tag for files whose bit depth changes on output, e.g. "32f→16". */
+function bitDepthTag(file: FileEntry): HTMLElement | null {
+  const source = file.sourceFormat;
+  if (!source || file.name.toLowerCase().endsWith('.mp3')) return null;
+  const output = resolveOutputFormat(source, appState.settings.preserveBitDepth);
+  if (sameFormat(source, output)) return null;
+  return h('span', { class: 'tag', title: `${formatLabel(source)} → ${formatLabel(output)}` }, [
+    `${formatShortLabel(source)}→${formatShortLabel(output)}`,
+  ]);
 }

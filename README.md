@@ -17,7 +17,8 @@ processing and file reading/writing happens locally in your browser.
    Every supported sample in it (including subfolders) is queued. Favorite folders can be
    saved in the sidebar for quick access.
 2. **Adjust settings.** Silence threshold, minimum silence duration, padding, speed-up,
-   bitrate, and preserve-stereo (off = mono downmix).
+   bitrate, preserve stereo (off = mono downmix), and preserve bit depth (off = 16-bit
+   WAV).
 3. **Check the trim.** Selecting a file opens the waveform editor: the green and red handles
    show where leading and trailing silence will be cut. Drag them to override the automatic
    trim for that file (double-click a handle to revert to auto). Press Space to preview, and
@@ -32,10 +33,9 @@ processing and file reading/writing happens locally in your browser.
 
    ![Processing results](docs/screenshots/results.png)
 
-MP3 inputs stay MP3; everything else is written as WAV. Files longer than 20 seconds after
-processing get an underscore (`_`) prefix for KO II compatibility.
-
-See [`web/README.md`](web/README.md) for development and deployment instructions.
+MP3 inputs stay MP3; everything else is written as WAV — 16-bit by default, or the
+source's own bit depth (e.g. 32-bit float) with **Preserve bit depth** on. Files longer
+than 20 seconds after processing get an underscore (`_`) prefix for KO II compatibility.
 
 ## Development
 

@@ -25,6 +25,7 @@ export class MainView {
   private estimator = new BatchEstimator();
   private estimateTimer?: number;
   private unsubscribers: Array<() => void> = [];
+  private lastPreserveBitDepth = appState.settings.preserveBitDepth;
 
   constructor(onProcess: () => void) {
     this.waveformEditor = new WaveformEditor();
@@ -88,7 +89,14 @@ export class MainView {
         if (this.fileTable.selectedId === null && files.length > 0) this.fileTable.select(files[0].id);
         this.scheduleEstimate();
       }),
-      appEvents.on('settings-changed', () => this.scheduleEstimate()),
+      appEvents.on('settings-changed', ({ settings }) => {
+        // Bit-depth tags depend on this setting; skip re-rendering on every slider tick.
+        if (settings.preserveBitDepth !== this.lastPreserveBitDepth) {
+          this.lastPreserveBitDepth = settings.preserveBitDepth;
+          this.fileTable.render(appState.files);
+        }
+        this.scheduleEstimate();
+      }),
     );
 
     document.addEventListener('keydown', this.handleKeyDown);
