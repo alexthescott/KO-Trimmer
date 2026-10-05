@@ -34,6 +34,16 @@ function defaultPoolSize(): number {
   return Math.min(MAX_WORKERS, Math.max(1, (cores || 4) - 1));
 }
 
+function createProcessingWorker(): Worker {
+  return new Worker(new URL('./processing.worker.ts', import.meta.url), { type: 'module' });
+}
+
+export interface WorkerPoolOptions {
+  size?: number;
+  /** Builds one worker; a fake in tests. */
+  createWorker?: () => Worker;
+}
+
 /**
  * Pooled Web Worker batch processor. Queued-but-undispatched jobs are
  * dropped immediately on abort; jobs already running are allowed to finish
@@ -54,16 +64,14 @@ export class WorkerPool {
     return this.workers.length;
   }
 
-  constructor(onProgress: ProgressHandler = () => {}, size = defaultPoolSize()) {
+  constructor(onProgress: ProgressHandler = () => {}, options: WorkerPoolOptions = {}) {
+    const { size = defaultPoolSize(), createWorker = createProcessingWorker } = options;
     this.onProgress = onProgress;
-    this.workers = Array.from({ length: size }, () => this.createWorker());
+    this.workers = Array.from({ length: size }, () => this.attach(createWorker()));
     this.freeWorkers = [...this.workers];
   }
 
-  private createWorker(): Worker {
-    const worker = new Worker(new URL('./processing.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+  private attach(worker: Worker): Worker {
     worker.onmessage = (event: MessageEvent<WorkerOutMessage>) =>
       this.handleMessage(worker, event.data);
     worker.onerror = (event) => {
