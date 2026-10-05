@@ -160,20 +160,20 @@ function checkboxRow(
   return h('div', { class: 'checkbox-row' }, [checkbox, h('label', {}, [labelText]), h('small', {}, [helpText])]);
 }
 
+/** Disables a checkbox row, with `reason` as a tooltip so hovering explains why. */
+function disableRow(row: HTMLElement, reason: string): HTMLElement {
+  row.querySelector('input')!.disabled = true;
+  row.title = reason;
+  return row;
+}
+
 function renderOverwriteRow(): HTMLElement {
   const anyOverwritable = appState.files.some(canOverwrite);
-  const checkbox = h('input', {
-    type: 'checkbox',
-    checked: appState.settings.overwrite,
-    disabled: !anyOverwritable,
-  }) as HTMLInputElement;
-  checkbox.addEventListener('change', () => appState.updateSettings({ overwrite: checkbox.checked }));
-
   const helpText = anyOverwritable
     ? 'Replaces WAV/MP3 sources in place. Other formats are re-encoded as WAV, so they are written as new files.'
     : 'Requires WAV or MP3 files added via a folder picker or drag-drop, not individual file picking.';
-
-  const row = h('div', { class: 'checkbox-row' }, [checkbox, h('label', {}, ['Overwrite original']), h('small', {}, [helpText])]);
-  if (!anyOverwritable) row.setAttribute('title', helpText);
-  return row;
+  const row = checkboxRow('Overwrite original', appState.settings.overwrite, helpText, (checked) =>
+    appState.updateSettings({ overwrite: checked }),
+  );
+  return anyOverwritable ? row : disableRow(row, helpText);
 }

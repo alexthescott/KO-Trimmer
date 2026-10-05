@@ -11,11 +11,11 @@ import { channelsOf, type PcmAudio } from './channels';
  * `nativeSampleRate` known, decode through an OfflineAudioContext at that
  * rate instead, keeping output identical across machines. Unknown rates
  * fall back to the device rate.
+ *
+ * Consumes (detaches) `arrayBuffer` — pass a copy if you still need the bytes.
  */
 export async function decodeAudioFile(arrayBuffer: ArrayBuffer, nativeSampleRate?: number): Promise<PcmAudio> {
   const ctx = decodeContextFor(nativeSampleRate);
-  // decodeAudioData detaches/consumes the buffer, so pass a copy if the
-  // caller still needs the original bytes afterward.
   const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
   return { channels: channelsOf(audioBuffer), sampleRate: audioBuffer.sampleRate };
 }

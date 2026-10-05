@@ -22,7 +22,7 @@ export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[
   return result;
 }
 
-/** Root folder name for a batch, used to name the sibling `<root>_trimmed` output directory. */
+/** Root folder name for a batch, used to name the `<root>_trimmed.zip` download. */
 export function deriveRootName(entries: DroppedEntry[]): string | undefined {
   const withSlash = entries.find((e) => e.relativePath.includes('/'));
   return withSlash?.relativePath.split('/')[0];

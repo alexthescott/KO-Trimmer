@@ -32,20 +32,23 @@ function computePeaks(channels: Float32Array[]): Peaks {
   const min = new Float32Array(blocks);
   const max = new Float32Array(blocks);
   for (let b = 0; b < blocks; b++) {
-    let lo = 0;
-    let hi = 0;
-    const end = Math.min(n, (b + 1) * PEAK_BLOCK);
-    for (const channel of channels) {
-      for (let i = b * PEAK_BLOCK; i < end; i++) {
-        const v = channel[i];
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
-      }
-    }
-    min[b] = lo;
-    max[b] = hi;
+    [min[b], max[b]] = sampleExtent(channels, b * PEAK_BLOCK, Math.min(n, (b + 1) * PEAK_BLOCK));
   }
   return { min, max };
+}
+
+/** [min, max] over samples [from, to) of every channel, including 0. */
+function sampleExtent(channels: Float32Array[], from: number, to: number): [number, number] {
+  let lo = 0;
+  let hi = 0;
+  for (const channel of channels) {
+    for (let i = from; i < to; i++) {
+      const v = channel[i];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  }
+  return [lo, hi];
 }
 
 /** Min/max column per canvas pixel over the `visible` sample window. */
@@ -70,13 +73,7 @@ export function drawWave(ctx: CanvasRenderingContext2D, wave: Waveform, visible:
         if (peaks.max[b] > hi) hi = peaks.max[b];
       }
     } else {
-      for (const channel of channels) {
-        for (let i = s0; i < s1; i++) {
-          const v = channel[i];
-          if (v < lo) lo = v;
-          if (v > hi) hi = v;
-        }
-      }
+      [lo, hi] = sampleExtent(channels, s0, s1);
     }
     const y0 = mid - hi * mid;
     const y1 = mid - lo * mid;

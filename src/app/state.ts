@@ -74,7 +74,6 @@ class AppState {
     appEvents.emit('settings-changed', { settings: this.settings });
   }
 
-  /** A directory was opened as the source: default output goes inside it, unless the user chose one. */
   /**
    * Remembers the source root without touching disk: a dropped folder's handle
    * is read-only until permission is requested, which needs a user gesture.
