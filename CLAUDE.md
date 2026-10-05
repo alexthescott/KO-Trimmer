@@ -59,7 +59,8 @@ src/
               (pickWritableDirectory), dragDropEntries (TRIMMED_SUFFIX), permissions
               (ensureReadWrite),
               outputWriter (FS Access sink; OPFS-backed ZIP sink; in-memory
-              split-ZIP fallback), asyncQueue (backpressured producer→stream),
+              split-ZIP fallback), zipStream (client-zip over asyncQueue, shared
+              by both ZIP sinks), asyncQueue (backpressured producer→stream),
               archivePaths (de-duplicated ZIP entry names), writeFile,
               overwriteWriter (true in-place overwrite; canOverwrite)
   workers/    protocol.ts (message types built on PipelineRequest/PipelineOutput),
@@ -127,8 +128,9 @@ checkbox disabled with an explanatory tooltip rather than silently no-opping. Th
 is one archive of the whole batch, streamed store-only to the Origin Private File
 System as outputs complete (`DiskZipOutputSink`, client-zip, ZIP64 past 4 GB) and
 downloaded from disk — so batch size isn't bounded by RAM or Firefox's 2 GB Blob-part
-limit. Without OPFS (e.g. Firefox private windows) it falls back to in-memory fflate
-ZIPs split into ~1 GB parts (`ZipOutputSink`).
+limit. Without OPFS (e.g. Firefox private windows) it falls back to in-memory ZIPs
+split into ~1 GB parts (`ZipOutputSink`). Both use the same client-zip `ZipStream`;
+fflate is a devDependency only, for unzipping in tests.
 
 **Default output location:** the File System Access API gives a directory handle no way
 to reach its own parent, so a true sibling `<root>_trimmed/` folder isn't reachable.
