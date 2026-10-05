@@ -1,4 +1,5 @@
-import { decodeAudioFile, type DecodedAudio } from './decode';
+import { decodeAudioFile } from './decode';
+import type { PcmAudio } from './channels';
 import type { Mp3PreviewRequest, Mp3PreviewResponse } from '../workers/mp3Preview.worker';
 
 let worker: Worker | null = null;
@@ -24,7 +25,7 @@ function getWorker(): Worker {
  * the batch output will have. Channels are copied, never transferred — they
  * may be views of the editor's source audio.
  */
-export async function mp3RoundTrip(channels: Float32Array[], sampleRate: number, kbps: number): Promise<DecodedAudio> {
+export async function mp3RoundTrip(channels: Float32Array[], sampleRate: number, kbps: number): Promise<PcmAudio> {
   const id = nextId++;
   const bytes = await new Promise<Uint8Array>((resolve, reject) => {
     pending.set(id, { resolve, reject });

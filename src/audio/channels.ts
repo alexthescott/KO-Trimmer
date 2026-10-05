@@ -1,3 +1,9 @@
+/** Planar float PCM at a sample rate — decoded, rendered or about to be encoded. */
+export interface PcmAudio {
+  channels: Float32Array[];
+  sampleRate: number;
+}
+
 /** Frames (samples per channel) in a planar buffer; 0 when there are no channels. */
 export function frameCount(channels: Float32Array[]): number {
   return channels[0]?.length ?? 0;
@@ -17,4 +23,16 @@ export function sampleAt(channel: Float32Array, pos: number): number {
 export function floatToInt(sample: number, negativeScale: number, positiveScale: number): number {
   const clamped = Math.max(-1, Math.min(1, sample));
   return Math.round(clamped < 0 ? clamped * negativeScale : clamped * positiveScale);
+}
+
+/** Copies an AudioBuffer out to planar channels the caller owns. */
+export function channelsOf(buffer: AudioBuffer): Float32Array[] {
+  return Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i).slice());
+}
+
+/** Copies planar channels into a new AudioBuffer on `ctx`. */
+export function toAudioBuffer(ctx: BaseAudioContext, channels: Float32Array[], sampleRate: number): AudioBuffer {
+  const buffer = ctx.createBuffer(channels.length, frameCount(channels), sampleRate);
+  channels.forEach((channel, i) => buffer.copyToChannel(channel as Float32Array<ArrayBuffer>, i));
+  return buffer;
 }

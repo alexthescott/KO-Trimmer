@@ -1,4 +1,4 @@
-import type { DecodedAudio } from './decode';
+import type { PcmAudio } from './channels';
 import { dataView, iffChunks, isWave, waveFormatTag, WAVE_FORMAT_IEEE_FLOAT, WAVE_FORMAT_PCM } from './iffChunks';
 
 /**
@@ -14,7 +14,7 @@ import { dataView, iffChunks, isWave, waveFormatTag, WAVE_FORMAT_IEEE_FLOAT, WAV
  * Returns undefined for anything else (ADPCM, A-law, malformed headers) so
  * the caller can fall back to decodeAudioData.
  */
-export function decodeWav(bytes: Uint8Array): DecodedAudio | undefined {
+export function decodeWav(bytes: Uint8Array): PcmAudio | undefined {
   if (!isWave(bytes)) return undefined;
   const view = dataView(bytes);
 
@@ -58,7 +58,7 @@ function readFmt(view: DataView, body: number, size: number): WavFmt | undefined
   return { channels, sampleRate, blockAlign, bytesPerSample, float };
 }
 
-function decodeSamples(view: DataView, start: number, frames: number, fmt: WavFmt): DecodedAudio {
+function decodeSamples(view: DataView, start: number, frames: number, fmt: WavFmt): PcmAudio {
   const read = sampleReader(view, fmt);
   const channels = Array.from({ length: fmt.channels }, () => new Float32Array(frames));
   let offset = start;

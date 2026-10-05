@@ -1,9 +1,5 @@
 import { getSharedContext } from './audioContext';
-
-export interface DecodedAudio {
-  channels: Float32Array[];
-  sampleRate: number;
-}
+import { channelsOf, type PcmAudio } from './channels';
 
 /**
  * Decodes a file's bytes via the Web Audio API. Runs on the main thread
@@ -16,16 +12,12 @@ export interface DecodedAudio {
  * rate instead, keeping output identical across machines. Unknown rates
  * fall back to the device rate.
  */
-export async function decodeAudioFile(arrayBuffer: ArrayBuffer, nativeSampleRate?: number): Promise<DecodedAudio> {
+export async function decodeAudioFile(arrayBuffer: ArrayBuffer, nativeSampleRate?: number): Promise<PcmAudio> {
   const ctx = decodeContextFor(nativeSampleRate);
   // decodeAudioData detaches/consumes the buffer, so pass a copy if the
   // caller still needs the original bytes afterward.
   const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-  const channels: Float32Array[] = [];
-  for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-    channels.push(audioBuffer.getChannelData(i).slice());
-  }
-  return { channels, sampleRate: audioBuffer.sampleRate };
+  return { channels: channelsOf(audioBuffer), sampleRate: audioBuffer.sampleRate };
 }
 
 const MIN_CONTEXT_RATE = 3000;

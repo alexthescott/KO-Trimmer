@@ -1,7 +1,7 @@
 import type { FileEntry, ProcessingSettings } from './types';
 import { appState } from './state';
 import { splitNameAndExtension } from './fileNames';
-import { decodeAudioFile } from '../audio/decode';
+import { decodeEntry } from './decodedCache';
 import { WorkerPool, type JobResult } from '../workers/workerPool';
 import type { OutputSink } from '../fs/outputWriter';
 import { overwriteSourceFile, canOverwrite } from '../fs/overwriteWriter';
@@ -99,8 +99,7 @@ async function processFile(
 }
 
 async function decodeOnMainThread(file: FileEntry): Promise<JobSource> {
-  const { channels, sampleRate } = await decodeAudioFile(await file.file.arrayBuffer(), file.sourceSampleRate);
-  return { kind: 'pcm', channels, sampleRate };
+  return { kind: 'pcm', ...(await decodeEntry(file)) };
 }
 
 /** Overwrites the source when enabled and possible, else writes to the sink; returns the result with any added warning. */

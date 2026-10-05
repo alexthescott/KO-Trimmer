@@ -9,7 +9,7 @@ import { encodeWav } from './wavEncoder';
 import { encodeMp3 } from './mp3Encoder';
 import { buildOutputFilename, exceedsKoIILength } from './naming';
 import { peakAbs, type SampleFormat } from './sampleFormat';
-import { frameCount } from './channels';
+import { frameCount, type PcmAudio } from './channels';
 import { chooseOutputFormat, outputContainerFor, type OutputContainer } from './outputContainer';
 
 /** Everything the pipeline needs about one file — serializable, so it can cross to the worker. */
@@ -39,12 +39,7 @@ export interface PipelineOutput {
   warning?: string;
 }
 
-export interface RenderedAudio {
-  channels: Float32Array[];
-  sampleRate: number;
-}
-
-export interface RenderInput extends RenderedAudio {
+export interface RenderInput extends PcmAudio {
   bounds: SampleRange;
   container: OutputContainer;
   settings: ProcessingSettings;
@@ -80,7 +75,7 @@ export function clampManualTrim(trim: SampleRange, totalLength: number): TrimBou
  * plays it as the live "Play Processed" preview — one code path, so the
  * preview can't drift from the batch output.
  */
-export async function renderAudible(input: RenderInput): Promise<RenderedAudio> {
+export async function renderAudible(input: RenderInput): Promise<PcmAudio> {
   const { settings, onStage } = input;
   let channels = sliceChannels(input.channels, input.bounds);
 

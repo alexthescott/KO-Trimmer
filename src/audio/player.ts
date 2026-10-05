@@ -1,5 +1,5 @@
 import { getSharedContext } from './audioContext';
-import { frameCount } from './channels';
+import { frameCount, toAudioBuffer } from './channels';
 
 export interface PlaybackHandle {
   /** Seconds elapsed since playback started. */
@@ -21,14 +21,12 @@ export function playChannels(
   onEnded: () => void,
 ): PlaybackHandle | null {
   stopPlayback();
-  const length = frameCount(channels);
-  if (length === 0) return null;
+  if (frameCount(channels) === 0) return null;
 
   const ctx = getSharedContext();
   if (ctx.state === 'suspended') void ctx.resume();
 
-  const buffer = ctx.createBuffer(channels.length, length, sampleRate);
-  channels.forEach((channel, i) => buffer.copyToChannel(channel as Float32Array<ArrayBuffer>, i));
+  const buffer = toAudioBuffer(ctx, channels, sampleRate);
 
   const source = ctx.createBufferSource();
   source.buffer = buffer;

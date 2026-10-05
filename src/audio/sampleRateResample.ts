@@ -1,4 +1,4 @@
-import { frameCount, sampleAt } from './channels';
+import { channelsOf, frameCount, sampleAt, toAudioBuffer } from './channels';
 
 /**
  * WAV output sample rate for a "max sample rate" setting: returns the target
@@ -30,22 +30,12 @@ export async function resampleToRate(
     const inputLength = frameCount(channels);
     const outputLength = resampledLength(inputLength, originalSampleRate, targetSampleRate);
     const ctx = new OfflineAudioContext(channels.length, outputLength, targetSampleRate);
-    const buffer = ctx.createBuffer(channels.length, inputLength, originalSampleRate);
-    channels.forEach((channel, i) =>
-      buffer.copyToChannel(channel as Float32Array<ArrayBuffer>, i),
-    );
-
     const source = ctx.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = toAudioBuffer(ctx, channels, originalSampleRate);
     source.connect(ctx.destination);
     source.start(0);
 
-    const rendered = await ctx.startRendering();
-    const out: Float32Array[] = [];
-    for (let i = 0; i < rendered.numberOfChannels; i++) {
-      out.push(rendered.getChannelData(i).slice());
-    }
-    return out;
+    return channelsOf(await ctx.startRendering());
   }
 
   return linearResample(channels, originalSampleRate, targetSampleRate);

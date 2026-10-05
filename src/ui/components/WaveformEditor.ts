@@ -4,10 +4,9 @@ import { appEvents } from '../../app/events';
 import { getDecoded } from '../../app/decodedCache';
 import { extensionOf } from '../../app/fileNames';
 import type { FileEntry, SampleRange } from '../../app/types';
-import type { DecodedAudio } from '../../audio/decode';
 import type { TrimBounds } from '../../audio/trim';
 import { computeAutoTrimBounds, type RenderInput } from '../../audio/pipeline';
-import { frameCount } from '../../audio/channels';
+import { frameCount, type PcmAudio } from '../../audio/channels';
 import { outputContainerFor, type OutputContainer } from '../../audio/outputContainer';
 import { playChannels, stopPlayback, type PlaybackHandle } from '../../audio/player';
 import { Viewport } from './waveform/Viewport';
@@ -48,7 +47,7 @@ export class WaveformEditor {
 
   private file?: FileEntry;
   private loadToken = 0;
-  private audio?: DecodedAudio;
+  private audio?: PcmAudio;
   private container: OutputContainer = 'wav';
   private original?: Waveform;
   private autoBounds?: TrimBounds;
@@ -163,7 +162,7 @@ export class WaveformEditor {
     this.sizeEl.textContent = '';
     this.showPlaceholder('Decoding…');
 
-    let audio: DecodedAudio;
+    let audio: PcmAudio;
     try {
       audio = await getDecoded(file);
     } catch (err) {

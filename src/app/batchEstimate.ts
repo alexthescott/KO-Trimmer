@@ -1,9 +1,8 @@
 import type { FileEntry, ProcessingSettings } from './types';
-import { peekDecoded } from './decodedCache';
-import { decodeAudioFile, type DecodedAudio } from '../audio/decode';
+import { decodeEntry, peekDecoded } from './decodedCache';
 import { computeAutoTrimBounds } from '../audio/pipeline';
 import { estimateOutputBytes, extrapolateBatchEstimate, type BatchEstimateSample } from '../audio/estimate';
-import { frameCount } from '../audio/channels';
+import { frameCount, type PcmAudio } from '../audio/channels';
 import { peakAbs } from '../audio/sampleFormat';
 import { extensionOf } from './fileNames';
 
@@ -115,6 +114,6 @@ export class BatchEstimator {
 }
 
 /** Reuses the editor's decoded audio when it's already in memory. */
-async function decodeForEstimate(file: FileEntry): Promise<DecodedAudio> {
-  return peekDecoded(file.id) ?? decodeAudioFile(await file.file.arrayBuffer(), file.sourceSampleRate);
+function decodeForEstimate(file: FileEntry): Promise<PcmAudio> {
+  return peekDecoded(file.id) ?? decodeEntry(file);
 }

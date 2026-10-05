@@ -1,6 +1,6 @@
 import { runPipeline } from '../audio/pipeline';
 import { decodeWav } from '../audio/wavDecoder';
-import type { DecodedAudio } from '../audio/decode';
+import type { PcmAudio } from '../audio/channels';
 import type { ProcessingStage } from '../app/types';
 import {
   errorMessage,
@@ -47,7 +47,7 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
   }
 };
 
-async function resolveSource(source: JobSource): Promise<DecodedAudio> {
+async function resolveSource(source: JobSource): Promise<PcmAudio> {
   if (source.kind === 'pcm') return source;
   const decoded = decodeWav(new Uint8Array(await source.file.arrayBuffer()));
   if (!decoded) throw new UnsupportedWavError();

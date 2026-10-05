@@ -1,13 +1,13 @@
-import { renderAudible, type RenderInput, type RenderedAudio } from '../../../audio/pipeline';
+import { renderAudible, type RenderInput } from '../../../audio/pipeline';
 import { mp3RoundTrip } from '../../../audio/mp3Preview';
 import { peakAbs } from '../../../audio/sampleFormat';
-import { frameCount } from '../../../audio/channels';
+import { frameCount, type PcmAudio } from '../../../audio/channels';
 import { FULL_MP3_BITRATE } from '../../../audio/settingsDefaults';
 import { waveformOf, type Waveform } from './draw';
 
 const PREVIEW_DEBOUNCE_MS = 150;
 
-export interface ProcessedPreview extends RenderedAudio {
+export interface ProcessedPreview extends PcmAudio {
   wave: Waveform;
   /** Absolute peak, for the clip warning. */
   peak: number;

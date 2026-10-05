@@ -1,12 +1,13 @@
 import type { PipelineOutput, PipelineRequest } from '../audio/pipeline';
 import type { ProcessingStage } from '../app/types';
+import type { PcmAudio } from '../audio/channels';
 
 /**
  * Where the job's audio comes from: PCM already decoded on the main thread,
  * or a WAV file the worker reads and decodes itself (no main-thread work).
  */
 export type JobSource =
-  | { kind: 'pcm'; channels: Float32Array[]; sampleRate: number }
+  | ({ kind: 'pcm' } & PcmAudio)
   | { kind: 'wav'; file: File };
 
 export interface QueuedJob extends Omit<PipelineRequest, 'channels' | 'sampleRate'> {
