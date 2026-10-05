@@ -1,6 +1,5 @@
 import { h, formatBytes, formatSizeChange } from '../dom';
 import type { FileEntry } from '../../app/types';
-import { appState } from '../../app/state';
 import { formatLabel, formatShortLabel, sameFormat } from '../../audio/sampleFormat';
 import { chooseOutputFormat, outputContainerFor } from '../../audio/outputContainer';
 import type { FileEstimate } from '../../app/batchEstimate';
@@ -19,12 +18,15 @@ export interface FileTableOptions {
   onSelect?: (file: FileEntry) => void;
   /** When provided, each row gets a remove (✕) button. */
   onRemove?: (file: FileEntry) => void;
+  /** The Preserve Bit Depth setting, which decides the bit-depth tags. */
+  preserveBitDepth: boolean;
 }
 
 export class FileTable {
   element: HTMLElement;
   selectedId: string | null = null;
   private options: FileTableOptions;
+  private preserveBitDepth: boolean;
   private lastFiles: FileEntry[] = [];
   private estimates = new Map<string, FileEstimate>();
   private sizeCells = new Map<string, HTMLElement>();
@@ -32,8 +34,9 @@ export class FileTable {
   private statusCells = new Map<string, HTMLElement>();
   private rowIndexById = new Map<string, number>();
 
-  constructor(options: FileTableOptions = {}) {
+  constructor(options: FileTableOptions) {
     this.options = options;
+    this.preserveBitDepth = options.preserveBitDepth;
     this.element = h('table', { class: 'file-table' });
   }
 
@@ -42,6 +45,13 @@ export class FileTable {
     this.render(this.lastFiles);
     const file = this.lastFiles.find((f) => f.id === id);
     if (file) this.options.onSelect?.(file);
+  }
+
+  /** Re-tags every row when the setting actually changes (settings fire on every slider tick). */
+  setPreserveBitDepth(value: boolean): void {
+    if (value === this.preserveBitDepth) return;
+    this.preserveBitDepth = value;
+    this.render(this.lastFiles);
   }
 
   /** Moves the selection `delta` rows up/down, clamped to the list. */
@@ -60,7 +70,7 @@ export class FileTable {
     const file = this.lastFiles.find((f) => f.id === id);
     if (!file) return;
     this.sizeCells.get(id)?.replaceChildren(sizeText(file, estimate.bytes));
-    this.nameCells.get(id)?.replaceChildren(...nameCellContents(file, estimate.peak));
+    this.nameCells.get(id)?.replaceChildren(...this.nameCellContents(file, estimate.peak));
   }
 
   /** Patches one row's cells in place — O(1) DOM work, unlike a full render. */
@@ -69,7 +79,7 @@ export class FileTable {
     if (idx === undefined) return;
     this.lastFiles[idx] = file;
     const estimate = this.estimates.get(file.id);
-    this.nameCells.get(file.id)?.replaceChildren(...nameCellContents(file, estimate?.peak));
+    this.nameCells.get(file.id)?.replaceChildren(...this.nameCellContents(file, estimate?.peak));
     this.sizeCells.get(file.id)?.replaceChildren(sizeText(file, estimate?.bytes));
     const statusCell = this.statusCells.get(file.id);
     if (statusCell) {
@@ -112,7 +122,7 @@ export class FileTable {
       const estimate = this.estimates.get(file.id);
       const sizeCell = h('td', { class: 'readout size-cell' }, [sizeText(file, estimate?.bytes)]);
       this.sizeCells.set(file.id, sizeCell);
-      const nameCell = h('td', {}, nameCellContents(file, estimate?.peak));
+      const nameCell = h('td', {}, this.nameCellContents(file, estimate?.peak));
       this.nameCells.set(file.id, nameCell);
       const statusCell = h('td', { class: `status status-${file.status}` }, [statusText(file)]);
       this.statusCells.set(file.id, statusCell);
@@ -137,6 +147,14 @@ export class FileTable {
       ]),
       h('tbody', {}, rows),
     );
+  }
+
+  private nameCellContents(file: FileEntry, peak: number | undefined): Array<Node | string> {
+    const tags = [
+      file.manualTrim ? h('span', { class: 'tag' }, ['manual trim']) : null,
+      bitDepthTag(file, this.preserveBitDepth, peak),
+    ];
+    return [file.relativePath, ...tags.filter((tag): tag is HTMLElement => tag !== null)];
   }
 }
 
@@ -168,20 +186,15 @@ function sizeText(file: FileEntry, estimate: number | undefined): string {
   return `${original} → —`;
 }
 
-function nameCellContents(file: FileEntry, peak: number | undefined): Array<Node | string> {
-  const tags = [file.manualTrim ? h('span', { class: 'tag' }, ['manual trim']) : null, bitDepthTag(file, peak)];
-  return [file.relativePath, ...tags.filter((tag): tag is HTMLElement => tag !== null)];
-}
-
 /**
  * Tag for files whose bit depth changes on output, e.g. "32f→16", or that
  * stay 32-bit float because a lower bit depth would clip (`peak` from the
  * estimate; the title says why).
  */
-function bitDepthTag(file: FileEntry, peak: number | undefined): HTMLElement | null {
+function bitDepthTag(file: FileEntry, preserveBitDepth: boolean, peak: number | undefined): HTMLElement | null {
   const source = file.sourceFormat;
   const container = outputContainerFor(extensionOf(file.name));
-  const { format: output, clipNote } = chooseOutputFormat(container, source, appState.settings.preserveBitDepth, peak);
+  const { format: output, clipNote } = chooseOutputFormat(container, source, preserveBitDepth, peak);
   if (clipNote) return h('span', { class: 'tag', title: clipNote }, ['32f · avoids clip']);
   if (!source || !output || sameFormat(source, output)) return null;
   return h('span', { class: 'tag', title: `${formatLabel(source)} → ${formatLabel(output)}` }, [

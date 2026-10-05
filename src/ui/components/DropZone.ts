@@ -65,7 +65,7 @@ export class DropZone {
 
   private async addEntries(entries: DroppedEntry[]): Promise<void> {
     if (entries.length === 0) return;
-    if (!appState.rootName) appState.rootName = deriveRootName(entries);
+    appState.adoptRootName(deriveRootName(entries));
     const fileEntries = await toFileEntries(entries);
     appState.addFiles(fileEntries);
   }

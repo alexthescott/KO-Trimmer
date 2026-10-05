@@ -20,14 +20,14 @@ let currentView: MainView | ProcessingView | null = null;
 let welcomeOverlay: HTMLElement | null = null;
 
 function showMain(): void {
-  currentView?.destroy?.();
+  currentView?.destroy();
   const mainView = new MainView(() => showProcessing());
   currentView = mainView;
   renderBody(mainView.element);
 }
 
 function showProcessing(): void {
-  currentView?.destroy?.();
+  currentView?.destroy();
   const processingView = new ProcessingView(appState.files, () => showMain());
   currentView = processingView;
   renderBody(processingView.element);

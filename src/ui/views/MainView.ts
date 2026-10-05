@@ -24,13 +24,13 @@ export class MainView {
   private estimator = new BatchEstimator();
   private estimateTimer?: number;
   private unsubscribers: Array<() => void> = [];
-  private lastPreserveBitDepth = appState.settings.preserveBitDepth;
 
   constructor(onProcess: () => void) {
     this.waveformEditor = new WaveformEditor();
     this.fileTable = new FileTable({
       onSelect: (file: FileEntry) => void this.waveformEditor.show(file),
       onRemove: (file: FileEntry) => this.removeFile(file),
+      preserveBitDepth: appState.settings.preserveBitDepth,
     });
     this.settingsPanel = new SettingsPanel();
 
@@ -91,11 +91,7 @@ export class MainView {
         this.scheduleEstimate();
       }),
       appEvents.on('settings-changed', ({ settings }) => {
-        // Bit-depth tags depend on this setting; skip re-rendering on every slider tick.
-        if (settings.preserveBitDepth !== this.lastPreserveBitDepth) {
-          this.lastPreserveBitDepth = settings.preserveBitDepth;
-          this.fileTable.render(appState.files);
-        }
+        this.fileTable.setPreserveBitDepth(settings.preserveBitDepth);
         this.scheduleEstimate();
       }),
     );
@@ -132,7 +128,8 @@ export class MainView {
     const wasSelected = this.fileTable.selectedId === file.id;
     if (wasSelected) this.waveformEditor.stop();
     evictDecoded(file.id);
-    const nextId = appState.removeFile(file.id);
+    const nextId = appState.neighbourOf(file.id);
+    appState.removeFile(file.id);
     if (wasSelected) {
       this.fileTable.selectedId = null;
       if (nextId) this.fileTable.select(nextId);

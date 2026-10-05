@@ -9,12 +9,21 @@ class AppState {
   files: FileEntry[] = [];
   /** Where the current run writes outputs (set by prepareOutputRoot); undefined means ZIP download. */
   outputRootHandle?: FileSystemDirectoryHandle;
-  /** Root folder name of the batch, for naming the ZIP. */
-  rootName?: string;
   /** Picked/dropped source folder; its `<name>_trimmed` subfolder is the default output. */
   private sourceRootHandle?: FileSystemDirectoryHandle;
   /** Explicit "Choose output folder…" — sticks until Clear All. */
   private outputRootOverride?: FileSystemDirectoryHandle;
+  private batchRootName?: string;
+
+  /** Root folder name of the batch, for naming the ZIP. */
+  get rootName(): string | undefined {
+    return this.batchRootName;
+  }
+
+  /** The first add of a batch names it; later adds keep that name. */
+  adoptRootName(name: string | undefined): void {
+    this.batchRootName ??= name;
+  }
 
   setFiles(files: FileEntry[]): void {
     this.files = files;
@@ -30,20 +39,24 @@ class AppState {
 
   clearFiles(): void {
     this.files = [];
-    this.rootName = undefined;
+    this.batchRootName = undefined;
     this.outputRootHandle = undefined;
     this.sourceRootHandle = undefined;
     this.outputRootOverride = undefined;
     appEvents.emit('files-changed', { files: this.files });
   }
 
-  /** Removes one file and returns the id that should become selected next, if any. */
-  removeFile(id: string): string | undefined {
+  /** The file that takes `id`'s place in the list once it's removed: the next one, else the previous. */
+  neighbourOf(id: string): string | undefined {
     const idx = this.files.findIndex((f) => f.id === id);
     if (idx < 0) return undefined;
+    return (this.files[idx + 1] ?? this.files[idx - 1])?.id;
+  }
+
+  removeFile(id: string): void {
+    if (!this.files.some((f) => f.id === id)) return;
     this.files = this.files.filter((f) => f.id !== id);
     appEvents.emit('files-changed', { files: this.files });
-    return (this.files[idx] ?? this.files[idx - 1])?.id;
   }
 
   updateFile(id: string, patch: Partial<FileEntry>): void {

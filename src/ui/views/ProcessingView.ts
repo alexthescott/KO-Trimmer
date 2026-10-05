@@ -11,7 +11,7 @@ import { TRIMMED_SUFFIX } from '../../fs/dragDropEntries';
 
 export class ProcessingView {
   element: HTMLElement;
-  private fileTable = new FileTable();
+  private fileTable = new FileTable({ preserveBitDepth: appState.settings.preserveBitDepth });
   private overallFill: HTMLElement;
   private statusLabel: HTMLElement;
   private logEl: HTMLElement;
@@ -119,16 +119,18 @@ export class ProcessingView {
         onFileUpdate: (id, patch) => appState.updateFile(id, patch),
       });
     } catch (err) {
-      this.statusLabel.textContent = `Processing failed: ${errorMessage(err)}`;
-      this.stopButton.style.display = 'none';
-      this.closeButton.disabled = false;
+      this.finish(`Processing failed: ${errorMessage(err)}`);
       return;
     }
 
-    this.statusLabel.textContent = summary.aborted ? 'Stopped.' : 'Processing complete!';
+    this.finish(summary.aborted ? 'Stopped.' : 'Processing complete!');
+    this.resultsContainer.replaceChildren(renderResultsSummary(summary, this.describeOutput()));
+  }
+
+  private finish(status: string): void {
+    this.statusLabel.textContent = status;
     this.stopButton.style.display = 'none';
     this.closeButton.disabled = false;
-    this.resultsContainer.replaceChildren(renderResultsSummary(summary, this.describeOutput()));
   }
 
   destroy(): void {
