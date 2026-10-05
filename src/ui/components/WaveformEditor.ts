@@ -132,6 +132,9 @@ export class WaveformEditor {
         if (!current) void this.show(undefined);
         else this.file = current;
       }),
+      appEvents.on('file-updated', ({ file }) => {
+        if (this.file?.id === file.id) this.file = file;
+      }),
     );
   }
 

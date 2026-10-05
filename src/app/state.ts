@@ -47,8 +47,12 @@ class AppState {
   }
 
   updateFile(id: string, patch: Partial<FileEntry>): void {
-    this.files = this.files.map((f) => (f.id === id ? { ...f, ...patch } : f));
-    appEvents.emit('files-changed', { files: this.files });
+    const idx = this.files.findIndex((f) => f.id === id);
+    if (idx < 0) return;
+    const file = { ...this.files[idx], ...patch };
+    this.files = this.files.slice();
+    this.files[idx] = file;
+    appEvents.emit('file-updated', { file });
   }
 
   updateSettings(patch: Partial<ProcessingSettings>): void {

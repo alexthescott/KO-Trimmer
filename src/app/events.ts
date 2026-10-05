@@ -1,7 +1,10 @@
 import type { FileEntry, ProcessingSettings } from './types';
 
 export interface AppEventMap {
+  /** The list itself changed (added, removed, cleared, replaced). */
   'files-changed': { files: FileEntry[] };
+  /** One entry was patched in place; the list's membership and order are unchanged. */
+  'file-updated': { file: FileEntry };
   'settings-changed': { settings: ProcessingSettings };
 }
 

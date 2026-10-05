@@ -29,6 +29,8 @@ export class FileTable {
   private estimates = new Map<string, FileEstimate>();
   private sizeCells = new Map<string, HTMLElement>();
   private nameCells = new Map<string, HTMLElement>();
+  private statusCells = new Map<string, HTMLElement>();
+  private rowIndexById = new Map<string, number>();
 
   constructor(options: FileTableOptions = {}) {
     this.options = options;
@@ -61,10 +63,27 @@ export class FileTable {
     this.nameCells.get(id)?.replaceChildren(...nameCellContents(file, estimate.peak));
   }
 
+  /** Patches one row's cells in place — O(1) DOM work, unlike a full render. */
+  updateRow(file: FileEntry): void {
+    const idx = this.rowIndexById.get(file.id);
+    if (idx === undefined) return;
+    this.lastFiles[idx] = file;
+    const estimate = this.estimates.get(file.id);
+    this.nameCells.get(file.id)?.replaceChildren(...nameCellContents(file, estimate?.peak));
+    this.sizeCells.get(file.id)?.replaceChildren(sizeText(file, estimate?.bytes));
+    const statusCell = this.statusCells.get(file.id);
+    if (statusCell) {
+      statusCell.className = `status status-${file.status}`;
+      statusCell.textContent = statusText(file);
+    }
+  }
+
   render(files: FileEntry[]): void {
-    this.lastFiles = files;
+    this.lastFiles = [...files];
     this.sizeCells.clear();
     this.nameCells.clear();
+    this.statusCells.clear();
+    this.rowIndexById = new Map(files.map((f, i) => [f.id, i]));
     if (files.length === 0) {
       this.element.replaceChildren(
         h('tbody', {}, [h('tr', {}, [h('td', {}, ['No files added yet.'])])]),
@@ -95,10 +114,12 @@ export class FileTable {
       this.sizeCells.set(file.id, sizeCell);
       const nameCell = h('td', {}, nameCellContents(file, estimate?.peak));
       this.nameCells.set(file.id, nameCell);
+      const statusCell = h('td', { class: `status status-${file.status}` }, [statusText(file)]);
+      this.statusCells.set(file.id, statusCell);
       const row = h('tr', { class: file.id === this.selectedId ? 'selected' : '' }, [
         nameCell,
         sizeCell,
-        h('td', { class: `status status-${file.status}` }, [statusText(file)]),
+        statusCell,
         removeCell,
       ]);
       row.addEventListener('click', () => this.select(file.id));

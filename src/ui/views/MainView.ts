@@ -86,6 +86,10 @@ export class MainView {
         if (this.fileTable.selectedId === null && files.length > 0) this.fileTable.select(files[0].id);
         this.scheduleEstimate();
       }),
+      appEvents.on('file-updated', ({ file }) => {
+        this.fileTable.updateRow(file);
+        this.scheduleEstimate();
+      }),
       appEvents.on('settings-changed', ({ settings }) => {
         // Bit-depth tags depend on this setting; skip re-rendering on every slider tick.
         if (settings.preserveBitDepth !== this.lastPreserveBitDepth) {

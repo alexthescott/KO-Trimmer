@@ -20,7 +20,9 @@ export class ProcessingView {
   private controller = new AbortController();
   private total: number;
   private finishedCount = 0;
-  private loggedIds = new Set<string>();
+  /** Row updates waiting for the next frame; workers can report far faster than the screen redraws. */
+  private pendingUpdates = new Map<string, FileEntry>();
+  private flushFrame?: number;
   private unsubscribe: () => void;
   private onDone: () => void;
 
@@ -54,33 +56,33 @@ export class ProcessingView {
 
     this.fileTable.render(files);
 
-    this.unsubscribe = appEvents.on('files-changed', ({ files: updated }) => {
-      this.fileTable.render(updated);
-      this.recountFinished(updated);
+    this.unsubscribe = appEvents.on('file-updated', ({ file }) => {
+      this.pendingUpdates.set(file.id, file);
+      this.flushFrame ??= requestAnimationFrame(() => this.flushUpdates());
     });
 
     this.run(files);
   }
 
-  private recountFinished(files: FileEntry[]): void {
-    const finished = files.filter((f) => f.status === 'done' || f.status === 'error' || f.status === 'skipped');
-    if (finished.length === this.finishedCount) return;
-
-    // Workers finish out of list order, so log by id rather than by position.
-    for (const file of finished) {
-      if (this.loggedIds.has(file.id)) continue;
-      this.loggedIds.add(file.id);
+  /** Applies the frame's row updates, logs newly finished files, and advances the progress bar. */
+  private flushUpdates(): void {
+    this.flushFrame = undefined;
+    const logLines: HTMLElement[] = [];
+    for (const file of this.pendingUpdates.values()) {
+      this.fileTable.updateRow(file);
+      // Each file reaches a final status exactly once (recordOutcome), so no dedupe needed.
+      if (!isFinished(file)) continue;
+      this.finishedCount++;
       const icon = file.status === 'done' ? '✅' : file.status === 'error' ? '❌' : '⏭️';
-      this.appendLog(`${icon} ${file.relativePath}${file.error ? ' — ' + file.error : ''}`);
+      logLines.push(h('div', {}, [`${icon} ${file.relativePath}${file.error ? ' — ' + file.error : ''}`]));
     }
-    this.finishedCount = finished.length;
+    this.pendingUpdates.clear();
+    if (logLines.length === 0) return;
+
+    this.logEl.append(...logLines);
+    this.logEl.scrollTop = this.logEl.scrollHeight;
     const pct = this.total > 0 ? (this.finishedCount / this.total) * 100 : 0;
     this.overallFill.style.width = `${pct}%`;
-  }
-
-  private appendLog(line: string): void {
-    this.logEl.append(h('div', {}, [line]));
-    this.logEl.scrollTop = this.logEl.scrollHeight;
   }
 
   private handleStop(): void {
@@ -124,5 +126,10 @@ export class ProcessingView {
 
   destroy(): void {
     this.unsubscribe();
+    if (this.flushFrame !== undefined) cancelAnimationFrame(this.flushFrame);
   }
+}
+
+function isFinished(file: FileEntry): boolean {
+  return file.status === 'done' || file.status === 'error' || file.status === 'skipped';
 }

@@ -38,6 +38,10 @@ export class WorkerPool {
   private aborted = false;
   private onProgress: ProgressHandler;
 
+  get size(): number {
+    return this.workers.length;
+  }
+
   constructor(onProgress: ProgressHandler = () => {}, size = defaultPoolSize()) {
     this.onProgress = onProgress;
     this.workers = Array.from({ length: size }, () => this.createWorker());

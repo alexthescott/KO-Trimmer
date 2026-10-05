@@ -7,6 +7,14 @@ import type { OutputSink } from '../fs/outputWriter';
 import { overwriteSourceFile, canOverwrite } from '../fs/overwriteWriter';
 import { formatLabel, sameFormat } from '../audio/sampleFormat';
 import { errorMessage } from '../workers/protocol';
+import { forEachConcurrent } from './concurrency';
+
+/**
+ * Files decoded ahead of a free worker. Each in-flight file holds its source
+ * bytes and decoded float32 PCM (2-10x the file size), so starting the whole
+ * batch at once would exhaust memory on large folders.
+ */
+const DECODE_AHEAD = 2;
 
 export interface BatchSummary {
   processedCount: number;
@@ -41,13 +49,11 @@ export async function processBatch(
   };
   signal.addEventListener('abort', onAbort);
 
-  const tasks = files.map(async (file) => {
+  await forEachConcurrent(files, pool.size + DECODE_AHEAD, async (file) => {
     const outcome = await processFile(file, settings, pool, outputSink, signal);
     recordOutcome(file, outcome);
     tally(summary, outcome);
   });
-
-  await Promise.allSettled(tasks);
   signal.removeEventListener('abort', onAbort);
   pool.terminate();
   await outputSink.finalize();
