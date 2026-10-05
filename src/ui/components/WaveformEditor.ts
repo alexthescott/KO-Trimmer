@@ -8,11 +8,11 @@ import type { FileEntry } from '../../app/types';
 import type { RenderInput } from '../../audio/pipeline';
 import { frameCount, type PcmAudio } from '../../audio/channels';
 import { outputContainerFor, type OutputContainer } from '../../audio/outputContainer';
-import { playChannels, stopPlayback, type PlaybackHandle } from '../../audio/player';
 import { Viewport } from './waveform/Viewport';
 import { PreviewRenderer, type ProcessedPreview } from './waveform/PreviewRenderer';
 import { trimInfoText, sizeSummaryText } from './waveform/readouts';
 import { TrimState, type TrimHandle } from './waveform/TrimState';
+import { PreviewPlayback, type PlaybackTarget } from './waveform/PreviewPlayback';
 import {
   dimOutside,
   drawHandle,
@@ -28,13 +28,6 @@ const HANDLE_HIT_PX = 8;
 const ZOOM_IN_FACTOR = 0.8;
 const ZOOM_OUT_FACTOR = 1.25;
 const NO_FILE_TEXT = 'Select a file to see its waveform and trim points.';
-
-type PlaybackTarget = 'original' | 'processed';
-
-interface Playback {
-  target: PlaybackTarget;
-  handle: PlaybackHandle;
-}
 
 /** Everything known about the shown file once it has decoded; all set together. */
 interface LoadedFile {
@@ -61,8 +54,13 @@ export class WaveformEditor {
   private preview: PreviewRenderer;
 
   private drag?: TrimHandle;
-  private playback?: Playback;
-  private rafId?: number;
+  private playback = new PreviewPlayback({
+    onStateChange: () => {
+      this.updateButtons();
+      this.draw();
+    },
+    onFrame: () => this.draw(),
+  });
 
   private titleEl: HTMLElement;
   private sizeEl: HTMLElement;
@@ -192,13 +190,12 @@ export class WaveformEditor {
 
   /** Space-bar behaviour: stop if anything is playing, else play the processed preview. */
   toggleDefaultPlayback(): void {
-    if (this.playback) this.stop();
+    if (this.playback.target) this.stop();
     else void this.togglePlay('processed');
   }
 
   stop(): void {
-    stopPlayback();
-    this.endPlayback();
+    this.playback.stop();
   }
 
   destroy(): void {
@@ -250,53 +247,28 @@ export class WaveformEditor {
   // ---- playback -----------------------------------------------------------
 
   private async togglePlay(target: PlaybackTarget): Promise<void> {
-    if (this.playback?.target === target) {
+    if (this.playback.target === target) {
       this.stop();
       return;
     }
-    if (!this.loaded) return;
-
-    let source = this.loaded.audio;
-    if (target === 'processed') {
-      await this.preview.flush();
-      if (!this.processed) return;
-      source = this.processed;
-    }
-
-    const handle = playChannels(source.channels, source.sampleRate, () => {
-      if (this.playback?.handle === handle) this.endPlayback();
-    });
-    if (!handle) return;
-    this.playback = { target, handle };
-    this.updateButtons();
-    this.tick();
+    const audio = await this.audioFor(target);
+    if (audio) this.playback.start(target, audio);
   }
 
-  private endPlayback(): void {
-    this.playback = undefined;
-    if (this.rafId !== undefined) cancelAnimationFrame(this.rafId);
-    this.rafId = undefined;
-    this.updateButtons();
-    this.draw();
+  /** The original audio, or the processed preview once its pending render is done. */
+  private async audioFor(target: PlaybackTarget): Promise<PcmAudio | undefined> {
+    if (!this.loaded) return undefined;
+    if (target === 'original') return this.loaded.audio;
+    await this.preview.flush();
+    return this.processed;
   }
-
-  private tick = (): void => {
-    this.draw();
-    if (this.playback) this.rafId = requestAnimationFrame(this.tick);
-  };
 
   private updateButtons(): void {
-    const target = this.playback?.target;
+    const target = this.playback.target;
     this.playOriginalButton.textContent = target === 'original' ? 'Stop' : 'Play Original';
     this.playProcessedButton.textContent = target === 'processed' ? 'Stop' : 'Play Processed';
     this.playOriginalButton.classList.toggle('active', target === 'original');
     this.playProcessedButton.classList.toggle('active', target === 'processed');
-  }
-
-  private playbackProportion(): number {
-    if (!this.playback) return 0;
-    const { handle } = this.playback;
-    return handle.duration > 0 ? handle.position() / handle.duration : 0;
   }
 
   // ---- readouts -----------------------------------------------------------
@@ -411,8 +383,8 @@ export class WaveformEditor {
       dimOutside(ctx, xStart, xEnd, colors.dim);
       drawHandle(ctx, xStart, dpr, colors.success);
       drawHandle(ctx, xEnd, dpr, colors.danger);
-      if (this.playback?.target === 'original') {
-        const playheadSample = this.playbackProportion() * trim.frames;
+      if (this.playback.target === 'original') {
+        const playheadSample = this.playback.progress * trim.frames;
         drawPlayhead(ctx, this.viewport.proportionOf(playheadSample) * width, dpr, colors.accent);
       }
     }
@@ -421,8 +393,8 @@ export class WaveformEditor {
     if (bottom && this.processed) {
       const { ctx, dpr } = bottom;
       drawWave(ctx, this.processed.wave, { start: 0, end: frameCount(this.processed.channels) }, colors.wave);
-      if (this.playback?.target === 'processed') {
-        drawPlayhead(ctx, this.playbackProportion() * ctx.canvas.width, dpr, colors.accent);
+      if (this.playback.target === 'processed') {
+        drawPlayhead(ctx, this.playback.progress * ctx.canvas.width, dpr, colors.accent);
       }
     }
   }
