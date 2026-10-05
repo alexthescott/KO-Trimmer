@@ -8,6 +8,11 @@ export function resolveWavSampleRate(sourceRate: number, setting: number | null)
   return setting !== null && setting < sourceRate ? setting : undefined;
 }
 
+/** Frames after resampling `frames` from `fromRate` to `toRate` — shared with the size estimate. */
+export function resampledLength(frames: number, fromRate: number, toRate: number): number {
+  return Math.ceil((frames * toRate) / fromRate);
+}
+
 /**
  * Resample via OfflineAudioContext (high-quality, built into the browser).
  * Must run where OfflineAudioContext is available (main thread, or a
@@ -23,7 +28,7 @@ export async function resampleToRate(
 
   if (typeof OfflineAudioContext !== 'undefined') {
     const inputLength = frameCount(channels);
-    const outputLength = Math.ceil((inputLength * targetSampleRate) / originalSampleRate);
+    const outputLength = resampledLength(inputLength, originalSampleRate, targetSampleRate);
     const ctx = new OfflineAudioContext(channels.length, outputLength, targetSampleRate);
     const buffer = ctx.createBuffer(channels.length, inputLength, originalSampleRate);
     channels.forEach((channel, i) =>
@@ -52,7 +57,7 @@ function linearResample(
   targetSampleRate: number,
 ): Float32Array[] {
   const ratio = targetSampleRate / originalSampleRate;
-  const outputLength = Math.max(1, Math.round(frameCount(channels) * ratio));
+  const outputLength = resampledLength(frameCount(channels), originalSampleRate, targetSampleRate);
 
   return channels.map((channel) => {
     const output = new Float32Array(outputLength);

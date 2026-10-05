@@ -11,10 +11,16 @@
  */
 import { frameCount, sampleAt } from './channels';
 
+/** Frames left after speeding `frames` up by `speedMultiplier` — shared with the size estimate. */
+export function speedUpLength(frames: number, speedMultiplier: number): number {
+  if (speedMultiplier <= 1.0 || frames === 0) return frames;
+  return Math.max(1, Math.round(frames / speedMultiplier));
+}
+
 export function speedUp(channels: Float32Array[], speedMultiplier: number): Float32Array[] {
   if (speedMultiplier <= 1.0) return channels;
 
-  const outputLength = Math.max(1, Math.round(frameCount(channels) / speedMultiplier));
+  const outputLength = speedUpLength(frameCount(channels), speedMultiplier);
   const taps = speedMultiplier >= 1.5 ? Math.round(speedMultiplier) : 1;
   const tapOffset = (taps - 1) / 2;
 
