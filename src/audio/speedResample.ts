@@ -12,7 +12,7 @@
 import { frameCount, sampleAt } from './channels';
 
 /** Frames left after speeding `frames` up by `speedMultiplier` — shared with the size estimate. */
-export function speedUpLength(frames: number, speedMultiplier: number): number {
+export function speedUpFrames(frames: number, speedMultiplier: number): number {
   if (speedMultiplier <= 1.0 || frames === 0) return frames;
   return Math.max(1, Math.round(frames / speedMultiplier));
 }
@@ -20,13 +20,13 @@ export function speedUpLength(frames: number, speedMultiplier: number): number {
 export function speedUp(channels: Float32Array[], speedMultiplier: number): Float32Array[] {
   if (speedMultiplier <= 1.0) return channels;
 
-  const outputLength = speedUpLength(frameCount(channels), speedMultiplier);
+  const outputFrames = speedUpFrames(frameCount(channels), speedMultiplier);
   const taps = speedMultiplier >= 1.5 ? Math.round(speedMultiplier) : 1;
   const tapOffset = (taps - 1) / 2;
 
   return channels.map((channel) => {
-    const output = new Float32Array(outputLength);
-    for (let i = 0; i < outputLength; i++) {
+    const output = new Float32Array(outputFrames);
+    for (let i = 0; i < outputFrames; i++) {
       const center = i * speedMultiplier;
       let sum = 0;
       for (let k = 0; k < taps; k++) {

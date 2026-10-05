@@ -10,37 +10,37 @@ export interface TrimBounds extends SampleRange {
  * (including any other region touching neither edge) untouched.
  */
 export function computeTrimBounds(
-  totalLength: number,
+  totalFrames: number,
   regions: SilenceRegion[],
   sampleRate: number,
   paddingMs: number,
 ): TrimBounds {
-  if (regions.length === 0 || totalLength === 0) {
-    return { start: 0, end: totalLength };
+  if (regions.length === 0 || totalFrames === 0) {
+    return { start: 0, end: totalFrames };
   }
 
   const first = regions[0];
   const last = regions[regions.length - 1];
 
   const contentStart = first.start === 0 ? first.end + 1 : 0;
-  const contentEnd = last.end === totalLength - 1 ? last.start : totalLength;
+  const contentEnd = last.end === totalFrames - 1 ? last.start : totalFrames;
 
   if (contentStart >= contentEnd) {
     return {
       start: 0,
-      end: totalLength,
+      end: totalFrames,
       warning: 'Entire file is below the silence threshold — not trimmed.',
     };
   }
 
   const paddingSamples = Math.round((paddingMs * sampleRate) / 1000);
   const finalStart = Math.max(0, contentStart - paddingSamples);
-  const finalEnd = Math.min(totalLength, contentEnd + paddingSamples);
+  const finalEnd = Math.min(totalFrames, contentEnd + paddingSamples);
 
   if (finalStart >= finalEnd) {
     return {
       start: 0,
-      end: totalLength,
+      end: totalFrames,
       warning: 'Padding settings left no audio to keep — not trimmed.',
     };
   }

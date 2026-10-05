@@ -2,7 +2,7 @@ import { Mp3Encoder } from '@breezystack/lamejs';
 import { floatTo16BitPcm } from './wavEncoder';
 import { frameCount } from './channels';
 
-const SAMPLES_PER_CHUNK = 1152; // lamejs-recommended chunk size
+const FRAMES_PER_CHUNK = 1152; // lamejs-recommended chunk size
 const CANCEL_CHECK_EVERY_N_CHUNKS = 8;
 
 /**
@@ -22,17 +22,17 @@ export function encodeMp3(
   const encoder = new Mp3Encoder(numChannels, sampleRate, kbps);
 
   const pcm = channels.slice(0, numChannels).map(floatTo16BitPcm);
-  const totalSamples = frameCount(channels);
+  const totalFrames = frameCount(channels);
   const chunks: Uint8Array[] = [];
 
   let chunkCount = 0;
-  for (let i = 0; i < totalSamples; i += SAMPLES_PER_CHUNK) {
+  for (let i = 0; i < totalFrames; i += FRAMES_PER_CHUNK) {
     if (chunkCount % CANCEL_CHECK_EVERY_N_CHUNKS === 0 && isCancelled?.()) {
       throw new DOMException('MP3 encode cancelled', 'AbortError');
     }
 
-    const left = pcm[0].subarray(i, i + SAMPLES_PER_CHUNK);
-    const right = numChannels === 2 ? pcm[1].subarray(i, i + SAMPLES_PER_CHUNK) : undefined;
+    const left = pcm[0].subarray(i, i + FRAMES_PER_CHUNK);
+    const right = numChannels === 2 ? pcm[1].subarray(i, i + FRAMES_PER_CHUNK) : undefined;
     const encoded = encoder.encodeBuffer(left, right);
     if (encoded.length > 0) chunks.push(encoded);
     chunkCount++;

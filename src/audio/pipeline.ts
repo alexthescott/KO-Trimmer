@@ -60,11 +60,11 @@ export function computeAutoTrimBounds(
   return computeTrimBounds(frameCount(channels), regions, sampleRate, settings.paddingMs);
 }
 
-export function clampManualTrim(trim: SampleRange, totalLength: number): TrimBounds {
-  const start = Math.max(0, Math.min(totalLength, Math.round(trim.start)));
-  const end = Math.max(start, Math.min(totalLength, Math.round(trim.end)));
+export function clampManualTrim(trim: SampleRange, totalFrames: number): TrimBounds {
+  const start = Math.max(0, Math.min(totalFrames, Math.round(trim.start)));
+  const end = Math.max(start, Math.min(totalFrames, Math.round(trim.end)));
   if (end - start <= 0) {
-    return { start: 0, end: totalLength, warning: 'Manual trim selected no audio — not trimmed.' };
+    return { start: 0, end: totalFrames, warning: 'Manual trim selected no audio — not trimmed.' };
   }
   return { start, end };
 }

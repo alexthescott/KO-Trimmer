@@ -1,6 +1,6 @@
 import type { ProcessingSettings } from '../app/types';
-import { resampledLength, resolveWavSampleRate } from './sampleRateResample';
-import { speedUpLength } from './speedResample';
+import { resampledFrames, resolveWavSampleRate } from './sampleRateResample';
+import { speedUpFrames } from './speedResample';
 import type { SampleFormat } from './sampleFormat';
 import { wavHeaderBytes } from './wavEncoder';
 import { chooseWavFormat, outputContainerFor } from './outputContainer';
@@ -29,7 +29,7 @@ export function estimateOutputBytes(input: EstimateInput): number {
   const { settings } = input;
   const channels = settings.preserveStereo ? input.sourceChannels : Math.min(1, input.sourceChannels);
 
-  let frames = speedUpLength(input.trimmedFrames, settings.speedMultiplier);
+  let frames = speedUpFrames(input.trimmedFrames, settings.speedMultiplier);
 
   if (outputContainerFor(input.extension) === 'mp3') {
     const durationSec = frames / input.sourceSampleRate;
@@ -37,7 +37,7 @@ export function estimateOutputBytes(input: EstimateInput): number {
   }
 
   const target = resolveWavSampleRate(input.sourceSampleRate, settings.wavSampleRateHz ?? null);
-  if (target !== undefined) frames = resampledLength(frames, input.sourceSampleRate, target);
+  if (target !== undefined) frames = resampledFrames(frames, input.sourceSampleRate, target);
 
   const { format } = chooseWavFormat(input.sourceFormat, settings.preserveBitDepth ?? false, input.peak);
   return wavHeaderBytes(format) + frames * channels * (format.bits / 8);

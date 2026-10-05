@@ -49,7 +49,7 @@ src/
               sourceHeader.ts (header parsing: bit depth + native
               sample rate), sampleFormat.ts (SampleFormat, output bit-depth policy,
               labels, clip warning), estimate.ts (output-size prediction; reuses
-              speedUpLength/resampledLength so it can't drift from the pipeline),
+              speedUpFrames/resampledFrames so it can't drift from the pipeline),
               pipeline.ts (renderAudible = trim/mono/speed/resample, shared by
               runPipeline and the editor preview; computeAutoTrimBounds shared with
               the estimator), audioContext.ts + player.ts (preview playback, main

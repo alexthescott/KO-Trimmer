@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { speedUp, speedUpLength } from '../../src/audio/speedResample';
+import { speedUp, speedUpFrames } from '../../src/audio/speedResample';
 
 describe('speedUp', () => {
   it('is a no-op at 1.0x', () => {
@@ -58,18 +58,18 @@ describe('speedUp', () => {
   });
 });
 
-describe('speedUpLength', () => {
+describe('speedUpFrames', () => {
   it('matches the length speedUp actually produces', () => {
     for (const frames of [1, 2, 3, 1000, 44101]) {
       for (const speed of [1.05, 1.5, 2, 2.37, 3]) {
         const [out] = speedUp([new Float32Array(frames)], speed);
-        expect(speedUpLength(frames, speed)).toBe(out.length);
+        expect(speedUpFrames(frames, speed)).toBe(out.length);
       }
     }
   });
 
   it('keeps an empty buffer empty', () => {
-    expect(speedUpLength(0, 2)).toBe(0);
+    expect(speedUpFrames(0, 2)).toBe(0);
     const [out] = speedUp([new Float32Array(0)], 2);
     expect(out.length).toBe(0);
   });

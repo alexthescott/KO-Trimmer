@@ -9,7 +9,7 @@ export function resolveWavSampleRate(sourceRate: number, setting: number | null)
 }
 
 /** Frames after resampling `frames` from `fromRate` to `toRate` — shared with the size estimate. */
-export function resampledLength(frames: number, fromRate: number, toRate: number): number {
+export function resampledFrames(frames: number, fromRate: number, toRate: number): number {
   return Math.ceil((frames * toRate) / fromRate);
 }
 
@@ -27,9 +27,9 @@ export async function resampleToRate(
   if (originalSampleRate === targetSampleRate) return channels;
 
   if (typeof OfflineAudioContext !== 'undefined') {
-    const inputLength = frameCount(channels);
-    const outputLength = resampledLength(inputLength, originalSampleRate, targetSampleRate);
-    const ctx = new OfflineAudioContext(channels.length, outputLength, targetSampleRate);
+    const inputFrames = frameCount(channels);
+    const outputFrames = resampledFrames(inputFrames, originalSampleRate, targetSampleRate);
+    const ctx = new OfflineAudioContext(channels.length, outputFrames, targetSampleRate);
     const source = ctx.createBufferSource();
     source.buffer = toAudioBuffer(ctx, channels, originalSampleRate);
     source.connect(ctx.destination);
@@ -47,11 +47,11 @@ function linearResample(
   targetSampleRate: number,
 ): Float32Array[] {
   const ratio = targetSampleRate / originalSampleRate;
-  const outputLength = resampledLength(frameCount(channels), originalSampleRate, targetSampleRate);
+  const outputFrames = resampledFrames(frameCount(channels), originalSampleRate, targetSampleRate);
 
   return channels.map((channel) => {
-    const output = new Float32Array(outputLength);
-    for (let i = 0; i < outputLength; i++) output[i] = sampleAt(channel, i / ratio);
+    const output = new Float32Array(outputFrames);
+    for (let i = 0; i < outputFrames; i++) output[i] = sampleAt(channel, i / ratio);
     return output;
   });
 }
