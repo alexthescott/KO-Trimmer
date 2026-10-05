@@ -36,7 +36,8 @@ src/
               run: processFile -> outcomePatch -> tally; takes an onFileUpdate callback
               + injectable pool, never touches appState), decodedCache.ts (3-entry LRU
               of decoded audio for the editor; decodeEntry), batchEstimate.ts
-              (progressive per-file + whole-batch size estimate), fileNames.ts (the one
+              (progressive per-file + whole-batch size estimate), estimateScheduler.ts
+              (debounces/cancels estimate runs for MainView), fileNames.ts (the one
               name/extension splitter), errors.ts (errorMessage), fileEntries.ts,
               types.ts (incl. SampleRange)
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
@@ -67,7 +68,8 @@ src/
               processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
               (pooled, AbortController-based cancellation)
   ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
-              WaveformEditor + waveform/ [Viewport, PreviewRenderer, readouts, draw],
+              WaveformEditor + waveform/ [Viewport, TrimState (trim rules, no DOM),
+              PreviewPlayback, PreviewRenderer, readouts, draw],
               SettingsPanel, ResultsSummary, AboutDialog — fixed
               bottom-left About button + modal); dom.ts (h() element helper),
               format.ts (bytes/percent/plural/duration formatting)
@@ -76,7 +78,9 @@ src/
   pwa/        registerSW.ts (vite-plugin-pwa)
 tests/unit/       Vitest specs for every pure audio/ module plus the pure logic pulled
                   out of the UI (Viewport, readouts, fileNames, settings migration),
-                  plus processBatch/BatchEstimator with faked pool/decoder —
+                  plus orchestration/UI-state units (processBatch, BatchEstimator,
+                  WorkerPool, EstimateScheduler, TrimState, PreviewPlayback, drop walk,
+                  ZipOutputSink) against fakes —
                   run these first when touching DSP logic; they encode the exact
                   algorithms below.
 scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.svg)
