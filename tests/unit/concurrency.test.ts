@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { forEachConcurrent } from '../../src/app/concurrency';
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -19,13 +19,16 @@ describe('forEachConcurrent', () => {
     expect(seen.sort()).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
-  it('keeps going after a task rejects', async () => {
+  it('keeps going after a task rejects, and logs it', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const seen: number[] = [];
     await forEachConcurrent([1, 2, 3], 1, async (n) => {
       if (n === 2) throw new Error('boom');
       seen.push(n);
     });
     expect(seen).toEqual([1, 3]);
+    expect(log).toHaveBeenCalledOnce();
+    log.mockRestore();
   });
 
   it('handles an empty list', async () => {

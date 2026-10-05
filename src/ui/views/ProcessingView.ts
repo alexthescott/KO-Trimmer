@@ -110,7 +110,13 @@ export class ProcessingView {
     let summary: BatchSummary;
     try {
       const sink = await this.buildOutputSink();
-      summary = await processBatch(files, appState.settings, sink, this.controller.signal);
+      summary = await processBatch({
+        files,
+        settings: appState.settings,
+        outputSink: sink,
+        signal: this.controller.signal,
+        onFileUpdate: (id, patch) => appState.updateFile(id, patch),
+      });
     } catch (err) {
       this.statusLabel.textContent = `Processing failed: ${err instanceof Error ? err.message : String(err)}`;
       this.stopButton.style.display = 'none';

@@ -1,8 +1,7 @@
 import type { FileEntry, ProcessingSettings } from './types';
-import { appState } from './state';
 import { splitNameAndExtension } from './fileNames';
 import { decodeEntry } from './decodedCache';
-import { WorkerPool, type JobResult } from '../workers/workerPool';
+import { WorkerPool, type JobResult, type ProgressHandler } from '../workers/workerPool';
 import type { OutputSink } from '../fs/outputWriter';
 import { overwriteSourceFile, canOverwrite } from '../fs/overwriteWriter';
 import { formatLabel, sameFormat } from '../audio/sampleFormat';
@@ -31,33 +30,51 @@ export interface BatchSummary {
   aborted: boolean;
 }
 
+/** What processBatch needs from a worker pool; WorkerPool in the app, a fake in tests. */
+export type JobRunner = Pick<WorkerPool, 'size' | 'enqueue' | 'abort' | 'terminate'>;
+
+export interface BatchRequest {
+  files: FileEntry[];
+  settings: ProcessingSettings;
+  outputSink: OutputSink;
+  signal: AbortSignal;
+  /** Per-file status/stage/result patches, as they happen. */
+  onFileUpdate: (id: string, patch: Partial<FileEntry>) => void;
+  createPool?: (onProgress: ProgressHandler) => JobRunner;
+}
+
+/** One batch run's shared collaborators, so per-file helpers take two arguments, not five. */
+interface BatchRun {
+  settings: ProcessingSettings;
+  outputSink: OutputSink;
+  signal: AbortSignal;
+  pool: JobRunner;
+}
+
 type FileOutcome = { kind: 'done'; result: JobResult } | { kind: 'skipped' } | { kind: 'error'; message: string };
 
 const NOT_OVERWRITTEN_WARNING = 'Not overwritten — re-encoded as WAV, written as a new file';
 
-export async function processBatch(
-  files: FileEntry[],
-  settings: ProcessingSettings,
-  outputSink: OutputSink,
-  signal: AbortSignal,
-): Promise<BatchSummary> {
+export async function processBatch(request: BatchRequest): Promise<BatchSummary> {
+  const { files, settings, outputSink, signal, onFileUpdate } = request;
+  const createPool = request.createPool ?? ((onProgress) => new WorkerPool(onProgress));
+  const pool = createPool((fileId, stage) => onFileUpdate(fileId, { stage }));
+  const run: BatchRun = { settings, outputSink, signal, pool };
   const summary = emptySummary();
-  const pool = new WorkerPool((fileId, stage) => appState.updateFile(fileId, { stage }));
-  const onAbort = () => {
-    summary.aborted = true;
-    pool.abort();
-  };
+  const onAbort = () => pool.abort();
   signal.addEventListener('abort', onAbort);
 
   await forEachConcurrent(files, pool.size + DECODE_AHEAD, async (file) => {
-    const outcome = await processFile(file, settings, pool, outputSink, signal);
-    recordOutcome(file, outcome);
+    onFileUpdate(file.id, { status: 'processing' });
+    const outcome = await processFile(file, run);
+    onFileUpdate(file.id, outcomePatch(outcome));
     tally(summary, outcome);
   });
   signal.removeEventListener('abort', onAbort);
   pool.terminate();
   await outputSink.finalize();
 
+  summary.aborted = signal.aborted;
   return summary;
 }
 
@@ -66,35 +83,33 @@ export async function processBatch(
  * formats (and WAV the worker can't read) via decodeAudioData on the main
  * thread. Never throws: failures become an outcome.
  */
-async function processFile(
-  file: FileEntry,
-  settings: ProcessingSettings,
-  pool: WorkerPool,
-  outputSink: OutputSink,
-  signal: AbortSignal,
-): Promise<FileOutcome> {
-  if (signal.aborted) return { kind: 'skipped' };
-  appState.updateFile(file.id, { status: 'processing' });
+async function processFile(file: FileEntry, run: BatchRun): Promise<FileOutcome> {
+  if (run.signal.aborted) return { kind: 'skipped' };
   try {
-    const job: Omit<QueuedJob, 'source'> = {
-      fileId: file.id,
-      ...splitNameAndExtension(file.name),
-      settings,
-      originalBytes: file.size,
-      sourceFormat: file.sourceFormat,
-      manualTrim: file.manualTrim,
-    };
-    const source: JobSource = job.extension === 'wav' ? { kind: 'wav', file: file.file } : await decodeOnMainThread(file);
-    const result = await pool
-      .enqueue({ ...job, source })
-      .catch(async (err) => {
-        if (!(err instanceof UnsupportedWavError)) throw err;
-        return pool.enqueue({ ...job, source: await decodeOnMainThread(file) });
-      });
+    const result = await runJob(file, run);
     if (result.aborted) return { kind: 'skipped' };
-    return { kind: 'done', result: await writeOutput(file, result, settings, outputSink) };
+    return { kind: 'done', result: await writeOutput(file, result, run) };
   } catch (err) {
-    return signal.aborted ? { kind: 'skipped' } : { kind: 'error', message: errorMessage(err) };
+    return run.signal.aborted ? { kind: 'skipped' } : { kind: 'error', message: errorMessage(err) };
+  }
+}
+
+/** Runs the pipeline job, retrying with main-thread PCM when the worker can't decode the WAV itself. */
+async function runJob(file: FileEntry, { settings, pool }: BatchRun): Promise<JobResult> {
+  const job: Omit<QueuedJob, 'source'> = {
+    fileId: file.id,
+    ...splitNameAndExtension(file.name),
+    settings,
+    originalBytes: file.size,
+    sourceFormat: file.sourceFormat,
+    manualTrim: file.manualTrim,
+  };
+  const source: JobSource = job.extension === 'wav' ? { kind: 'wav', file: file.file } : await decodeOnMainThread(file);
+  try {
+    return await pool.enqueue({ ...job, source });
+  } catch (err) {
+    if (!(err instanceof UnsupportedWavError)) throw err;
+    return pool.enqueue({ ...job, source: await decodeOnMainThread(file) });
   }
 }
 
@@ -103,12 +118,7 @@ async function decodeOnMainThread(file: FileEntry): Promise<JobSource> {
 }
 
 /** Overwrites the source when enabled and possible, else writes to the sink; returns the result with any added warning. */
-async function writeOutput(
-  file: FileEntry,
-  result: JobResult,
-  settings: ProcessingSettings,
-  outputSink: OutputSink,
-): Promise<JobResult> {
+async function writeOutput(file: FileEntry, result: JobResult, { settings, outputSink }: BatchRun): Promise<JobResult> {
   if (settings.overwrite && canOverwrite(file)) {
     await overwriteSourceFile(file.fileHandle, result.bytes);
     return result;
@@ -125,18 +135,16 @@ function deriveOutputRelativePath(file: FileEntry, outputName: string): string {
   return [...parts.slice(1, -1), outputName].join('/');
 }
 
-function recordOutcome(file: FileEntry, outcome: FileOutcome): void {
+function outcomePatch(outcome: FileOutcome): Partial<FileEntry> {
   switch (outcome.kind) {
     case 'done': {
       const { outputName, stats, warning } = outcome.result;
-      appState.updateFile(file.id, { status: 'done', outputName, stats, warning, stage: undefined });
-      return;
+      return { status: 'done', outputName, stats, warning, stage: undefined };
     }
     case 'skipped':
-      appState.updateFile(file.id, { status: 'skipped' });
-      return;
+      return { status: 'skipped' };
     case 'error':
-      appState.updateFile(file.id, { status: 'error', error: outcome.message });
+      return { status: 'error', error: outcome.message };
   }
 }
 
