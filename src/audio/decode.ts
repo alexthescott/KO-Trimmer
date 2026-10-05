@@ -1,10 +1,4 @@
-let sharedContext: AudioContext | null = null;
-
-/** Shared by decode and preview playback (audio/player.ts). */
-export function getSharedContext(): AudioContext {
-  if (!sharedContext) sharedContext = new AudioContext();
-  return sharedContext;
-}
+import { getSharedContext } from './audioContext';
 
 export interface DecodedAudio {
   channels: Float32Array[];

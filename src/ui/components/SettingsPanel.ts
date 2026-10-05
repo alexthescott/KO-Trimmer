@@ -2,19 +2,26 @@ import { h } from '../dom';
 import { appState } from '../../app/state';
 import { BITRATE_OPTIONS, SETTINGS_RANGES, WAV_SAMPLE_RATE_OPTIONS } from '../../audio/settingsDefaults';
 import { canOverwrite } from '../../fs/overwriteWriter';
-import type { FileEntry } from '../../app/types';
 
 export class SettingsPanel {
   element: HTMLElement;
+  private overwriteRow: HTMLElement;
 
   constructor() {
     this.element = h('div', { class: 'panel' });
+    this.overwriteRow = renderOverwriteRow();
     this.render();
+  }
+
+  /** The file list changed: only the overwrite row depends on it. */
+  refresh(): void {
+    const row = renderOverwriteRow();
+    this.overwriteRow.replaceWith(row);
+    this.overwriteRow = row;
   }
 
   private render(): void {
     const s = appState.settings;
-    const anyHandleBacked = appState.files.some((f: FileEntry) => canOverwrite(f.fileHandle));
 
     const el = h('div', { class: 'settings-grid' }, [
       field('Silence Threshold', sliderInput('threshold', s.thresholdDb, SETTINGS_RANGES.thresholdDb, (v) => `${v} dB`, (v) =>
@@ -57,14 +64,10 @@ export class SettingsPanel {
         'Unchecked writes 16-bit WAV (smallest). Checked keeps the source format, e.g. 32-bit float — check your device supports it.',
         (checked) => appState.updateSettings({ preserveBitDepth: checked }),
       ),
-      overwriteCheckboxRow(s.overwrite, anyHandleBacked),
+      this.overwriteRow,
     ]);
 
     this.element.replaceChildren(h('h3', {}, ['Settings']), el, checkboxes);
-  }
-
-  refresh(): void {
-    this.render();
   }
 }
 
@@ -156,19 +159,20 @@ function checkboxRow(
   return h('div', { class: 'checkbox-row' }, [checkbox, h('label', {}, [labelText]), h('small', {}, [helpText])]);
 }
 
-function overwriteCheckboxRow(checked: boolean, anyHandleBacked: boolean): HTMLElement {
+function renderOverwriteRow(): HTMLElement {
+  const anyOverwritable = appState.files.some(canOverwrite);
   const checkbox = h('input', {
     type: 'checkbox',
-    checked,
-    disabled: !anyHandleBacked,
+    checked: appState.settings.overwrite,
+    disabled: !anyOverwritable,
   }) as HTMLInputElement;
   checkbox.addEventListener('change', () => appState.updateSettings({ overwrite: checkbox.checked }));
 
-  const helpText = anyHandleBacked
-    ? 'Replaces the original source file in place instead of writing a new file.'
-    : 'Requires selecting files via a folder picker or drag-drop, not individual file picking.';
+  const helpText = anyOverwritable
+    ? 'Replaces WAV/MP3 sources in place. Other formats are re-encoded as WAV, so they are written as new files.'
+    : 'Requires WAV or MP3 files added via a folder picker or drag-drop, not individual file picking.';
 
   const row = h('div', { class: 'checkbox-row' }, [checkbox, h('label', {}, ['Overwrite original']), h('small', {}, [helpText])]);
-  if (!anyHandleBacked) row.setAttribute('title', helpText);
+  if (!anyOverwritable) row.setAttribute('title', helpText);
   return row;
 }

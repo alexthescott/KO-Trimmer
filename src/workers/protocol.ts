@@ -1,21 +1,21 @@
-import type { ProcessingSettings, ProcessingStage, ProcessStats } from '../app/types';
-import type { SampleFormat } from '../audio/sampleFormat';
+import type { PipelineOutput, PipelineRequest } from '../audio/pipeline';
+import type { ProcessingStage } from '../app/types';
 
-export interface ProcessJobRequest {
-  type: 'process';
-  jobId: string;
+export interface QueuedJob extends PipelineRequest {
   fileId: string;
-  channels: Float32Array[];
-  sampleRate: number;
-  extension: string;
-  baseName: string;
-  settings: ProcessingSettings;
-  originalBytes: number;
-  sourceFormat?: SampleFormat;
-  manualTrim?: { start: number; end: number };
 }
 
-export type WorkerInMessage = ProcessJobRequest;
+export interface ProcessJobRequest extends QueuedJob {
+  type: 'process';
+  jobId: string;
+}
+
+export interface CancelJobRequest {
+  type: 'cancel';
+  jobId: string;
+}
+
+export type WorkerInMessage = ProcessJobRequest | CancelJobRequest;
 
 export interface ProgressMessage {
   type: 'progress';
@@ -24,15 +24,10 @@ export interface ProgressMessage {
   stage: ProcessingStage;
 }
 
-export interface DoneMessage {
+export interface DoneMessage extends PipelineOutput {
   type: 'done';
   jobId: string;
   fileId: string;
-  bytes: Uint8Array;
-  outputName: string;
-  outputExtension: string;
-  stats: ProcessStats;
-  warning?: string;
 }
 
 export interface ErrorMessage {
@@ -43,3 +38,12 @@ export interface ErrorMessage {
 }
 
 export type WorkerOutMessage = ProgressMessage | DoneMessage | ErrorMessage;
+
+/** Typed postMessage from inside a worker (the DOM lib types `self` as Window). */
+export function postFromWorker<T>(message: T, transfer: Transferable[] = []): void {
+  (self as unknown as Worker).postMessage(message, { transfer });
+}
+
+export function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

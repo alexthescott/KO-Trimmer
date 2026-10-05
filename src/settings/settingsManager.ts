@@ -1,6 +1,7 @@
 import type { ProcessingSettings } from '../app/types';
-import { DEFAULT_SETTINGS } from '../audio/settingsDefaults';
+import { DEFAULT_SETTINGS, FULL_MP3_BITRATE } from '../audio/settingsDefaults';
 
+// Keys keep the app's old "KO Trimmer" name so saved settings survive the rename.
 const SETTINGS_KEY = 'koTrimmer.settings';
 const SHOW_WELCOME_KEY = 'koTrimmer.showWelcome';
 
@@ -10,7 +11,7 @@ export function loadSettings(): ProcessingSettings {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
     const stored = JSON.parse(raw);
-    return migrate({ ...DEFAULT_SETTINGS, ...stored }, stored);
+    return migrateLegacyBitrate({ ...DEFAULT_SETTINGS, ...stored }, stored);
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -41,13 +42,20 @@ export function saveShowWelcome(show: boolean): void {
   }
 }
 
+/** The WAV sample rate an old "bitrate" choice implied, highest threshold first. */
+const LEGACY_RATE_BY_MIN_KBPS: ReadonlyArray<readonly [minKbps: number, rateHz: number]> = [
+  [192, 44100],
+  [128, 22050],
+  [96, 16000],
+  [0, 11025],
+];
+
 /**
  * Settings saved before WAV sample rate was split out of "bitrate" carried
  * the rate implicitly in bitrateKbps; carry that choice over once.
  */
-function migrate(settings: ProcessingSettings, stored: Record<string, unknown>): ProcessingSettings {
-  if ('wavSampleRateHz' in stored || settings.bitrateKbps >= 320) return settings;
-  const legacyRate =
-    settings.bitrateKbps >= 192 ? 44100 : settings.bitrateKbps >= 128 ? 22050 : settings.bitrateKbps >= 96 ? 16000 : 11025;
+export function migrateLegacyBitrate(settings: ProcessingSettings, stored: Record<string, unknown>): ProcessingSettings {
+  if ('wavSampleRateHz' in stored || settings.bitrateKbps >= FULL_MP3_BITRATE) return settings;
+  const [, legacyRate] = LEGACY_RATE_BY_MIN_KBPS.find(([minKbps]) => settings.bitrateKbps >= minKbps)!;
   return { ...settings, wavSampleRateHz: legacyRate };
 }

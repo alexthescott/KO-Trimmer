@@ -1,7 +1,7 @@
 import type { SilenceRegion } from '../app/types';
 
 /**
- * Silence-region detection. threshold_db -> linear amplitude via 10^(db/20); boolean mask vs energy;
+ * Silence-region detection. Threshold dB -> linear amplitude via 10^(db/20); boolean mask vs energy;
  * contiguous true-runs become regions; edge cases at sample 0 and the last
  * sample are handled explicitly.
  */

@@ -6,6 +6,7 @@ import { renderResultsSummary } from '../components/ResultsSummary';
 import { processBatch, type BatchSummary } from '../../app/processBatch';
 import { FsAccessOutputSink, ZipOutputSink, type OutputSink } from '../../fs/outputWriter';
 import type { FileEntry } from '../../app/types';
+import { TRIMMED_SUFFIX } from '../../fs/dragDropEntries';
 
 export class ProcessingView {
   element: HTMLElement;
@@ -92,7 +93,7 @@ export class ProcessingView {
     if (appState.outputRootHandle) {
       return new FsAccessOutputSink(appState.outputRootHandle);
     }
-    const zipName = `${appState.rootName ?? 'sample-trimmer-output'}_trimmed.zip`;
+    const zipName = `${appState.rootName ?? 'sample-trimmer-output'}${TRIMMED_SUFFIX}.zip`;
     return new ZipOutputSink(zipName);
   }
 
@@ -119,7 +120,6 @@ export class ProcessingView {
     this.stopButton.style.display = 'none';
     this.closeButton.disabled = false;
     this.resultsContainer.replaceChildren(renderResultsSummary(summary, this.describeOutput()));
-    appEvents.emit('processing-finished', { aborted: summary.aborted });
   }
 
   destroy(): void {

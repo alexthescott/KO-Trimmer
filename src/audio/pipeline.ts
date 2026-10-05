@@ -1,4 +1,4 @@
-import type { ProcessingSettings, ProcessStats } from '../app/types';
+import type { ProcessingSettings, ProcessingStage, ProcessStats, SampleRange } from '../app/types';
 import { computeEnergyEnvelope } from './energyEnvelope';
 import { detectSilenceRegions } from './silenceDetector';
 import { computeTrimBounds, sliceChannels, type TrimBounds } from './trim';
@@ -7,10 +7,13 @@ import { speedUp } from './speedResample';
 import { resolveWavSampleRate, resampleToRate } from './sampleRateResample';
 import { encodeWav } from './wavEncoder';
 import { encodeMp3 } from './mp3Encoder';
-import { buildOutputFilename } from './naming';
-import { clipWarning, peakAbs, resolveOutputFormat, type SampleFormat } from './sampleFormat';
+import { buildOutputFilename, exceedsKoIILength } from './naming';
+import { clipWarning, peakAbs, type SampleFormat } from './sampleFormat';
+import { frameCount } from './channels';
+import { outputContainerFor, outputSampleFormat, type OutputContainer } from './outputContainer';
 
-export interface PipelineInput {
+/** Everything the pipeline needs about one file — serializable, so it can cross to the worker. */
+export interface PipelineRequest {
   channels: Float32Array[];
   sampleRate: number;
   extension: string;
@@ -19,18 +22,33 @@ export interface PipelineInput {
   originalBytes: number;
   /** Source bit depth from the file header, if known. */
   sourceFormat?: SampleFormat;
-  /** User-dragged trim points (source samples, end exclusive); overrides auto-detection. */
-  manualTrim?: { start: number; end: number };
-  onStage?: (stage: 'trim' | 'downmix' | 'speedup' | 'resample' | 'encode') => void;
+  /** User-dragged trim points; overrides auto-detection. */
+  manualTrim?: SampleRange;
+}
+
+export interface PipelineInput extends PipelineRequest {
+  onStage?: (stage: ProcessingStage) => void;
   isCancelled?: () => boolean;
 }
 
 export interface PipelineOutput {
   bytes: Uint8Array;
   outputName: string;
-  outputExtension: string;
+  outputExtension: OutputContainer;
   stats: ProcessStats;
   warning?: string;
+}
+
+export interface RenderedAudio {
+  channels: Float32Array[];
+  sampleRate: number;
+}
+
+export interface RenderInput extends RenderedAudio {
+  bounds: SampleRange;
+  container: OutputContainer;
+  settings: ProcessingSettings;
+  onStage?: (stage: ProcessingStage) => void;
 }
 
 /**
@@ -44,10 +62,10 @@ export function computeAutoTrimBounds(
 ): TrimBounds {
   const energy = computeEnergyEnvelope(channels);
   const regions = detectSilenceRegions(energy, sampleRate, settings.thresholdDb, settings.minDurationMs);
-  return computeTrimBounds(channels[0]?.length ?? 0, regions, sampleRate, settings.paddingMs);
+  return computeTrimBounds(frameCount(channels), regions, sampleRate, settings.paddingMs);
 }
 
-export function clampManualTrim(trim: { start: number; end: number }, totalLength: number): TrimBounds {
+export function clampManualTrim(trim: SampleRange, totalLength: number): TrimBounds {
   const start = Math.max(0, Math.min(totalLength, Math.round(trim.start)));
   const end = Math.max(start, Math.min(totalLength, Math.round(trim.end)));
   if (end - start <= 0) {
@@ -57,96 +75,72 @@ export function clampManualTrim(trim: { start: number; end: number }, totalLengt
 }
 
 /**
- * The audible part of the pipeline (trim -> mono -> speed -> WAV
- * sample-rate reduction) without encoding, for the waveform editor's
- * live "Play Processed" preview before a batch is run.
+ * The audible stages (trim -> mono -> speed-up -> WAV sample-rate reduction)
+ * without encoding. runPipeline encodes its result, and the waveform editor
+ * plays it as the live "Play Processed" preview — one code path, so the
+ * preview can't drift from the batch output.
  */
-export async function renderPreview(
-  channels: Float32Array[],
-  sampleRate: number,
-  bounds: TrimBounds,
-  extension: string,
-  settings: ProcessingSettings,
-): Promise<{ channels: Float32Array[]; sampleRate: number }> {
-  let out = sliceChannels(channels, bounds);
-  if (!settings.preserveStereo) out = downmixToMono(out);
-  if (settings.speedMultiplier > 1.0) out = speedUp(out, settings.speedMultiplier);
-  let rate = sampleRate;
-  const target = extension === 'mp3' ? undefined : resolveWavSampleRate(sampleRate, settings.wavSampleRateHz);
-  if (target !== undefined && (out[0]?.length ?? 0) > 0) {
-    rate = target;
-    out = await resampleToRate(out, sampleRate, rate);
+export async function renderAudible(input: RenderInput): Promise<RenderedAudio> {
+  const { settings, onStage } = input;
+  let channels = sliceChannels(input.channels, input.bounds);
+
+  onStage?.('downmix');
+  if (!settings.preserveStereo) channels = downmixToMono(channels);
+
+  onStage?.('speedup');
+  if (settings.speedMultiplier > 1.0) channels = speedUp(channels, settings.speedMultiplier);
+
+  const targetSampleRate =
+    input.container === 'wav' ? resolveWavSampleRate(input.sampleRate, settings.wavSampleRateHz) : undefined;
+  if (targetSampleRate === undefined || frameCount(channels) === 0) {
+    return { channels, sampleRate: input.sampleRate };
   }
-  return { channels: out, sampleRate: rate };
+  onStage?.('resample');
+  return { channels: await resampleToRate(channels, input.sampleRate, targetSampleRate), sampleRate: targetSampleRate };
 }
 
 /**
- * Orchestrates decode(already done by caller) -> trim -> mono/stereo ->
- * speed-up -> sample-rate/bitrate reduction -> encode, in that fixed order.
- * Browser-native containers we have encoders for are wav and mp3; any
- * other decodable input (flac/aiff/m4a/ogg) has no browser-side re-encoder
- * available without a heavy new dependency, so it is written out as WAV
- * (lossless, and every target hardware sampler accepts WAV natively).
+ * Orchestrates decode (already done by caller) -> trim -> mono/stereo ->
+ * speed-up -> sample-rate reduction -> encode, in that fixed order.
  */
 export async function runPipeline(input: PipelineInput): Promise<PipelineOutput> {
   const { settings } = input;
-  const originalDurationSec = (input.channels[0]?.length ?? 0) / input.sampleRate;
+  const container = outputContainerFor(input.extension);
 
   input.onStage?.('trim');
   const bounds = input.manualTrim
-    ? clampManualTrim(input.manualTrim, input.channels[0]?.length ?? 0)
+    ? clampManualTrim(input.manualTrim, frameCount(input.channels))
     : computeAutoTrimBounds(input.channels, input.sampleRate, settings);
-  let channels = sliceChannels(input.channels, bounds);
-
-  input.onStage?.('downmix');
-  if (!settings.preserveStereo) {
-    channels = downmixToMono(channels);
-  }
-
-  input.onStage?.('speedup');
-  if (settings.speedMultiplier > 1.0) {
-    channels = speedUp(channels, settings.speedMultiplier);
-  }
-
-  const outputExtension = input.extension === 'mp3' ? 'mp3' : 'wav';
-
-  let sampleRate = input.sampleRate;
-  const targetSampleRate =
-    outputExtension === 'wav' ? resolveWavSampleRate(sampleRate, settings.wavSampleRateHz) : undefined;
-  if (targetSampleRate !== undefined) {
-    input.onStage?.('resample');
-    channels = await resampleToRate(channels, sampleRate, targetSampleRate);
-    sampleRate = targetSampleRate;
-  }
+  const rendered = await renderAudible({ ...input, bounds, container });
 
   input.onStage?.('encode');
-  const outputFormat = outputExtension === 'wav' ? resolveOutputFormat(input.sourceFormat, settings.preserveBitDepth) : undefined;
-  const clip = outputFormat ? clipWarning(peakAbs(channels), outputFormat) : undefined;
+  const outputFormat = outputSampleFormat(container, input.sourceFormat, settings.preserveBitDepth);
+  const clip = outputFormat && clipWarning(peakAbs(rendered.channels), outputFormat);
   const bytes =
-    outputExtension === 'mp3'
-      ? encodeMp3(channels, sampleRate, settings.bitrateKbps, input.isCancelled)
-      : encodeWav(channels, sampleRate, outputFormat);
+    container === 'mp3'
+      ? encodeMp3(rendered.channels, rendered.sampleRate, settings.bitrateKbps, input.isCancelled)
+      : encodeWav(rendered.channels, rendered.sampleRate, outputFormat);
 
-  const finalDurationSec = (channels[0]?.length ?? 0) / sampleRate;
+  const finalDurationSec = frameCount(rendered.channels) / rendered.sampleRate;
   const outputName = buildOutputFilename({
     baseName: input.baseName,
-    extension: outputExtension,
+    extension: container,
     preserveStereo: settings.preserveStereo,
     bitrateKbps: settings.bitrateKbps,
-    targetSampleRate,
+    targetSampleRate: rendered.sampleRate !== input.sampleRate ? rendered.sampleRate : undefined,
     finalDurationSec,
   });
 
   const stats: ProcessStats = {
     originalBytes: input.originalBytes,
     outputBytes: bytes.length,
-    originalDurationSec,
+    originalDurationSec: frameCount(input.channels) / input.sampleRate,
     outputDurationSec: finalDurationSec,
-    longerThan20s: finalDurationSec > 20,
+    exceedsKoIILength: exceedsKoIILength(finalDurationSec),
     sourceFormat: outputFormat && input.sourceFormat,
     outputFormat,
   };
 
   const warning = [bounds.warning, clip].filter(Boolean).join(' · ') || undefined;
-  return { bytes, outputName, outputExtension, stats, warning };
+  return { bytes, outputName, outputExtension: container, stats, warning };
 }

@@ -1,4 +1,5 @@
-import { h, formatBytes } from '../dom';
+import { h, formatBytes, formatSizeChange, plural } from '../dom';
+import { KO_II_MAX_DURATION_SEC } from '../../audio/naming';
 import type { BatchSummary } from '../../app/processBatch';
 
 /**
@@ -9,11 +10,6 @@ export function renderResultsSummary(
   summary: BatchSummary,
   outputDescription: string,
 ): HTMLElement {
-  const reduction =
-    summary.originalBytes > 0
-      ? Math.round((1 - summary.outputBytes / summary.originalBytes) * 100)
-      : 0;
-
   const rows: HTMLElement[] = [
     h('p', {}, [`Processed: ${summary.processedCount}`]),
   ];
@@ -24,24 +20,24 @@ export function renderResultsSummary(
   if (summary.originalBytes > 0) {
     rows.push(
       h('p', {}, [
-        `${formatBytes(summary.originalBytes)} → ${formatBytes(summary.outputBytes)} (${
-          reduction >= 0 ? '−' : '+'
-        }${Math.abs(reduction)}%)`,
+        `${formatBytes(summary.originalBytes)} → ${formatBytes(summary.outputBytes)} ` +
+          `(${formatSizeChange(summary.originalBytes, summary.outputBytes)})`,
       ]),
     );
   }
   for (const [conversion, count] of Object.entries(summary.formatConversions)) {
-    rows.push(h('p', {}, [`${count} file${count === 1 ? '' : 's'} converted ${conversion}`]));
+    rows.push(h('p', {}, [`${plural(count, 'file')} converted ${conversion}`]));
   }
   rows.push(h('p', { class: 'muted' }, [outputDescription]));
 
-  if (summary.longerThan20sNames.length > 0) {
+  const overLength = summary.overKoIILengthNames;
+  if (overLength.length > 0) {
     rows.push(
       h('div', { style: 'color:var(--warning)' }, [
         h('p', {}, [
-          `${summary.longerThan20sNames.length} file(s) are still over 20s — saved with a leading underscore for KO II sorting:`,
+          `${plural(overLength.length, 'file')} still over ${KO_II_MAX_DURATION_SEC}s — saved with a leading underscore for KO II sorting:`,
         ]),
-        h('ul', {}, summary.longerThan20sNames.map((name) => h('li', {}, [name]))),
+        h('ul', {}, overLength.map((name) => h('li', {}, [name]))),
       ]),
     );
   }

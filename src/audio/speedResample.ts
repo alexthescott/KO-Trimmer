@@ -9,11 +9,12 @@
  * idea as the JUCE KOTrimmer's average-then-decimate, but centred so it
  * adds no time shift. At 2x this puts a null exactly at the source Nyquist.
  */
+import { frameCount, sampleAt } from './channels';
+
 export function speedUp(channels: Float32Array[], speedMultiplier: number): Float32Array[] {
   if (speedMultiplier <= 1.0) return channels;
 
-  const inputLength = channels[0]?.length ?? 0;
-  const outputLength = Math.max(1, Math.round(inputLength / speedMultiplier));
+  const outputLength = Math.max(1, Math.round(frameCount(channels) / speedMultiplier));
   const taps = speedMultiplier >= 1.5 ? Math.round(speedMultiplier) : 1;
   const tapOffset = (taps - 1) / 2;
 
@@ -23,18 +24,10 @@ export function speedUp(channels: Float32Array[], speedMultiplier: number): Floa
       const center = i * speedMultiplier;
       let sum = 0;
       for (let k = 0; k < taps; k++) {
-        sum += interpolate(channel, center + k - tapOffset, inputLength);
+        sum += sampleAt(channel, center + k - tapOffset);
       }
       output[i] = sum / taps;
     }
     return output;
   });
-}
-
-function interpolate(channel: Float32Array, pos: number, length: number): number {
-  const clamped = Math.max(0, Math.min(length - 1, pos));
-  const idxFloor = Math.floor(clamped);
-  const idxCeil = Math.min(idxFloor + 1, length - 1);
-  const frac = clamped - idxFloor;
-  return channel[idxFloor] + (channel[idxCeil] - channel[idxFloor]) * frac;
 }

@@ -1,6 +1,6 @@
 import { h } from '../dom';
 import { resolveDroppedItems, type DroppedEntry } from '../../fs/dragDropEntries';
-import { pickDirectory, resolveDefaultOutputRoot } from '../../fs/directoryPicker';
+import { pickDirectory } from '../../fs/directoryPicker';
 import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import { toFileEntries, deriveRootName } from '../../app/fileEntries';
 import { appState } from '../../app/state';
@@ -26,9 +26,7 @@ export class DropZone {
       const dataTransfer = (e as DragEvent).dataTransfer;
       if (!dataTransfer) return;
       const { entries, rootHandle } = await resolveDroppedItems(dataTransfer.items);
-      if (rootHandle && !appState.outputRootIsOverride) {
-        appState.outputRootHandle = await resolveDefaultOutputRoot(rootHandle, rootHandle.name);
-      }
+      if (rootHandle) await appState.useSourceRoot(rootHandle);
       await this.addEntries(entries);
     });
     zone.addEventListener('click', () => this.handleClick());
@@ -57,9 +55,7 @@ export class DropZone {
     if (isFileSystemAccessSupported()) {
       const picked = await pickDirectory();
       if (picked) {
-        if (!appState.outputRootIsOverride) {
-          appState.outputRootHandle = await resolveDefaultOutputRoot(picked.handle, picked.handle.name);
-        }
+        await appState.useSourceRoot(picked.handle);
         await this.addEntries(picked.entries);
       }
       return;

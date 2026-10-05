@@ -21,14 +21,16 @@ describe('encodeMp3 (lamejs smoke test)', () => {
     expect(foundFrameSync).toBe(true);
   });
 
-  it('stops early when isCancelled reports true', () => {
+  it('throws AbortError instead of returning a truncated file when cancelled', () => {
     const sampleRate = 44100;
     const channel = tone(sampleRate * 2, 0.5, 440, sampleRate); // 2s, many chunks
     let calls = 0;
-    const bytes = encodeMp3([channel], sampleRate, 128, () => {
-      calls++;
-      return calls > 1; // cancel after the first check
-    });
-    expect(bytes.length).toBeGreaterThan(0);
+    const encode = () =>
+      encodeMp3([channel], sampleRate, 128, () => {
+        calls++;
+        return calls > 1; // cancel after the first check
+      });
+    expect(encode).toThrow(expect.objectContaining({ name: 'AbortError' }));
+    expect(calls).toBe(2);
   });
 });

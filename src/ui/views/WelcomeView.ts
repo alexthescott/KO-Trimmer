@@ -1,7 +1,7 @@
 import { h } from '../dom';
 import { saveShowWelcome } from '../../settings/settingsManager';
 import { isFileSystemAccessSupported } from '../../fs/capabilities';
-import { addFavorite } from '../../fs/favoritesStore';
+import { pickAndAddFavorite } from '../../fs/favoritesStore';
 import { appState } from '../../app/state';
 
 export class WelcomeView {
@@ -12,14 +12,7 @@ export class WelcomeView {
 
     const addFavoriteButton = h('button', {
       onclick: async () => {
-        if (!isFileSystemAccessSupported()) return;
-        try {
-          const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-          await addFavorite(handle.name, handle);
-          await appState.refreshFavorites();
-        } catch (err) {
-          if (!(err instanceof DOMException && err.name === 'AbortError')) throw err;
-        }
+        if (await pickAndAddFavorite()) await appState.refreshFavorites();
       },
     }, ['+ Add Favorite Directory']);
 

@@ -1,26 +1,11 @@
-import type { ProcessingSettings, ProcessingStage, ProcessStats } from '../app/types';
-import type { WorkerOutMessage } from './protocol';
-import type { SampleFormat } from '../audio/sampleFormat';
+import type { ProcessingStage } from '../app/types';
+import type { PipelineOutput } from '../audio/pipeline';
+import type { CancelJobRequest, ProcessJobRequest, QueuedJob, WorkerOutMessage } from './protocol';
 
-export interface QueuedJob {
-  fileId: string;
-  channels: Float32Array[];
-  sampleRate: number;
-  extension: string;
-  baseName: string;
-  settings: ProcessingSettings;
-  originalBytes: number;
-  sourceFormat?: SampleFormat;
-  manualTrim?: { start: number; end: number };
-}
+export type { QueuedJob } from './protocol';
 
-export interface JobResult {
+export interface JobResult extends PipelineOutput {
   fileId: string;
-  bytes: Uint8Array;
-  outputName: string;
-  outputExtension: string;
-  stats: ProcessStats;
-  warning?: string;
   aborted: boolean;
 }
 
@@ -97,15 +82,8 @@ export class WorkerPool {
       return;
     }
 
-    entry.resolve({
-      fileId: msg.fileId,
-      bytes: msg.bytes,
-      outputName: msg.outputName,
-      outputExtension: msg.outputExtension,
-      stats: msg.stats,
-      warning: msg.warning,
-      aborted: this.aborted,
-    });
+    const { type: _type, jobId: _jobId, ...output } = msg;
+    entry.resolve({ ...output, aborted: this.aborted });
   }
 
   private dispatchNext(): void {
@@ -130,22 +108,9 @@ export class WorkerPool {
     this.jobIdByWorker.set(worker, jobId);
     this.pendingByJobId.set(jobId, entry);
 
-    worker.postMessage(
-      {
-        type: 'process',
-        jobId,
-        fileId: entry.job.fileId,
-        channels: entry.job.channels,
-        sampleRate: entry.job.sampleRate,
-        extension: entry.job.extension,
-        baseName: entry.job.baseName,
-        settings: entry.job.settings,
-        originalBytes: entry.job.originalBytes,
-        sourceFormat: entry.job.sourceFormat,
-        manualTrim: entry.job.manualTrim,
-      },
-      { transfer: entry.job.channels.map((c) => c.buffer) },
-    );
+    worker.postMessage({ type: 'process', jobId, ...entry.job } satisfies ProcessJobRequest, {
+      transfer: entry.job.channels.map((c) => c.buffer),
+    });
   }
 
   enqueue(job: QueuedJob): Promise<JobResult> {
@@ -162,10 +127,8 @@ export class WorkerPool {
   /** Drops queued jobs and forwards a best-effort cancel to in-flight workers. */
   abort(): void {
     this.aborted = true;
-    for (const jobId of this.pendingByJobId.keys()) {
-      for (const [worker, id] of this.jobIdByWorker) {
-        if (id === jobId) worker.postMessage({ type: 'cancel', jobId });
-      }
+    for (const [worker, jobId] of this.jobIdByWorker) {
+      worker.postMessage({ type: 'cancel', jobId } satisfies CancelJobRequest);
     }
     this.dispatchNext();
   }

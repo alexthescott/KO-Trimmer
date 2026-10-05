@@ -4,9 +4,6 @@ export interface AppEventMap {
   'files-changed': { files: FileEntry[] };
   'settings-changed': { settings: ProcessingSettings };
   'favorites-changed': {};
-  'processing-started': {};
-  'processing-finished': { aborted: boolean };
-  'view-changed': { view: 'welcome' | 'main' | 'processing' };
 }
 
 /** Tiny typed pub/sub so UI modules stay decoupled without a framework. */

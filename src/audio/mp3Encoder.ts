@@ -1,22 +1,16 @@
 import { Mp3Encoder } from '@breezystack/lamejs';
+import { floatTo16BitPcm } from './wavEncoder';
+import { frameCount } from './channels';
 
 const SAMPLES_PER_CHUNK = 1152; // lamejs-recommended chunk size
 const CANCEL_CHECK_EVERY_N_CHUNKS = 8;
-
-function floatTo16BitPcm(channel: Float32Array): Int16Array {
-  const out = new Int16Array(channel.length);
-  for (let i = 0; i < channel.length; i++) {
-    const sample = Math.max(-1, Math.min(1, channel[i]));
-    out[i] = Math.round(sample < 0 ? sample * 0x8000 : sample * 0x7fff);
-  }
-  return out;
-}
 
 /**
  * Pure-JS MP3 encoder so MP3 bitrate output works entirely offline, no
  * FFmpeg binary.
  * `isCancelled` is polled between chunks so a Stop click feels responsive
- * even on the single most expensive processing stage.
+ * even on the single most expensive processing stage; a cancelled encode
+ * throws an AbortError rather than returning a truncated file.
  */
 export function encodeMp3(
   channels: Float32Array[],
@@ -28,13 +22,13 @@ export function encodeMp3(
   const encoder = new Mp3Encoder(numChannels, sampleRate, kbps);
 
   const pcm = channels.slice(0, numChannels).map(floatTo16BitPcm);
-  const totalSamples = pcm[0]?.length ?? 0;
+  const totalSamples = frameCount(channels);
   const chunks: Uint8Array[] = [];
 
   let chunkCount = 0;
   for (let i = 0; i < totalSamples; i += SAMPLES_PER_CHUNK) {
     if (chunkCount % CANCEL_CHECK_EVERY_N_CHUNKS === 0 && isCancelled?.()) {
-      return concatUint8Arrays(chunks);
+      throw new DOMException('MP3 encode cancelled', 'AbortError');
     }
 
     const left = pcm[0].subarray(i, i + SAMPLES_PER_CHUNK);

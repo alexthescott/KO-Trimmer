@@ -1,4 +1,4 @@
-import { h, formatBytes } from '../dom';
+import { h, formatBytes, formatSizeChange, plural } from '../dom';
 import { appState } from '../../app/state';
 import { appEvents } from '../../app/events';
 import { evictDecoded } from '../../app/decodedCache';
@@ -8,7 +8,7 @@ import { FavoritesSidebar } from '../components/FavoritesSidebar';
 import { SettingsPanel } from '../components/SettingsPanel';
 import { FileTable } from '../components/FileTable';
 import { WaveformEditor } from '../components/WaveformEditor';
-import { pickOutputDirectory } from '../../fs/directoryPicker';
+import { pickWritableDirectory } from '../../fs/directoryPicker';
 import { canOverwrite } from '../../fs/overwriteWriter';
 import type { FileEntry } from '../../app/types';
 
@@ -151,11 +151,11 @@ export class MainView {
 
   private handleProcess(onProcess: () => void): void {
     if (appState.settings.overwrite) {
-      const count = appState.files.filter((f) => canOverwrite(f.fileHandle)).length;
+      const count = appState.files.filter(canOverwrite).length;
       if (
         count > 0 &&
         !confirm(
-          `Overwrite ${count} original file${count === 1 ? '' : 's'}?\n\n` +
+          `Overwrite ${plural(count, 'original file')}?\n\n` +
             'The source files will be replaced with the trimmed versions. This cannot be undone.',
         )
       ) {
@@ -193,11 +193,10 @@ export class MainView {
 
   private renderBatchEstimate(estimate: BatchEstimate): void {
     const { originalBytes, estimatedBytes, analysed, total } = estimate;
-    const pct = Math.round((1 - estimatedBytes / Math.max(1, originalBytes)) * 100);
     const partial = analysed < total ? ` (analysed ${analysed}/${total})` : '';
     this.batchEstimateEl.textContent =
-      `${total} file${total === 1 ? '' : 's'} · ${formatBytes(originalBytes)} → ` +
-      `~${formatBytes(estimatedBytes)} (${pct >= 0 ? '−' : '+'}${Math.abs(pct)}%)${partial}`;
+      `${plural(total, 'file')} · ${formatBytes(originalBytes)} → ` +
+      `~${formatBytes(estimatedBytes)} (${formatSizeChange(originalBytes, estimatedBytes)})${partial}`;
   }
 
   // ---- output location ----------------------------------------------------
@@ -215,10 +214,9 @@ export class MainView {
   }
 
   private async handleChooseOutputDirectory(): Promise<void> {
-    const handle = await pickOutputDirectory();
+    const handle = await pickWritableDirectory();
     if (!handle) return;
-    appState.outputRootHandle = handle;
-    appState.outputRootIsOverride = true;
+    appState.setOutputRoot(handle);
     this.updateOutputLocation();
   }
 

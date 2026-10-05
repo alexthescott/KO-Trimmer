@@ -1,10 +1,12 @@
 import type { FileEntry, ProcessingSettings } from './types';
 import { appState } from './state';
+import { splitNameAndExtension } from './fileNames';
 import { decodeAudioFile } from '../audio/decode';
-import { WorkerPool } from '../workers/workerPool';
+import { WorkerPool, type JobResult } from '../workers/workerPool';
 import type { OutputSink } from '../fs/outputWriter';
 import { overwriteSourceFile, canOverwrite } from '../fs/overwriteWriter';
 import { formatLabel, sameFormat } from '../audio/sampleFormat';
+import { errorMessage } from '../workers/protocol';
 
 export interface BatchSummary {
   processedCount: number;
@@ -12,29 +14,16 @@ export interface BatchSummary {
   errorCount: number;
   originalBytes: number;
   outputBytes: number;
-  longerThan20sNames: string[];
+  /** Outputs still over the KO II length limit after processing. */
+  overKoIILengthNames: string[];
   /** e.g. { "32-bit float → 16-bit": 14 } */
   formatConversions: Record<string, number>;
   aborted: boolean;
 }
 
-const MIME_BY_EXTENSION: Record<string, string> = {
-  wav: 'audio/wav',
-  mp3: 'audio/mpeg',
-};
+type FileOutcome = { kind: 'done'; result: JobResult } | { kind: 'skipped' } | { kind: 'error'; message: string };
 
-/** Strips the top-level root folder segment, keeping any deeper subfolder structure. */
-function deriveOutputRelativePath(file: FileEntry, outputName: string): string {
-  const parts = file.relativePath.split('/');
-  if (parts.length <= 1) return outputName;
-  return [...parts.slice(1, -1), outputName].join('/');
-}
-
-function splitNameAndExtension(name: string): { baseName: string; extension: string } {
-  const idx = name.lastIndexOf('.');
-  if (idx <= 0) return { baseName: name, extension: '' };
-  return { baseName: name.slice(0, idx), extension: name.slice(idx + 1).toLowerCase() };
-}
+const NOT_OVERWRITTEN_WARNING = 'Not overwritten — re-encoded as WAV, written as a new file';
 
 export async function processBatch(
   files: FileEntry[],
@@ -42,19 +31,8 @@ export async function processBatch(
   outputSink: OutputSink,
   signal: AbortSignal,
 ): Promise<BatchSummary> {
-  const summary: BatchSummary = {
-    processedCount: 0,
-    skippedCount: 0,
-    errorCount: 0,
-    originalBytes: 0,
-    outputBytes: 0,
-    longerThan20sNames: [],
-    formatConversions: {},
-    aborted: false,
-  };
-
+  const summary = emptySummary();
   const pool = new WorkerPool((fileId, stage) => appState.updateFile(fileId, { stage }));
-
   const onAbort = () => {
     summary.aborted = true;
     pool.abort();
@@ -62,78 +40,9 @@ export async function processBatch(
   signal.addEventListener('abort', onAbort);
 
   const tasks = files.map(async (file) => {
-    if (signal.aborted) {
-      appState.updateFile(file.id, { status: 'skipped' });
-      summary.skippedCount++;
-      return;
-    }
-
-    appState.updateFile(file.id, { status: 'processing' });
-    try {
-      const arrayBuffer = await file.file!.arrayBuffer();
-      const { channels, sampleRate } = await decodeAudioFile(arrayBuffer, file.sourceSampleRate);
-      const { baseName, extension } = splitNameAndExtension(file.name);
-
-      const result = await pool.enqueue({
-        fileId: file.id,
-        channels,
-        sampleRate,
-        extension,
-        baseName,
-        settings,
-        originalBytes: file.size,
-        sourceFormat: file.sourceFormat,
-        manualTrim: file.manualTrim,
-      });
-
-      if (result.aborted) {
-        appState.updateFile(file.id, { status: 'skipped' });
-        summary.skippedCount++;
-        return;
-      }
-
-      if (settings.overwrite && canOverwrite(file.fileHandle)) {
-        await overwriteSourceFile(file.fileHandle!, result.bytes);
-      } else {
-        const relativePath = deriveOutputRelativePath(file, result.outputName);
-        await outputSink.write(relativePath, result.bytes);
-      }
-
-      const mime = MIME_BY_EXTENSION[result.outputExtension] ?? 'application/octet-stream';
-      const blob = new Blob([result.bytes as Uint8Array<ArrayBuffer>], { type: mime });
-      const blobUrl = URL.createObjectURL(blob);
-
-      appState.updateFile(file.id, {
-        status: 'done',
-        outputName: result.outputName,
-        stats: result.stats,
-        warning: result.warning,
-        resultBlob: blob,
-        resultBlobUrl: blobUrl,
-        stage: undefined,
-      });
-
-      summary.processedCount++;
-      summary.originalBytes += result.stats.originalBytes;
-      summary.outputBytes += result.stats.outputBytes;
-      if (result.stats.longerThan20s) summary.longerThan20sNames.push(result.outputName);
-      const { sourceFormat, outputFormat } = result.stats;
-      if (sourceFormat && outputFormat && !sameFormat(sourceFormat, outputFormat)) {
-        const key = `${formatLabel(sourceFormat)} → ${formatLabel(outputFormat)}`;
-        summary.formatConversions[key] = (summary.formatConversions[key] ?? 0) + 1;
-      }
-    } catch (err) {
-      if (signal.aborted) {
-        appState.updateFile(file.id, { status: 'skipped' });
-        summary.skippedCount++;
-      } else {
-        appState.updateFile(file.id, {
-          status: 'error',
-          error: err instanceof Error ? err.message : String(err),
-        });
-        summary.errorCount++;
-      }
-    }
+    const outcome = await processFile(file, settings, pool, outputSink, signal);
+    recordOutcome(file, outcome);
+    tally(summary, outcome);
   });
 
   await Promise.allSettled(tasks);
@@ -142,4 +51,105 @@ export async function processBatch(
   await outputSink.finalize();
 
   return summary;
+}
+
+/** Decode (main thread) -> pipeline (worker) -> write. Never throws: failures become an outcome. */
+async function processFile(
+  file: FileEntry,
+  settings: ProcessingSettings,
+  pool: WorkerPool,
+  outputSink: OutputSink,
+  signal: AbortSignal,
+): Promise<FileOutcome> {
+  if (signal.aborted) return { kind: 'skipped' };
+  appState.updateFile(file.id, { status: 'processing' });
+  try {
+    const { channels, sampleRate } = await decodeAudioFile(await file.file.arrayBuffer(), file.sourceSampleRate);
+    const result = await pool.enqueue({
+      fileId: file.id,
+      channels,
+      sampleRate,
+      ...splitNameAndExtension(file.name),
+      settings,
+      originalBytes: file.size,
+      sourceFormat: file.sourceFormat,
+      manualTrim: file.manualTrim,
+    });
+    if (result.aborted) return { kind: 'skipped' };
+    return { kind: 'done', result: await writeOutput(file, result, settings, outputSink) };
+  } catch (err) {
+    return signal.aborted ? { kind: 'skipped' } : { kind: 'error', message: errorMessage(err) };
+  }
+}
+
+/** Overwrites the source when enabled and possible, else writes to the sink; returns the result with any added warning. */
+async function writeOutput(
+  file: FileEntry,
+  result: JobResult,
+  settings: ProcessingSettings,
+  outputSink: OutputSink,
+): Promise<JobResult> {
+  if (settings.overwrite && canOverwrite(file)) {
+    await overwriteSourceFile(file.fileHandle, result.bytes);
+    return result;
+  }
+  await outputSink.write(deriveOutputRelativePath(file, result.outputName), result.bytes);
+  if (!settings.overwrite) return result;
+  return { ...result, warning: [result.warning, NOT_OVERWRITTEN_WARNING].filter(Boolean).join(' · ') };
+}
+
+/** Strips the top-level root folder segment, keeping any deeper subfolder structure. */
+function deriveOutputRelativePath(file: FileEntry, outputName: string): string {
+  const parts = file.relativePath.split('/');
+  if (parts.length <= 1) return outputName;
+  return [...parts.slice(1, -1), outputName].join('/');
+}
+
+function recordOutcome(file: FileEntry, outcome: FileOutcome): void {
+  switch (outcome.kind) {
+    case 'done': {
+      const { outputName, stats, warning } = outcome.result;
+      appState.updateFile(file.id, { status: 'done', outputName, stats, warning, stage: undefined });
+      return;
+    }
+    case 'skipped':
+      appState.updateFile(file.id, { status: 'skipped' });
+      return;
+    case 'error':
+      appState.updateFile(file.id, { status: 'error', error: outcome.message });
+  }
+}
+
+function tally(summary: BatchSummary, outcome: FileOutcome): void {
+  if (outcome.kind === 'skipped') {
+    summary.skippedCount++;
+    return;
+  }
+  if (outcome.kind === 'error') {
+    summary.errorCount++;
+    return;
+  }
+  const { stats, outputName } = outcome.result;
+  summary.processedCount++;
+  summary.originalBytes += stats.originalBytes;
+  summary.outputBytes += stats.outputBytes;
+  if (stats.exceedsKoIILength) summary.overKoIILengthNames.push(outputName);
+  const { sourceFormat, outputFormat } = stats;
+  if (sourceFormat && outputFormat && !sameFormat(sourceFormat, outputFormat)) {
+    const key = `${formatLabel(sourceFormat)} → ${formatLabel(outputFormat)}`;
+    summary.formatConversions[key] = (summary.formatConversions[key] ?? 0) + 1;
+  }
+}
+
+function emptySummary(): BatchSummary {
+  return {
+    processedCount: 0,
+    skippedCount: 0,
+    errorCount: 0,
+    originalBytes: 0,
+    outputBytes: 0,
+    overKoIILengthNames: [],
+    formatConversions: {},
+    aborted: false,
+  };
 }

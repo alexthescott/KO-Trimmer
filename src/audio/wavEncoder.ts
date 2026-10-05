@@ -1,4 +1,5 @@
 import { PCM16, type SampleFormat } from './sampleFormat';
+import { floatToInt, frameCount } from './channels';
 
 /**
  * Header size for a WAV written by encodeWav: 44 bytes for integer PCM;
@@ -12,7 +13,7 @@ export function wavHeaderBytes(format: SampleFormat): number {
 /** Hand-written RIFF WAV writer (8/16/24/32-bit PCM or 32-bit float) — no library dependency needed. */
 export function encodeWav(channels: Float32Array[], sampleRate: number, format: SampleFormat = PCM16): Uint8Array {
   const numChannels = channels.length;
-  const numFrames = channels[0]?.length ?? 0;
+  const numFrames = frameCount(channels);
   const bytesPerSample = format.bits / 8;
   const blockAlign = numChannels * bytesPerSample;
   const dataSize = numFrames * blockAlign;
@@ -58,24 +59,20 @@ export function encodeWav(channels: Float32Array[], sampleRate: number, format: 
 function sampleWriter(view: DataView, format: SampleFormat): (offset: number, sample: number) => void {
   // Float output keeps over-full-scale values; integer output clamps to [-1, 1].
   if (format.float) return (offset, s) => view.setFloat32(offset, s, true);
-  const toInt = (s: number, negScale: number, posScale: number) => {
-    const c = Math.max(-1, Math.min(1, s));
-    return Math.round(c < 0 ? c * negScale : c * posScale);
-  };
   switch (format.bits) {
     case 8: // unsigned, 128 = silence
-      return (offset, s) => view.setUint8(offset, toInt(s, 0x80, 0x7f) + 128);
+      return (offset, s) => view.setUint8(offset, floatToInt(s, 0x80, 0x7f) + 128);
     case 24:
       return (offset, s) => {
-        const v = toInt(s, 0x800000, 0x7fffff);
+        const v = floatToInt(s, 0x800000, 0x7fffff);
         view.setUint8(offset, v & 0xff);
         view.setUint8(offset + 1, (v >> 8) & 0xff);
         view.setUint8(offset + 2, (v >> 16) & 0xff);
       };
     case 32:
-      return (offset, s) => view.setInt32(offset, toInt(s, 0x80000000, 0x7fffffff), true);
+      return (offset, s) => view.setInt32(offset, floatToInt(s, 0x80000000, 0x7fffffff), true);
     default:
-      return (offset, s) => view.setInt16(offset, toInt(s, 0x8000, 0x7fff), true);
+      return (offset, s) => view.setInt16(offset, floatToInt(s, 0x8000, 0x7fff), true);
   }
 }
 
@@ -83,4 +80,9 @@ function writeString(view: DataView, offset: number, value: string): void {
   for (let i = 0; i < value.length; i++) {
     view.setUint8(offset + i, value.charCodeAt(i));
   }
+}
+
+/** 16-bit PCM samples, as the MP3 encoder takes them. */
+export function floatTo16BitPcm(channel: Float32Array): Int16Array {
+  return Int16Array.from(channel, (s) => floatToInt(s, 0x8000, 0x7fff));
 }

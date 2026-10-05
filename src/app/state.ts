@@ -2,14 +2,17 @@ import type { FavoriteDirectory, FileEntry, ProcessingSettings } from './types';
 import { appEvents } from './events';
 import { loadSettings, saveSettings } from '../settings/settingsManager';
 import { loadFavorites } from '../fs/favoritesStore';
+import { resolveDefaultOutputRoot } from '../fs/directoryPicker';
 
 class AppState {
   settings: ProcessingSettings = loadSettings();
   files: FileEntry[] = [];
   favorites: FavoriteDirectory[] = [];
+  /** Where outputs are written; undefined means ZIP download. */
   outputRootHandle?: FileSystemDirectoryHandle;
-  outputRootIsOverride = false;
+  /** Root folder name of the batch, for naming the ZIP. */
   rootName?: string;
+  private outputRootIsOverride = false;
 
   async init(): Promise<void> {
     this.favorites = await loadFavorites();
@@ -29,9 +32,6 @@ class AppState {
   }
 
   clearFiles(): void {
-    for (const file of this.files) {
-      if (file.resultBlobUrl) URL.revokeObjectURL(file.resultBlobUrl);
-    }
     this.files = [];
     this.rootName = undefined;
     this.outputRootHandle = undefined;
@@ -43,8 +43,6 @@ class AppState {
   removeFile(id: string): string | undefined {
     const idx = this.files.findIndex((f) => f.id === id);
     if (idx < 0) return undefined;
-    const removed = this.files[idx];
-    if (removed.resultBlobUrl) URL.revokeObjectURL(removed.resultBlobUrl);
     this.files = this.files.filter((f) => f.id !== id);
     appEvents.emit('files-changed', { files: this.files });
     return (this.files[idx] ?? this.files[idx - 1])?.id;
@@ -59,6 +57,17 @@ class AppState {
     this.settings = { ...this.settings, ...patch };
     saveSettings(this.settings);
     appEvents.emit('settings-changed', { settings: this.settings });
+  }
+
+  /** A directory was opened as the source: default output goes inside it, unless the user chose one. */
+  async useSourceRoot(handle: FileSystemDirectoryHandle): Promise<void> {
+    if (!this.outputRootIsOverride) this.outputRootHandle = await resolveDefaultOutputRoot(handle);
+  }
+
+  /** Explicit "Choose output folder…" — sticks until Clear All. */
+  setOutputRoot(handle: FileSystemDirectoryHandle): void {
+    this.outputRootHandle = handle;
+    this.outputRootIsOverride = true;
   }
 
   async refreshFavorites(): Promise<void> {

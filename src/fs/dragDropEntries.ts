@@ -1,4 +1,8 @@
 import { SUPPORTED_EXTENSIONS } from '../audio/settingsDefaults';
+import { extensionOf } from '../app/fileNames';
+
+/** Suffix of the output folder; folders ending in it are skipped so a re-scan never reprocesses output. */
+export const TRIMMED_SUFFIX = '_trimmed';
 
 export interface DroppedEntry {
   name: string;
@@ -8,8 +12,13 @@ export interface DroppedEntry {
 }
 
 function hasSupportedExtension(name: string): boolean {
-  const ext = name.split('.').pop()?.toLowerCase();
-  return !!ext && (SUPPORTED_EXTENSIONS as readonly string[]).includes(ext);
+  return (SUPPORTED_EXTENSIONS as readonly string[]).includes(extensionOf(name));
+}
+
+export interface ResolvedDrop {
+  entries: DroppedEntry[];
+  /** Set only when exactly one top-level dropped item was a writable directory handle. */
+  rootHandle?: FileSystemDirectoryHandle;
 }
 
 /**
@@ -17,12 +26,6 @@ function hasSupportedExtension(name: string): boolean {
  * (Chrome; keeps write capability for Overwrite/favorites) and falls back
  * to webkitGetAsEntry (read-only File objects) elsewhere.
  */
-export interface ResolvedDrop {
-  entries: DroppedEntry[];
-  /** Set only when exactly one top-level dropped item was a writable directory handle. */
-  rootHandle?: FileSystemDirectoryHandle;
-}
-
 export async function resolveDroppedItems(items: DataTransferItemList): Promise<ResolvedDrop> {
   const results: DroppedEntry[] = [];
   const topLevel: Array<FileSystemHandle | FileSystemEntry | File> = [];
@@ -79,7 +82,7 @@ async function walk(
       }
       return;
     }
-    if (handle.name.endsWith('_trimmed')) return; // avoid reprocessing our own output folder
+    if (handle.name.endsWith(TRIMMED_SUFFIX)) return;
     const dirHandle = handle as FileSystemDirectoryHandle;
     for await (const child of dirHandle.values()) {
       await walk(child, path, out);
@@ -97,7 +100,7 @@ async function walk(
     );
     out.push({ name: entry.name, relativePath: path, file });
   } else if (entry.isDirectory) {
-    if (entry.name.endsWith('_trimmed')) return; // avoid reprocessing our own output folder
+    if (entry.name.endsWith(TRIMMED_SUFFIX)) return;
     const dirEntry = entry as FileSystemDirectoryEntry;
     const reader = dirEntry.createReader();
     const children = await readAllEntries(reader);

@@ -1,3 +1,5 @@
+import { frameCount } from './channels';
+
 /**
  * Windowed-RMS energy envelope, upsampled back to full sample resolution.
  * Windowed RMS per frame, max across channels, then linear interpolation
@@ -9,7 +11,7 @@ export function computeEnergyEnvelope(
   frameLength = 2048,
   hopLength = 512,
 ): Float32Array {
-  const n = channels[0]?.length ?? 0;
+  const n = frameCount(channels);
   if (n === 0) return new Float32Array(0);
 
   const numFrames = Math.max(1, Math.ceil(n / hopLength));

@@ -1,9 +1,9 @@
 import { h } from '../dom';
 import { appState } from '../../app/state';
 import { appEvents } from '../../app/events';
-import { addFavorite, removeFavorite, ensureFavoritePermission } from '../../fs/favoritesStore';
+import { pickAndAddFavorite, removeFavorite } from '../../fs/favoritesStore';
+import { ensureReadWrite } from '../../fs/permissions';
 import { walkDirectoryHandle } from '../../fs/dragDropEntries';
-import { resolveDefaultOutputRoot } from '../../fs/directoryPicker';
 import { toFileEntries, deriveRootName } from '../../app/fileEntries';
 import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import type { FavoriteDirectory } from '../../app/types';
@@ -54,24 +54,13 @@ export class FavoritesSidebar {
   }
 
   private async handleAddFavorite(): Promise<void> {
-    if (!isFileSystemAccessSupported()) return;
-    try {
-      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-      await addFavorite(handle.name, handle);
-      await appState.refreshFavorites();
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      throw err;
-    }
+    if (await pickAndAddFavorite()) await appState.refreshFavorites();
   }
 
   private async handleSelectFavorite(fav: FavoriteDirectory): Promise<void> {
-    const granted = await ensureFavoritePermission(fav);
-    if (!granted) return;
+    if (!(await ensureReadWrite(fav.handle))) return;
     const entries = await walkDirectoryHandle(fav.handle);
-    if (!appState.outputRootIsOverride) {
-      appState.outputRootHandle = await resolveDefaultOutputRoot(fav.handle, fav.handle.name);
-    }
+    await appState.useSourceRoot(fav.handle);
     appState.rootName = deriveRootName(entries) ?? fav.displayName;
     const fileEntries = await toFileEntries(entries);
     appState.setFiles(fileEntries);

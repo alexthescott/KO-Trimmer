@@ -31,31 +31,41 @@ path is `/KO-Trimmer/` (`vite.config.ts`), matching this repo's Pages project-pa
 
 ```
 src/
-  app/        state.ts (single source of truth for files/settings/favorites),
-              events.ts (typed pub/sub), processBatch.ts (orchestrates a batch run),
-              decodedCache.ts (3-entry LRU of decoded audio for the editor),
-              batchEstimate.ts (progressive per-file + whole-batch size estimate),
-              fileEntries.ts, types.ts
+  app/        state.ts (single source of truth for files/settings/favorites/output
+              root), events.ts (typed pub/sub), processBatch.ts (orchestrates a batch
+              run: processFile -> recordOutcome -> tally), decodedCache.ts (3-entry LRU
+              of decoded audio for the editor), batchEstimate.ts (progressive per-file
+              + whole-batch size estimate), fileNames.ts (the one name/extension
+              splitter), fileEntries.ts, types.ts (incl. SampleRange)
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
-              sampleRateResample, wavEncoder, mp3Encoder, naming, sampleFormat.ts
-              (source header parsing: bit depth + native sample rate; output format),
-              estimate.ts
-              (output-size prediction), pipeline.ts (orchestrates the fixed stage
-              order below; also exports computeAutoTrimBounds + renderPreview, the
-              shared code paths the editor and estimator use), player.ts (preview
-              playback, main thread only)
-  fs/         File System Access API: capabilities, directoryPicker, dragDropEntries,
-              favoritesStore (IndexedDB via idb-keyval), outputWriter (FS Access sink +
-              ZIP/fflate fallback sink), overwriteWriter (true in-place overwrite)
-  workers/    processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
+              sampleRateResample, wavEncoder, mp3Encoder, naming (filename + KO II
+              length rule), channels.ts (frameCount/sampleAt/floatToInt helpers),
+              outputContainer.ts (the one "mp3 stays mp3, else wav" rule + output
+              sample format), sourceHeader.ts (header parsing: bit depth + native
+              sample rate), sampleFormat.ts (SampleFormat, output bit-depth policy,
+              labels, clip warning), estimate.ts (output-size prediction),
+              pipeline.ts (renderAudible = trim/mono/speed/resample, shared by
+              runPipeline and the editor preview; computeAutoTrimBounds shared with
+              the estimator), audioContext.ts + player.ts (preview playback, main
+              thread only)
+  fs/         File System Access API: capabilities, directoryPicker
+              (pickWritableDirectory), dragDropEntries (TRIMMED_SUFFIX), permissions
+              (ensureReadWrite), favoritesStore (IndexedDB via idb-keyval),
+              outputWriter (FS Access sink + ZIP/fflate fallback sink),
+              overwriteWriter (true in-place overwrite; canOverwrite)
+  workers/    protocol.ts (message types built on PipelineRequest/PipelineOutput),
+              processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
               (pooled, AbortController-based cancellation)
   ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
-              WaveformEditor, SettingsPanel, FavoritesSidebar, ResultsSummary,
-              AboutDialog — fixed bottom-left About button + modal)
+              WaveformEditor + waveform/ [Viewport, PreviewRenderer, readouts, draw],
+              SettingsPanel, FavoritesSidebar, ResultsSummary, AboutDialog — fixed
+              bottom-left About button + modal)
   settings/   settingsManager.ts — localStorage persistence
   pwa/        registerSW.ts (vite-plugin-pwa)
-tests/unit/       Vitest specs for every pure audio/ module — run these first when
-                  touching DSP logic; they encode the exact algorithms below.
+tests/unit/       Vitest specs for every pure audio/ module plus the pure logic pulled
+                  out of the UI (Viewport, readouts, fileNames, settings migration) —
+                  run these first when touching DSP logic; they encode the exact
+                  algorithms below.
 scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.svg)
 ```
 
@@ -109,7 +119,9 @@ walk skips any directory named `*_trimmed` to avoid reprocessing its own output.
    ending at the last sample, and leaves every internal region untouched.
 2. **"Overwrite" actually overwrites** the source file: `fs/overwriteWriter.ts` writes
    directly back to the source `FileSystemFileHandle` when enabled and supported
-   (disabled with a tooltip otherwise).
+   (disabled with a tooltip otherwise). Only when the output keeps the source's
+   container (WAV/MP3) — a FLAC/AIFF/M4A/OGG source is re-encoded as WAV, so it's
+   written as a new file with a warning rather than putting WAV bytes in a `.flac`.
 3. **KO-II >20s check uses final processed duration** (after trim + speed-up), since
    that's what ends up on the hardware (`audio/pipeline.ts` → `audio/naming.ts`).
 4. **Speed-up**: tape-style resample (`audio/speedResample.ts`, 1.0x–3.0x, default off)

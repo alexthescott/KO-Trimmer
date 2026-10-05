@@ -1,3 +1,5 @@
+import { frameCount, sampleAt } from './channels';
+
 /**
  * WAV output sample rate for a "max sample rate" setting: returns the target
  * only when it actually lowers the rate (never upsamples), else undefined.
@@ -20,7 +22,7 @@ export async function resampleToRate(
   if (originalSampleRate === targetSampleRate) return channels;
 
   if (typeof OfflineAudioContext !== 'undefined') {
-    const inputLength = channels[0].length;
+    const inputLength = frameCount(channels);
     const outputLength = Math.ceil((inputLength * targetSampleRate) / originalSampleRate);
     const ctx = new OfflineAudioContext(channels.length, outputLength, targetSampleRate);
     const buffer = ctx.createBuffer(channels.length, inputLength, originalSampleRate);
@@ -50,18 +52,11 @@ function linearResample(
   targetSampleRate: number,
 ): Float32Array[] {
   const ratio = targetSampleRate / originalSampleRate;
-  const inputLength = channels[0].length;
-  const outputLength = Math.max(1, Math.round(inputLength * ratio));
+  const outputLength = Math.max(1, Math.round(frameCount(channels) * ratio));
 
   return channels.map((channel) => {
     const output = new Float32Array(outputLength);
-    for (let i = 0; i < outputLength; i++) {
-      const srcPos = i / ratio;
-      const idxFloor = Math.min(Math.floor(srcPos), inputLength - 1);
-      const idxCeil = Math.min(idxFloor + 1, inputLength - 1);
-      const frac = srcPos - idxFloor;
-      output[i] = channel[idxFloor] + (channel[idxCeil] - channel[idxFloor]) * frac;
-    }
+    for (let i = 0; i < outputLength; i++) output[i] = sampleAt(channel, i / ratio);
     return output;
   });
 }

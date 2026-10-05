@@ -1,6 +1,7 @@
 import type { DroppedEntry } from '../fs/dragDropEntries';
 import type { FileEntry } from './types';
-import { FORMAT_PROBE_BYTES, id3v2Length, parseSourceInfo, type SourceInfo } from '../audio/sampleFormat';
+import { extensionOf } from './fileNames';
+import { FORMAT_PROBE_BYTES, id3v2Length, parseSourceInfo, type SourceInfo } from '../audio/sourceHeader';
 
 export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[]> {
   const result: FileEntry[] = [];
@@ -12,7 +13,6 @@ export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[
       name: entry.name,
       relativePath: entry.relativePath,
       size: file.size,
-      sourceKind: entry.fileHandle ? 'handle' : 'file',
       fileHandle: entry.fileHandle,
       file,
       status: 'queued',
@@ -35,13 +35,12 @@ export function deriveRootName(entries: DroppedEntry[]): string | undefined {
  */
 async function probeSource(file: File): Promise<{ sourceFormat?: SourceInfo['format']; sourceSampleRate?: number }> {
   try {
-    const extension = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase();
     let bytes = new Uint8Array(await file.slice(0, FORMAT_PROBE_BYTES).arrayBuffer());
     const tagLength = id3v2Length(bytes);
     if (tagLength > FORMAT_PROBE_BYTES - 4096) {
       bytes = new Uint8Array(await file.slice(tagLength, tagLength + 4096).arrayBuffer());
     }
-    const info = parseSourceInfo(bytes, extension);
+    const info = parseSourceInfo(bytes, extensionOf(file.name));
     return { sourceFormat: info.format, sourceSampleRate: info.sampleRate };
   } catch {
     return {};

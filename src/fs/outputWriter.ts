@@ -1,4 +1,5 @@
 import { zipSync } from 'fflate';
+import { ensureReadWrite } from './permissions';
 
 export interface OutputSink {
   write(relativePath: string, bytes: Uint8Array): Promise<void>;
@@ -16,12 +17,8 @@ export class FsAccessOutputSink implements OutputSink {
 
   private async ensurePermission(): Promise<void> {
     if (this.permissionChecked) return;
-    const granted = await this.rootHandle.queryPermission({ mode: 'readwrite' });
-    if (granted !== 'granted') {
-      const result = await this.rootHandle.requestPermission({ mode: 'readwrite' });
-      if (result !== 'granted') {
-        throw new Error('Write permission to the output directory was not granted.');
-      }
+    if (!(await ensureReadWrite(this.rootHandle))) {
+      throw new Error('Write permission to the output directory was not granted.');
     }
     this.permissionChecked = true;
   }

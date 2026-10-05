@@ -1,4 +1,5 @@
-import { getSharedContext } from './decode';
+import { getSharedContext } from './audioContext';
+import { frameCount } from './channels';
 
 export interface PlaybackHandle {
   /** Seconds elapsed since playback started. */
@@ -20,7 +21,7 @@ export function playChannels(
   onEnded: () => void,
 ): PlaybackHandle | null {
   stopPlayback();
-  const length = channels[0]?.length ?? 0;
+  const length = frameCount(channels);
   if (length === 0) return null;
 
   const ctx = getSharedContext();

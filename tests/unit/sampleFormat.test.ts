@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  clipWarning,
-  parseSourceInfo,
-  id3v2Length,
-  resolveOutputFormat,
-  PCM16,
-} from '../../src/audio/sampleFormat';
+import { clipWarning, resolveOutputFormat, PCM16 } from '../../src/audio/sampleFormat';
+import { parseSourceInfo, id3v2Length } from '../../src/audio/sourceHeader';
 import { encodeWav } from '../../src/audio/wavEncoder';
 import { encodeMp3 } from '../../src/audio/mp3Encoder';
 import { estimateOutputBytes } from '../../src/audio/estimate';

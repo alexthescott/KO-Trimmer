@@ -1,15 +1,24 @@
 import type { BitrateKbps } from '../app/types';
+import type { OutputContainer } from './outputContainer';
+import { FULL_MP3_BITRATE } from './settingsDefaults';
 
 export interface NamingInput {
   baseName: string; // filename without extension
-  extension: 'wav' | 'mp3' | string;
+  extension: OutputContainer;
   preserveStereo: boolean;
   bitrateKbps: BitrateKbps;
   targetSampleRate?: number; // only relevant for wav
   finalDurationSec: number;
 }
 
-const KO_II_MAX_DURATION_SEC = 20;
+/** Longest sample the KO II takes without the "_" prefix. */
+export const KO_II_MAX_DURATION_SEC = 20;
+
+const CD_SAMPLE_RATE = 44100;
+
+export function exceedsKoIILength(durationSec: number): boolean {
+  return durationSec > KO_II_MAX_DURATION_SEC;
+}
 
 /**
  * Output filename suffixing plus the KO-II >20s rule. The >20s check runs
@@ -19,19 +28,16 @@ const KO_II_MAX_DURATION_SEC = 20;
 export function buildOutputFilename(input: NamingInput): string {
   const parts = ['trimmed', input.preserveStereo ? 'stereo' : 'mono'];
 
-  if (input.extension === 'mp3' && input.bitrateKbps < 320) {
+  if (input.extension === 'mp3' && input.bitrateKbps < FULL_MP3_BITRATE) {
     parts.push(`${input.bitrateKbps}k`);
   } else if (
     input.extension === 'wav' &&
     input.targetSampleRate !== undefined &&
-    input.targetSampleRate < 44100
+    input.targetSampleRate < CD_SAMPLE_RATE
   ) {
     parts.push(`${input.targetSampleRate}Hz`);
   }
 
-  let filename = `${input.baseName}_${parts.join('_')}.${input.extension}`;
-  if (input.finalDurationSec > KO_II_MAX_DURATION_SEC) {
-    filename = `_${filename}`;
-  }
-  return filename;
+  const filename = `${input.baseName}_${parts.join('_')}.${input.extension}`;
+  return exceedsKoIILength(input.finalDurationSec) ? `_${filename}` : filename;
 }

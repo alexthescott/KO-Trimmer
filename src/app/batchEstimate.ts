@@ -2,9 +2,12 @@ import type { FileEntry, ProcessingSettings } from './types';
 import { peekDecoded } from './decodedCache';
 import { decodeAudioFile, type DecodedAudio } from '../audio/decode';
 import { computeAutoTrimBounds } from '../audio/pipeline';
-import { estimateOutputBytes, extrapolateBatchEstimate } from '../audio/estimate';
+import { estimateOutputBytes, extrapolateBatchEstimate, type BatchEstimateSample } from '../audio/estimate';
+import { frameCount } from '../audio/channels';
+import { extensionOf } from './fileNames';
 
-interface FileInfo {
+/** What the estimate needs from one decode, kept instead of the PCM itself. */
+interface DecodeSummary {
   channels: number;
   sampleRate: number;
   frames: number;
@@ -29,7 +32,7 @@ export interface BatchEstimate {
  * speed/bitrate/stereo never re-decodes; only detection-setting changes do.
  */
 export class BatchEstimator {
-  private info = new Map<string, FileInfo>();
+  private summaries = new Map<string, DecodeSummary>();
   private generation = 0;
 
   /** Resolves with the final total, or null if superseded by a newer call / cancel(). */
@@ -41,9 +44,8 @@ export class BatchEstimator {
   ): Promise<BatchEstimate | null> {
     const generation = ++this.generation;
     const detectKey = `${settings.thresholdDb}|${settings.minDurationMs}|${settings.paddingMs}`;
-    const candidates = files.filter((f) => f.file);
     const originalBytes = files.reduce((sum, f) => sum + f.size, 0);
-    const samples: Array<{ originalBytes: number; estimatedBytes: number }> = [];
+    const samples: BatchEstimateSample[] = [];
     const summarize = (): BatchEstimate => ({
       originalBytes,
       estimatedBytes: extrapolateBatchEstimate(samples, originalBytes),
@@ -51,8 +53,8 @@ export class BatchEstimator {
       total: files.length,
     });
 
-    for (const file of candidates) {
-      let info = this.info.get(file.id);
+    for (const file of files) {
+      let info = this.summaries.get(file.id);
       const needsAuto = !file.manualTrim && !info?.autoFrames.has(detectKey);
       if (!info || needsAuto) {
         let decoded;
@@ -65,12 +67,12 @@ export class BatchEstimator {
         info ??= {
           channels: decoded.channels.length,
           sampleRate: decoded.sampleRate,
-          frames: decoded.channels[0]?.length ?? 0,
+          frames: frameCount(decoded.channels),
           autoFrames: new Map(),
         };
         const bounds = computeAutoTrimBounds(decoded.channels, decoded.sampleRate, settings);
         info.autoFrames.set(detectKey, bounds.end - bounds.start);
-        this.info.set(file.id, info);
+        this.summaries.set(file.id, info);
       }
 
       const trimmedFrames = file.manualTrim
@@ -94,7 +96,7 @@ export class BatchEstimator {
   }
 
   forget(liveIds: Set<string>): void {
-    for (const id of this.info.keys()) if (!liveIds.has(id)) this.info.delete(id);
+    for (const id of this.summaries.keys()) if (!liveIds.has(id)) this.summaries.delete(id);
   }
 
   cancel(): void {
@@ -104,10 +106,5 @@ export class BatchEstimator {
 
 /** Reuses the editor's decoded audio when it's already in memory. */
 async function decodeForEstimate(file: FileEntry): Promise<DecodedAudio> {
-  return peekDecoded(file.id) ?? decodeAudioFile(await file.file!.arrayBuffer(), file.sourceSampleRate);
-}
-
-function extensionOf(name: string): string {
-  const idx = name.lastIndexOf('.');
-  return idx > 0 ? name.slice(idx + 1).toLowerCase() : '';
+  return peekDecoded(file.id) ?? decodeAudioFile(await file.file.arrayBuffer(), file.sourceSampleRate);
 }

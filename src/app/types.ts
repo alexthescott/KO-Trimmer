@@ -17,6 +17,12 @@ export interface ProcessingSettings {
   overwrite: boolean;
 }
 
+/** Sample positions, end exclusive. */
+export interface SampleRange {
+  start: number;
+  end: number;
+}
+
 export interface SilenceRegion {
   start: number;
   end: number;
@@ -32,7 +38,7 @@ export interface ProcessStats {
   outputBytes: number;
   originalDurationSec: number;
   outputDurationSec: number;
-  longerThan20s: boolean;
+  exceedsKoIILength: boolean;
   /** Set for WAV output when the source bit depth is known. */
   sourceFormat?: SampleFormat;
   outputFormat?: SampleFormat;
@@ -43,14 +49,11 @@ export interface FileEntry {
   name: string;
   relativePath: string;
   size: number;
-  sourceKind: 'handle' | 'file';
   fileHandle?: FileSystemFileHandle;
-  file?: File;
+  file: File;
   status: FileStatus;
   error?: string;
   warning?: string;
-  resultBlob?: Blob;
-  resultBlobUrl?: string;
   outputName?: string;
   stats?: ProcessStats;
   stage?: ProcessingStage;
@@ -59,7 +62,7 @@ export interface FileEntry {
   /** Native sample rate from the header; decode runs at this rate instead of the device's. */
   sourceSampleRate?: number;
   /** Manually dragged trim points in source samples (end exclusive); overrides auto-detect. */
-  manualTrim?: { start: number; end: number };
+  manualTrim?: SampleRange;
 }
 
 export interface FavoriteDirectory {

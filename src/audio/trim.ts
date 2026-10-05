@@ -1,8 +1,6 @@
-import type { SilenceRegion } from '../app/types';
+import type { SampleRange, SilenceRegion } from '../app/types';
 
-export interface TrimBounds {
-  start: number;
-  end: number; // exclusive
+export interface TrimBounds extends SampleRange {
   warning?: string;
 }
 
@@ -36,8 +34,8 @@ export function computeTrimBounds(
   }
 
   const paddingSamples = Math.round((paddingMs * sampleRate) / 1000);
-  let finalStart = Math.max(0, contentStart - paddingSamples);
-  let finalEnd = Math.min(totalLength, contentEnd + paddingSamples);
+  const finalStart = Math.max(0, contentStart - paddingSamples);
+  const finalEnd = Math.min(totalLength, contentEnd + paddingSamples);
 
   if (finalStart >= finalEnd) {
     return {
@@ -50,6 +48,6 @@ export function computeTrimBounds(
   return { start: finalStart, end: finalEnd };
 }
 
-export function sliceChannels(channels: Float32Array[], bounds: TrimBounds): Float32Array[] {
+export function sliceChannels(channels: Float32Array[], bounds: SampleRange): Float32Array[] {
   return channels.map((channel) => channel.slice(bounds.start, bounds.end));
 }

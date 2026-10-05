@@ -2,6 +2,7 @@ import type { ProcessingSettings } from '../app/types';
 import { resolveWavSampleRate } from './sampleRateResample';
 import { resolveOutputFormat, type SampleFormat } from './sampleFormat';
 import { wavHeaderBytes } from './wavEncoder';
+import { outputContainerFor } from './outputContainer';
 
 export interface EstimateInput {
   /** Frames kept after trim, at the source sample rate. */
@@ -30,7 +31,7 @@ export function estimateOutputBytes(input: EstimateInput): number {
     frames = Math.max(1, Math.round(frames / settings.speedMultiplier));
   }
 
-  if (input.extension === 'mp3') {
+  if (outputContainerFor(input.extension) === 'mp3') {
     const durationSec = frames / input.sourceSampleRate;
     return Math.round((durationSec * settings.bitrateKbps * 1000) / 8);
   }

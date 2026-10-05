@@ -1,7 +1,9 @@
-import { h, formatBytes } from '../dom';
+import { h, formatBytes, formatSizeChange } from '../dom';
 import type { FileEntry } from '../../app/types';
 import { appState } from '../../app/state';
-import { formatLabel, formatShortLabel, resolveOutputFormat, sameFormat } from '../../audio/sampleFormat';
+import { formatLabel, formatShortLabel, sameFormat } from '../../audio/sampleFormat';
+import { outputContainerFor, outputSampleFormat } from '../../audio/outputContainer';
+import { extensionOf } from '../../app/fileNames';
 
 const STAGE_LABEL: Record<string, string> = {
   decode: 'Decoding…',
@@ -122,11 +124,8 @@ function statusText(file: FileEntry): string {
       return file.stage ? STAGE_LABEL[file.stage] ?? 'Processing…' : 'Processing…';
     case 'done': {
       if (!file.stats) return 'Done';
-      const reduction = Math.round(
-        (1 - file.stats.outputBytes / Math.max(1, file.stats.originalBytes)) * 100,
-      );
       const warn = file.warning ? ` — ${file.warning}` : '';
-      return `Trimmed (${reduction >= 0 ? '−' : '+'}${Math.abs(reduction)}%)${warn}`;
+      return `Trimmed (${formatSizeChange(file.stats.originalBytes, file.stats.outputBytes)})${warn}`;
     }
     case 'error':
       return `Error: ${file.error ?? 'unknown error'}`;
@@ -148,9 +147,9 @@ function sizeText(file: FileEntry, estimate: number | undefined): string {
 /** Tag for files whose bit depth changes on output, e.g. "32f→16". */
 function bitDepthTag(file: FileEntry): HTMLElement | null {
   const source = file.sourceFormat;
-  if (!source || file.name.toLowerCase().endsWith('.mp3')) return null;
-  const output = resolveOutputFormat(source, appState.settings.preserveBitDepth);
-  if (sameFormat(source, output)) return null;
+  const container = outputContainerFor(extensionOf(file.name));
+  const output = outputSampleFormat(container, source, appState.settings.preserveBitDepth);
+  if (!source || !output || sameFormat(source, output)) return null;
   return h('span', { class: 'tag', title: `${formatLabel(source)} → ${formatLabel(output)}` }, [
     `${formatShortLabel(source)}→${formatShortLabel(output)}`,
   ]);

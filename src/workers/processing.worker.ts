@@ -1,9 +1,9 @@
 import { runPipeline } from '../audio/pipeline';
-import type { WorkerInMessage, WorkerOutMessage } from './protocol';
+import { errorMessage, postFromWorker, type WorkerInMessage, type WorkerOutMessage } from './protocol';
 
-let cancelledJobIds = new Set<string>();
+const cancelledJobIds = new Set<string>();
 
-self.onmessage = async (event: MessageEvent<WorkerInMessage | { type: 'cancel'; jobId: string }>) => {
+self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
   const msg = event.data;
 
   if (msg.type === 'cancel') {
@@ -11,43 +11,16 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage | { type: 'cancel'; 
     return;
   }
 
-  const { jobId, fileId } = msg;
+  const { type: _type, jobId, fileId, ...request } = msg;
   try {
     const result = await runPipeline({
-      channels: msg.channels,
-      sampleRate: msg.sampleRate,
-      extension: msg.extension,
-      baseName: msg.baseName,
-      settings: msg.settings,
-      originalBytes: msg.originalBytes,
-      sourceFormat: msg.sourceFormat,
-      manualTrim: msg.manualTrim,
+      ...request,
       isCancelled: () => cancelledJobIds.has(jobId),
-      onStage: (stage) => {
-        const progress: WorkerOutMessage = { type: 'progress', jobId, fileId, stage };
-        (self as unknown as Worker).postMessage(progress);
-      },
+      onStage: (stage) => postFromWorker<WorkerOutMessage>({ type: 'progress', jobId, fileId, stage }),
     });
-
-    const done: WorkerOutMessage = {
-      type: 'done',
-      jobId,
-      fileId,
-      bytes: result.bytes,
-      outputName: result.outputName,
-      outputExtension: result.outputExtension,
-      stats: result.stats,
-      warning: result.warning,
-    };
-    (self as unknown as Worker).postMessage(done, { transfer: [result.bytes.buffer] });
+    postFromWorker<WorkerOutMessage>({ type: 'done', jobId, fileId, ...result }, [result.bytes.buffer]);
   } catch (err) {
-    const error: WorkerOutMessage = {
-      type: 'error',
-      jobId,
-      fileId,
-      message: err instanceof Error ? err.message : String(err),
-    };
-    (self as unknown as Worker).postMessage(error);
+    postFromWorker<WorkerOutMessage>({ type: 'error', jobId, fileId, message: errorMessage(err) });
   } finally {
     cancelledJobIds.delete(jobId);
   }

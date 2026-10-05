@@ -16,7 +16,7 @@ export function getDecoded(file: FileEntry): Promise<DecodedAudio> {
     cache.set(file.id, hit);
     return hit;
   }
-  const promise = file.file!.arrayBuffer().then((buffer) => decodeAudioFile(buffer, file.sourceSampleRate));
+  const promise = file.file.arrayBuffer().then((buffer) => decodeAudioFile(buffer, file.sourceSampleRate));
   promise.catch(() => cache.delete(file.id));
   cache.set(file.id, promise);
   while (cache.size > MAX_ENTRIES) {
