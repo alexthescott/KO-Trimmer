@@ -19,6 +19,7 @@ export class ProcessingView {
   private controller = new AbortController();
   private total: number;
   private finishedCount = 0;
+  private loggedIds = new Set<string>();
   private unsubscribe: () => void;
   private onDone: () => void;
 
@@ -64,7 +65,10 @@ export class ProcessingView {
     const finished = files.filter((f) => f.status === 'done' || f.status === 'error' || f.status === 'skipped');
     if (finished.length === this.finishedCount) return;
 
-    for (const file of finished.slice(this.finishedCount)) {
+    // Workers finish out of list order, so log by id rather than by position.
+    for (const file of finished) {
+      if (this.loggedIds.has(file.id)) continue;
+      this.loggedIds.add(file.id);
       const icon = file.status === 'done' ? '✅' : file.status === 'error' ? '❌' : '⏭️';
       this.appendLog(`${icon} ${file.relativePath}${file.error ? ' — ' + file.error : ''}`);
     }
