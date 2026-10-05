@@ -3,7 +3,7 @@ import { resampledLength, resolveWavSampleRate } from './sampleRateResample';
 import { speedUpLength } from './speedResample';
 import type { SampleFormat } from './sampleFormat';
 import { wavHeaderBytes } from './wavEncoder';
-import { chooseOutputFormat, outputContainerFor } from './outputContainer';
+import { chooseWavFormat, outputContainerFor } from './outputContainer';
 
 export interface EstimateInput {
   /** Frames kept after trim, at the source sample rate. */
@@ -39,8 +39,8 @@ export function estimateOutputBytes(input: EstimateInput): number {
   const target = resolveWavSampleRate(input.sourceSampleRate, settings.wavSampleRateHz ?? null);
   if (target !== undefined) frames = resampledLength(frames, input.sourceSampleRate, target);
 
-  const { format } = chooseOutputFormat('wav', input.sourceFormat, settings.preserveBitDepth ?? false, input.peak);
-  return wavHeaderBytes(format!) + frames * channels * (format!.bits / 8);
+  const { format } = chooseWavFormat(input.sourceFormat, settings.preserveBitDepth ?? false, input.peak);
+  return wavHeaderBytes(format) + frames * channels * (format.bits / 8);
 }
 
 export interface BatchEstimateSample {

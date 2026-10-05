@@ -137,7 +137,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     outputDurationSec: finalDurationSec,
     exceedsKoIILength: exceedsKoIILength(finalDurationSec),
     keptFloatToAvoidClipping: clipNote !== undefined,
-    sourceFormat: outputFormat && input.sourceFormat,
+    sourceFormat: container === 'wav' ? input.sourceFormat : undefined,
     outputFormat,
   };
 

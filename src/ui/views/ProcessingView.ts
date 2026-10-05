@@ -1,6 +1,7 @@
 import { h } from '../dom';
 import { appState } from '../../app/state';
 import { appEvents } from '../../app/events';
+import { errorMessage } from '../../app/errors';
 import { FileTable } from '../components/FileTable';
 import { renderResultsSummary } from '../components/ResultsSummary';
 import { processBatch, type BatchSummary } from '../../app/processBatch';
@@ -118,7 +119,7 @@ export class ProcessingView {
         onFileUpdate: (id, patch) => appState.updateFile(id, patch),
       });
     } catch (err) {
-      this.statusLabel.textContent = `Processing failed: ${err instanceof Error ? err.message : String(err)}`;
+      this.statusLabel.textContent = `Processing failed: ${errorMessage(err)}`;
       this.stopButton.style.display = 'none';
       this.closeButton.disabled = false;
       return;

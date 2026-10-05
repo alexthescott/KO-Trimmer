@@ -2,6 +2,7 @@ import { h } from '../dom';
 import { appState } from '../../app/state';
 import { BITRATE_OPTIONS, SETTINGS_RANGES, WAV_SAMPLE_RATE_OPTIONS } from '../../audio/settingsDefaults';
 import { canOverwrite } from '../../fs/overwriteWriter';
+import type { BitrateKbps } from '../../app/types';
 
 export class SettingsPanel {
   element: HTMLElement;
@@ -125,7 +126,7 @@ function sliderInput(
   return h('div', { class: 'slider-row' }, [input, readout]);
 }
 
-function bitrateSelect(value: number, onChange: (v: (typeof BITRATE_OPTIONS)[number]) => void): HTMLElement {
+function bitrateSelect(value: BitrateKbps, onChange: (v: BitrateKbps) => void): HTMLElement {
   const select = h(
     'select',
     {},
@@ -133,7 +134,7 @@ function bitrateSelect(value: number, onChange: (v: (typeof BITRATE_OPTIONS)[num
       h('option', { value: String(kbps), selected: kbps === value }, [`${kbps} kbps`]),
     ),
   ) as HTMLSelectElement;
-  select.addEventListener('change', () => onChange(Number(select.value) as (typeof BITRATE_OPTIONS)[number]));
+  select.addEventListener('change', () => onChange(Number(select.value) as BitrateKbps));
   return select;
 }
 

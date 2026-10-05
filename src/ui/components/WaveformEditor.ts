@@ -2,6 +2,7 @@ import { h } from '../dom';
 import { appState } from '../../app/state';
 import { appEvents } from '../../app/events';
 import { getDecoded } from '../../app/decodedCache';
+import { errorMessage } from '../../app/errors';
 import { extensionOf } from '../../app/fileNames';
 import type { FileEntry, SampleRange } from '../../app/types';
 import type { TrimBounds } from '../../audio/trim';
@@ -167,7 +168,7 @@ export class WaveformEditor {
       audio = await getDecoded(file);
     } catch (err) {
       if (token === this.loadToken) {
-        this.showPlaceholder(`Couldn’t decode: ${err instanceof Error ? err.message : String(err)}`);
+        this.showPlaceholder(`Couldn’t decode: ${errorMessage(err)}`);
       }
       return;
     }

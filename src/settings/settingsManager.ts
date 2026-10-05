@@ -47,8 +47,9 @@ const LEGACY_RATE_BY_MIN_KBPS: ReadonlyArray<readonly [minKbps: number, rateHz: 
   [192, 44100],
   [128, 22050],
   [96, 16000],
-  [0, 11025],
 ];
+/** Implied by any legacy bitrate below the table. */
+const LEGACY_LOWEST_RATE = 11025;
 
 /**
  * Settings saved before WAV sample rate was split out of "bitrate" carried
@@ -56,6 +57,7 @@ const LEGACY_RATE_BY_MIN_KBPS: ReadonlyArray<readonly [minKbps: number, rateHz: 
  */
 export function migrateLegacyBitrate(settings: ProcessingSettings, stored: Record<string, unknown>): ProcessingSettings {
   if ('wavSampleRateHz' in stored || settings.bitrateKbps >= FULL_MP3_BITRATE) return settings;
-  const [, legacyRate] = LEGACY_RATE_BY_MIN_KBPS.find(([minKbps]) => settings.bitrateKbps >= minKbps)!;
+  const legacyRate =
+    LEGACY_RATE_BY_MIN_KBPS.find(([minKbps]) => settings.bitrateKbps >= minKbps)?.[1] ?? LEGACY_LOWEST_RATE;
   return { ...settings, wavSampleRateHz: legacyRate };
 }

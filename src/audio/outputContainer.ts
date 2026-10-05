@@ -10,6 +10,12 @@ export function outputContainerFor(sourceExtension: string): OutputContainer {
   return sourceExtension === 'mp3' ? 'mp3' : 'wav';
 }
 
+export interface WavFormat {
+  format: SampleFormat;
+  /** Set when integer output would have clipped, so 32-bit float is written instead. */
+  clipNote?: string;
+}
+
 export interface OutputFormat {
   /** Undefined for MP3, which has no PCM bit depth. */
   format?: SampleFormat;
@@ -28,7 +34,11 @@ export function chooseOutputFormat(
   preserveBitDepth: boolean,
   peak?: number,
 ): OutputFormat {
-  if (container === 'mp3') return {};
+  return container === 'mp3' ? {} : chooseWavFormat(source, preserveBitDepth, peak);
+}
+
+/** chooseOutputFormat for WAV, where there is always a sample format. */
+export function chooseWavFormat(source: SampleFormat | undefined, preserveBitDepth: boolean, peak?: number): WavFormat {
   const intended = resolveOutputFormat(source, preserveBitDepth);
   const note = peak === undefined ? undefined : clipNote(peak, intended);
   return note ? { format: FLOAT32, clipNote: note } : { format: intended };

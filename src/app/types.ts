@@ -1,6 +1,7 @@
 import type { SampleFormat } from '../audio/sampleFormat';
+import type { BITRATE_OPTIONS } from '../audio/settingsDefaults';
 
-export type BitrateKbps = 320 | 192 | 160 | 128 | 96 | 64;
+export type BitrateKbps = (typeof BITRATE_OPTIONS)[number];
 
 export interface ProcessingSettings {
   thresholdDb: number;

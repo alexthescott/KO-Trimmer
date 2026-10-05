@@ -1,5 +1,6 @@
 import { encodeMp3 } from '../audio/mp3Encoder';
-import { errorMessage, postFromWorker } from './protocol';
+import { errorMessage } from '../app/errors';
+import { postFromWorker } from './protocol';
 
 export interface Mp3PreviewRequest {
   id: number;

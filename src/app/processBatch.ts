@@ -5,7 +5,8 @@ import { WorkerPool, type JobResult, type ProgressHandler } from '../workers/wor
 import type { OutputSink } from '../fs/outputWriter';
 import { overwriteSourceFile, canOverwrite } from '../fs/overwriteWriter';
 import { formatLabel, sameFormat } from '../audio/sampleFormat';
-import { errorMessage, UnsupportedWavError, type JobSource, type QueuedJob } from '../workers/protocol';
+import { UnsupportedWavError, type JobSource, type QueuedJob } from '../workers/protocol';
+import { errorMessage } from './errors';
 import { forEachConcurrent } from './concurrency';
 
 /**

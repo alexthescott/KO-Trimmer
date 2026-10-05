@@ -2,8 +2,8 @@ import { runPipeline } from '../audio/pipeline';
 import { decodeWav } from '../audio/wavDecoder';
 import type { PcmAudio } from '../audio/channels';
 import type { ProcessingStage } from '../app/types';
+import { errorMessage } from '../app/errors';
 import {
-  errorMessage,
   postFromWorker,
   UnsupportedWavError,
   type JobSource,
