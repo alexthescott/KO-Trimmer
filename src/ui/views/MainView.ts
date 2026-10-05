@@ -3,7 +3,8 @@ import { formatBytes, formatSizeChange, plural } from '../format';
 import { appState } from '../../app/state';
 import { appEvents } from '../../app/events';
 import { evictDecoded } from '../../app/decodedCache';
-import { BatchEstimator, type BatchEstimate } from '../../app/batchEstimate';
+import type { BatchEstimate } from '../../app/batchEstimate';
+import { EstimateScheduler } from '../../app/estimateScheduler';
 import { DropZone } from '../components/DropZone';
 import { SettingsPanel } from '../components/SettingsPanel';
 import { FileTable } from '../components/FileTable';
@@ -11,8 +12,6 @@ import { WaveformEditor } from '../components/WaveformEditor';
 import { pickWritableDirectory } from '../../fs/directoryPicker';
 import { canOverwrite } from '../../fs/overwriteWriter';
 import type { FileEntry } from '../../app/types';
-
-const ESTIMATE_DEBOUNCE_MS = 300;
 
 export class MainView {
   element: HTMLElement;
@@ -22,8 +21,15 @@ export class MainView {
   private outputLocationEl: HTMLElement;
   private batchEstimateEl: HTMLElement;
   private processButton: HTMLButtonElement;
-  private estimator = new BatchEstimator();
-  private estimateTimer?: number;
+  private estimates = new EstimateScheduler({
+    current: () => ({ files: appState.files, settings: appState.settings }),
+    listener: {
+      onEmpty: () => (this.batchEstimateEl.textContent = ''),
+      onPending: () => (this.batchEstimateEl.textContent = 'Estimating…'),
+      onFile: (id, estimate) => this.fileTable.setEstimate(id, estimate),
+      onTotal: (estimate) => this.renderBatchEstimate(estimate),
+    },
+  });
   private unsubscribers: Array<() => void> = [];
 
   constructor(onProcess: () => void) {
@@ -76,7 +82,7 @@ export class MainView {
     this.fileTable.render(appState.files);
     this.processButton.disabled = appState.files.length === 0;
     this.updateOutputLocation();
-    this.scheduleEstimate();
+    this.estimates.schedule();
 
     this.unsubscribers.push(
       appEvents.on('files-changed', ({ files }) => {
@@ -85,15 +91,15 @@ export class MainView {
         this.processButton.disabled = files.length === 0;
         this.updateOutputLocation();
         if (this.fileTable.selectedId === null && files.length > 0) this.fileTable.select(files[0].id);
-        this.scheduleEstimate();
+        this.estimates.schedule();
       }),
       appEvents.on('file-updated', ({ file }) => {
         this.fileTable.updateRow(file);
-        this.scheduleEstimate();
+        this.estimates.schedule();
       }),
       appEvents.on('settings-changed', ({ settings }) => {
         this.fileTable.setPreserveBitDepth(settings.preserveBitDepth);
-        this.scheduleEstimate();
+        this.estimates.schedule();
       }),
     );
 
@@ -169,29 +175,6 @@ export class MainView {
 
   // ---- batch size estimate ------------------------------------------------
 
-  private scheduleEstimate(): void {
-    window.clearTimeout(this.estimateTimer);
-    this.estimator.cancel();
-    if (appState.files.length === 0) {
-      this.batchEstimateEl.textContent = '';
-      return;
-    }
-    this.batchEstimateEl.textContent = 'Estimating…';
-    this.estimateTimer = window.setTimeout(() => void this.runEstimate(), ESTIMATE_DEBOUNCE_MS);
-  }
-
-  private async runEstimate(): Promise<void> {
-    const files = appState.files;
-    this.estimator.forget(new Set(files.map((f) => f.id)));
-    const result = await this.estimator.estimate(
-      files,
-      appState.settings,
-      (id, estimate) => this.fileTable.setEstimate(id, estimate),
-      (progress) => this.renderBatchEstimate(progress),
-    );
-    if (result) this.renderBatchEstimate(result);
-  }
-
   private renderBatchEstimate(estimate: BatchEstimate): void {
     const { originalBytes, estimatedBytes, analysed, total } = estimate;
     const partial = analysed < total ? ` (analysed ${analysed}/${total})` : '';
@@ -223,8 +206,7 @@ export class MainView {
   }
 
   destroy(): void {
-    window.clearTimeout(this.estimateTimer);
-    this.estimator.cancel();
+    this.estimates.cancel();
     document.removeEventListener('keydown', this.handleKeyDown);
     this.waveformEditor.destroy();
     this.unsubscribers.forEach((u) => u());
