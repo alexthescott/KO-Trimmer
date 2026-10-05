@@ -1,4 +1,5 @@
 import type { DecodedAudio } from './decode';
+import { dataView, iffChunks, isWave, waveFormatTag, WAVE_FORMAT_IEEE_FLOAT, WAVE_FORMAT_PCM } from './iffChunks';
 
 /**
  * Pure-JS decoder for uncompressed WAV (RIFF/RF64/BW64): 8/16/24/32-bit
@@ -14,16 +15,11 @@ import type { DecodedAudio } from './decode';
  * the caller can fall back to decodeAudioData.
  */
 export function decodeWav(bytes: Uint8Array): DecodedAudio | undefined {
-  const tag = ascii(bytes, 0, 4);
-  if (!(tag === 'RIFF' || tag === 'RF64' || tag === 'BW64') || ascii(bytes, 8, 4) !== 'WAVE') return undefined;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (!isWave(bytes)) return undefined;
+  const view = dataView(bytes);
 
   let fmt: WavFmt | undefined;
-  let offset = 12;
-  while (offset + 8 <= bytes.length) {
-    const id = ascii(bytes, offset, 4);
-    const size = view.getUint32(offset + 4, true);
-    const body = offset + 8;
+  for (const { id, size, body } of iffChunks(bytes, true)) {
     if (id === 'fmt ') {
       fmt = readFmt(view, body, size);
       if (!fmt) return undefined;
@@ -34,7 +30,6 @@ export function decodeWav(bytes: Uint8Array): DecodedAudio | undefined {
       const available = Math.min(size, bytes.length - body);
       return decodeSamples(view, body, Math.floor(available / fmt.blockAlign), fmt);
     }
-    offset = body + size + (size % 2);
   }
   return undefined;
 }
@@ -48,24 +43,16 @@ interface WavFmt {
   float: boolean;
 }
 
-const PCM = 1;
-const IEEE_FLOAT = 3;
-const EXTENSIBLE = 0xfffe;
-
 function readFmt(view: DataView, body: number, size: number): WavFmt | undefined {
   if (size < 16 || body + 16 > view.byteLength) return undefined;
-  let formatTag = view.getUint16(body, true);
+  const formatTag = waveFormatTag(view, body, size);
   const channels = view.getUint16(body + 2, true);
   const sampleRate = view.getUint32(body + 4, true);
   const blockAlign = view.getUint16(body + 12, true);
-  if (formatTag === EXTENSIBLE) {
-    if (size < 40 || body + 26 > view.byteLength) return undefined;
-    formatTag = view.getUint16(body + 24, true); // first 2 bytes of the SubFormat GUID
-  }
   if (channels === 0 || sampleRate === 0 || blockAlign % channels !== 0) return undefined;
   const bytesPerSample = blockAlign / channels;
-  const float = formatTag === IEEE_FLOAT;
-  if (float ? bytesPerSample !== 4 && bytesPerSample !== 8 : formatTag !== PCM || bytesPerSample < 1 || bytesPerSample > 4) {
+  const float = formatTag === WAVE_FORMAT_IEEE_FLOAT;
+  if (float ? bytesPerSample !== 4 && bytesPerSample !== 8 : formatTag !== WAVE_FORMAT_PCM || bytesPerSample < 1 || bytesPerSample > 4) {
     return undefined;
   }
   return { channels, sampleRate, blockAlign, bytesPerSample, float };
@@ -98,9 +85,4 @@ function sampleReader(view: DataView, fmt: WavFmt): (offset: number) => number {
     default:
       return (o) => view.getInt32(o, true) / 0x80000000;
   }
-}
-
-function ascii(bytes: Uint8Array, offset: number, length: number): string {
-  if (offset + length > bytes.length) return '';
-  return String.fromCharCode(...bytes.subarray(offset, offset + length));
 }

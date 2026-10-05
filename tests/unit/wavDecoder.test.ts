@@ -39,6 +39,25 @@ describe('decodeWav', () => {
     expect(decoded.channels[0]).toHaveLength(2);
   });
 
+  it('decodes WAVE_FORMAT_EXTENSIBLE by its SubFormat, skipping chunks before fmt', () => {
+    const u16 = (v: number) => [v & 0xff, (v >> 8) & 0xff];
+    const u32 = (v: number) => [...u16(v & 0xffff), ...u16(v >>> 16)];
+    const fourcc = (s: string) => Array.from(s, (c) => c.charCodeAt(0));
+    const fmt = [
+      ...u16(0xfffe), ...u16(1), ...u32(8000), ...u32(16000), ...u16(2), ...u16(16),
+      ...u16(22), ...u16(16), ...u32(4), ...u16(1), ...new Array(14).fill(0),
+    ];
+    const bytes = new Uint8Array([
+      ...fourcc('RIFF'), ...u32(0), ...fourcc('WAVE'),
+      ...fourcc('JUNK'), ...u32(3), 0, 0, 0, 0,
+      ...fourcc('fmt '), ...u32(fmt.length), ...fmt,
+      ...fourcc('data'), ...u32(4), ...u16(0x4000), ...u16(0xc000),
+    ]);
+    const decoded = decodeWav(bytes)!;
+    expect(decoded.sampleRate).toBe(8000);
+    expect(Array.from(decoded.channels[0])).toEqual([0.5, -0.5]);
+  });
+
   it('rejects compressed WAV and non-WAV bytes', () => {
     const wav = encodeWav([left], 44100, { bits: 16, float: false });
     const adpcm = wav.slice();

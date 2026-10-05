@@ -1,4 +1,14 @@
 import type { SampleFormat } from './sampleFormat';
+import {
+  ascii,
+  dataView,
+  iffChunks,
+  isWave,
+  waveFormatTag,
+  WAVE_FORMAT_EXTENSIBLE,
+  WAVE_FORMAT_IEEE_FLOAT,
+  WAVE_FORMAT_PCM,
+} from './iffChunks';
 
 /**
  * Source header parsing: bit depth + native sample rate.
@@ -22,8 +32,8 @@ export const FORMAT_PROBE_BYTES = 64 * 1024;
 
 /** `extension` gates MP3 frame-sync scanning, which could false-match inside other binary formats. */
 export function parseSourceInfo(bytes: Uint8Array, extension = ''): SourceInfo {
+  if (isWave(bytes)) return parseWav(bytes);
   const tag = ascii(bytes, 0, 4);
-  if ((tag === 'RIFF' || tag === 'RF64' || tag === 'BW64') && ascii(bytes, 8, 4) === 'WAVE') return parseWav(bytes);
   if (tag === 'FORM' && ['AIFF', 'AIFC'].includes(ascii(bytes, 8, 4))) return parseAiff(bytes);
   if (tag === 'fLaC') return parseFlac(bytes);
   if (tag === 'OggS') return parseOgg(bytes);
@@ -39,26 +49,17 @@ export function id3v2Length(bytes: Uint8Array): number {
 
 function parseWav(bytes: Uint8Array): SourceInfo {
   const view = dataView(bytes);
-  let offset = 12;
-  while (offset + 8 <= bytes.length) {
-    const id = ascii(bytes, offset, 4);
-    const size = view.getUint32(offset + 4, true);
-    const body = offset + 8;
-    if (id === 'fmt ') {
-      if (body + 16 > bytes.length) return {};
-      let formatTag = view.getUint16(body, true);
-      const sampleRate = view.getUint32(body + 4, true);
-      let bits = view.getUint16(body + 14, true);
-      if (formatTag === 0xfffe && size >= 40 && body + 26 <= bytes.length) {
-        const validBits = view.getUint16(body + 18, true);
-        if (validBits > 0) bits = validBits;
-        formatTag = view.getUint16(body + 24, true); // first 2 bytes of the SubFormat GUID
-      }
-      if (formatTag === 1) return { format: { bits, float: false }, sampleRate };
-      if (formatTag === 3) return { format: { bits, float: true }, sampleRate };
-      return { sampleRate }; // compressed (ADPCM, A-law, …)
-    }
-    offset = body + size + (size % 2);
+  for (const { id, size, body } of iffChunks(bytes, true)) {
+    if (id !== 'fmt ') continue;
+    if (body + 16 > bytes.length) return {};
+    const sampleRate = view.getUint32(body + 4, true);
+    const formatTag = waveFormatTag(view, body, size);
+    const containerBits = view.getUint16(body + 14, true);
+    const isExtensible = view.getUint16(body, true) === WAVE_FORMAT_EXTENSIBLE && body + 20 <= bytes.length;
+    const bits = (isExtensible && view.getUint16(body + 18, true)) || containerBits;
+    if (formatTag === WAVE_FORMAT_PCM) return { format: { bits, float: false }, sampleRate };
+    if (formatTag === WAVE_FORMAT_IEEE_FLOAT) return { format: { bits, float: true }, sampleRate };
+    return { sampleRate }; // compressed (ADPCM, A-law, …)
   }
   return {};
 }
@@ -66,11 +67,7 @@ function parseWav(bytes: Uint8Array): SourceInfo {
 function parseAiff(bytes: Uint8Array): SourceInfo {
   const view = dataView(bytes);
   const isAifc = ascii(bytes, 8, 4) === 'AIFC';
-  let offset = 12;
-  while (offset + 8 <= bytes.length) {
-    const id = ascii(bytes, offset, 4);
-    const size = view.getUint32(offset + 4, false);
-    const body = offset + 8;
+  for (const { id, body } of iffChunks(bytes, false)) {
     if (id === 'COMM') {
       if (body + 18 > bytes.length) return {};
       const bits = view.getUint16(body + 6, false);
@@ -83,7 +80,6 @@ function parseAiff(bytes: Uint8Array): SourceInfo {
       if (compression === 'fl64' || compression === 'FL64') return { format: { bits: 64, float: true }, sampleRate };
       return { sampleRate };
     }
-    offset = body + size + (size % 2);
   }
   return {};
 }
@@ -134,13 +130,4 @@ function readExtended80(view: DataView, offset: number): number {
   const hi = view.getUint32(offset + 2, false);
   const lo = view.getUint32(offset + 6, false);
   return hi * 2 ** (exponent - 31) + lo * 2 ** (exponent - 63);
-}
-
-function dataView(bytes: Uint8Array): DataView {
-  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-}
-
-function ascii(bytes: Uint8Array, offset: number, length: number): string {
-  if (offset + length > bytes.length) return '';
-  return String.fromCharCode(...bytes.subarray(offset, offset + length));
 }

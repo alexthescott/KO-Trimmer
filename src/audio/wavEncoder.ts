@@ -1,5 +1,6 @@
 import { PCM16, type SampleFormat } from './sampleFormat';
 import { floatToInt, frameCount } from './channels';
+import { WAVE_FORMAT_IEEE_FLOAT, WAVE_FORMAT_PCM } from './iffChunks';
 
 /**
  * Header size for a WAV written by encodeWav: 44 bytes for integer PCM;
@@ -27,7 +28,7 @@ export function encodeWav(channels: Float32Array[], sampleRate: number, format: 
   writeString(view, 8, 'WAVE');
   writeString(view, 12, 'fmt ');
   view.setUint32(16, fmtSize, true);
-  view.setUint16(20, format.float ? 3 : 1, true); // IEEE float : PCM
+  view.setUint16(20, format.float ? WAVE_FORMAT_IEEE_FLOAT : WAVE_FORMAT_PCM, true);
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, sampleRate * blockAlign, true); // byte rate
