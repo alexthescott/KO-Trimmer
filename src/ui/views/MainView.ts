@@ -1,4 +1,5 @@
-import { h, formatBytes, formatSizeChange, plural } from '../dom';
+import { h } from '../dom';
+import { formatBytes, formatSizeChange, plural } from '../format';
 import { appState } from '../../app/state';
 import { appEvents } from '../../app/events';
 import { evictDecoded } from '../../app/decodedCache';

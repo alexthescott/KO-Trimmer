@@ -1,5 +1,5 @@
 import type { FileEntry, ProcessingSettings, SampleRange } from '../../../app/types';
-import { formatBytes, formatDuration, formatSizeChange } from '../../dom';
+import { formatBytes, formatDuration, formatSizeChange } from '../../format';
 import { estimateOutputBytes } from '../../../audio/estimate';
 import { resolveWavSampleRate } from '../../../audio/sampleRateResample';
 import { formatLabel, sameFormat } from '../../../audio/sampleFormat';

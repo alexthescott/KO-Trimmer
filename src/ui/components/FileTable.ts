@@ -1,4 +1,5 @@
-import { h, formatBytes, formatSizeChange } from '../dom';
+import { h } from '../dom';
+import { formatBytes, formatSizeChange } from '../format';
 import type { FileEntry } from '../../app/types';
 import { formatLabel, formatShortLabel, sameFormat } from '../../audio/sampleFormat';
 import { chooseOutputFormat, outputContainerFor } from '../../audio/outputContainer';

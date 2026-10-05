@@ -1,4 +1,5 @@
-import { h, formatBytes, formatSizeChange, plural } from '../dom';
+import { h } from '../dom';
+import { formatBytes, formatSizeChange, plural } from '../format';
 import { KO_II_MAX_DURATION_SEC } from '../../audio/naming';
 import type { BatchSummary } from '../../app/processBatch';
 
