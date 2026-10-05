@@ -1,8 +1,8 @@
 import type { ProcessingSettings } from '../app/types';
 import { resolveWavSampleRate } from './sampleRateResample';
-import { resolveOutputFormat, type SampleFormat } from './sampleFormat';
+import type { SampleFormat } from './sampleFormat';
 import { wavHeaderBytes } from './wavEncoder';
-import { outputContainerFor } from './outputContainer';
+import { chooseOutputFormat, outputContainerFor } from './outputContainer';
 
 export interface EstimateInput {
   /** Frames kept after trim, at the source sample rate. */
@@ -12,6 +12,8 @@ export interface EstimateInput {
   extension: string;
   /** Source bit depth from the file header, if known. */
   sourceFormat?: SampleFormat;
+  /** Absolute peak, if known: integer output that would clip is estimated as 32-bit float. */
+  peak?: number;
   settings: Pick<ProcessingSettings, 'speedMultiplier' | 'preserveStereo' | 'bitrateKbps'> &
     Partial<Pick<ProcessingSettings, 'preserveBitDepth' | 'wavSampleRateHz'>>;
 }
@@ -39,8 +41,8 @@ export function estimateOutputBytes(input: EstimateInput): number {
   const target = resolveWavSampleRate(input.sourceSampleRate, settings.wavSampleRateHz ?? null);
   if (target !== undefined) frames = Math.ceil((frames * target) / input.sourceSampleRate);
 
-  const format = resolveOutputFormat(input.sourceFormat, settings.preserveBitDepth ?? false);
-  return wavHeaderBytes(format) + frames * channels * (format.bits / 8);
+  const { format } = chooseOutputFormat('wav', input.sourceFormat, settings.preserveBitDepth ?? false, input.peak);
+  return wavHeaderBytes(format!) + frames * channels * (format!.bits / 8);
 }
 
 export interface BatchEstimateSample {

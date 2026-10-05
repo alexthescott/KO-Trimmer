@@ -8,9 +8,9 @@ import { resolveWavSampleRate, resampleToRate } from './sampleRateResample';
 import { encodeWav } from './wavEncoder';
 import { encodeMp3 } from './mp3Encoder';
 import { buildOutputFilename, exceedsKoIILength } from './naming';
-import { clipWarning, peakAbs, type SampleFormat } from './sampleFormat';
+import { peakAbs, type SampleFormat } from './sampleFormat';
 import { frameCount } from './channels';
-import { outputContainerFor, outputSampleFormat, type OutputContainer } from './outputContainer';
+import { chooseOutputFormat, outputContainerFor, type OutputContainer } from './outputContainer';
 
 /** Everything the pipeline needs about one file — serializable, so it can cross to the worker. */
 export interface PipelineRequest {
@@ -114,8 +114,12 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   const rendered = await renderAudible({ ...input, bounds, container });
 
   input.onStage?.('encode');
-  const outputFormat = outputSampleFormat(container, input.sourceFormat, settings.preserveBitDepth);
-  const clip = outputFormat && clipWarning(peakAbs(rendered.channels), outputFormat);
+  const { format: outputFormat, clipNote } = chooseOutputFormat(
+    container,
+    input.sourceFormat,
+    settings.preserveBitDepth,
+    container === 'wav' ? peakAbs(rendered.channels) : undefined,
+  );
   const bytes =
     container === 'mp3'
       ? encodeMp3(rendered.channels, rendered.sampleRate, settings.bitrateKbps, input.isCancelled)
@@ -137,10 +141,11 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     originalDurationSec: frameCount(input.channels) / input.sampleRate,
     outputDurationSec: finalDurationSec,
     exceedsKoIILength: exceedsKoIILength(finalDurationSec),
+    keptFloatToAvoidClipping: clipNote !== undefined,
     sourceFormat: outputFormat && input.sourceFormat,
     outputFormat,
   };
 
-  const warning = [bounds.warning, clip].filter(Boolean).join(' · ') || undefined;
+  const warning = [bounds.warning, clipNote].filter(Boolean).join(' · ') || undefined;
   return { bytes, outputName, outputExtension: container, stats, warning };
 }

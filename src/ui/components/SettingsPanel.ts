@@ -61,7 +61,7 @@ export class SettingsPanel {
       checkboxRow(
         'Preserve Bit Depth',
         s.preserveBitDepth,
-        'Unchecked writes 16-bit WAV (smallest). Checked keeps the source format, e.g. 32-bit float — check your device supports it.',
+        'Unchecked writes 16-bit WAV (smallest), except files that would clip, which stay 32-bit float. Checked keeps the source format, e.g. 32-bit float — check your device supports it.',
         (checked) => appState.updateSettings({ preserveBitDepth: checked }),
       ),
       this.overwriteRow,

@@ -2,7 +2,8 @@ import { h, formatBytes, formatSizeChange } from '../dom';
 import type { FileEntry } from '../../app/types';
 import { appState } from '../../app/state';
 import { formatLabel, formatShortLabel, sameFormat } from '../../audio/sampleFormat';
-import { outputContainerFor, outputSampleFormat } from '../../audio/outputContainer';
+import { chooseOutputFormat, outputContainerFor } from '../../audio/outputContainer';
+import type { FileEstimate } from '../../app/batchEstimate';
 import { extensionOf } from '../../app/fileNames';
 
 const STAGE_LABEL: Record<string, string> = {
@@ -25,8 +26,9 @@ export class FileTable {
   selectedId: string | null = null;
   private options: FileTableOptions;
   private lastFiles: FileEntry[] = [];
-  private estimates = new Map<string, number>();
+  private estimates = new Map<string, FileEstimate>();
   private sizeCells = new Map<string, HTMLElement>();
+  private nameCells = new Map<string, HTMLElement>();
 
   constructor(options: FileTableOptions = {}) {
     this.options = options;
@@ -50,17 +52,19 @@ export class FileTable {
     this.element.querySelector('tr.selected')?.scrollIntoView({ block: 'nearest' });
   }
 
-  /** Records one file's estimated output bytes and updates its Size cell in place. */
-  setEstimate(id: string, estimatedBytes: number): void {
-    this.estimates.set(id, estimatedBytes);
+  /** Records one file's estimate and updates its Size and name cells in place. */
+  setEstimate(id: string, estimate: FileEstimate): void {
+    this.estimates.set(id, estimate);
     const file = this.lastFiles.find((f) => f.id === id);
-    const cell = this.sizeCells.get(id);
-    if (file && cell) cell.textContent = sizeText(file, estimatedBytes);
+    if (!file) return;
+    this.sizeCells.get(id)?.replaceChildren(sizeText(file, estimate.bytes));
+    this.nameCells.get(id)?.replaceChildren(...nameCellContents(file, estimate.peak));
   }
 
   render(files: FileEntry[]): void {
     this.lastFiles = files;
     this.sizeCells.clear();
+    this.nameCells.clear();
     if (files.length === 0) {
       this.element.replaceChildren(
         h('tbody', {}, [h('tr', {}, [h('td', {}, ['No files added yet.'])])]),
@@ -86,14 +90,13 @@ export class FileTable {
             ),
           ])
         : null;
-      const sizeCell = h('td', { class: 'readout size-cell' }, [sizeText(file, this.estimates.get(file.id))]);
+      const estimate = this.estimates.get(file.id);
+      const sizeCell = h('td', { class: 'readout size-cell' }, [sizeText(file, estimate?.bytes)]);
       this.sizeCells.set(file.id, sizeCell);
+      const nameCell = h('td', {}, nameCellContents(file, estimate?.peak));
+      this.nameCells.set(file.id, nameCell);
       const row = h('tr', { class: file.id === this.selectedId ? 'selected' : '' }, [
-        h('td', {}, [
-          file.relativePath,
-          file.manualTrim ? h('span', { class: 'tag' }, ['manual trim']) : null,
-          bitDepthTag(file),
-        ]),
+        nameCell,
         sizeCell,
         h('td', { class: `status status-${file.status}` }, [statusText(file)]),
         removeCell,
@@ -144,11 +147,21 @@ function sizeText(file: FileEntry, estimate: number | undefined): string {
   return `${original} → —`;
 }
 
-/** Tag for files whose bit depth changes on output, e.g. "32f→16". */
-function bitDepthTag(file: FileEntry): HTMLElement | null {
+function nameCellContents(file: FileEntry, peak: number | undefined): Array<Node | string> {
+  const tags = [file.manualTrim ? h('span', { class: 'tag' }, ['manual trim']) : null, bitDepthTag(file, peak)];
+  return [file.relativePath, ...tags.filter((tag): tag is HTMLElement => tag !== null)];
+}
+
+/**
+ * Tag for files whose bit depth changes on output, e.g. "32f→16", or that
+ * stay 32-bit float because a lower bit depth would clip (`peak` from the
+ * estimate; the title says why).
+ */
+function bitDepthTag(file: FileEntry, peak: number | undefined): HTMLElement | null {
   const source = file.sourceFormat;
   const container = outputContainerFor(extensionOf(file.name));
-  const output = outputSampleFormat(container, source, appState.settings.preserveBitDepth);
+  const { format: output, clipNote } = chooseOutputFormat(container, source, appState.settings.preserveBitDepth, peak);
+  if (clipNote) return h('span', { class: 'tag', title: clipNote }, ['32f · avoids clip']);
   if (!source || !output || sameFormat(source, output)) return null;
   return h('span', { class: 'tag', title: `${formatLabel(source)} → ${formatLabel(output)}` }, [
     `${formatShortLabel(source)}→${formatShortLabel(output)}`,

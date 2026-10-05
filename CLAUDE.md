@@ -97,8 +97,10 @@ FLAC; first 64 KB, probed once in `app/fileEntries.ts` → `FileEntry.sourceForm
 a second small read past oversized MP3 ID3 tags). WAV output is 16-bit PCM by default;
 "Preserve Bit Depth" keeps the source format (8/16/24/32-bit int or 32-bit float).
 Conversions are surfaced in the editor size line, a `32f→16` tag in the file table, and
-the results summary; integer output of a float source peaking above 0 dBFS gets a clip
-warning.
+the results summary. Integer output that would clip (a float source peaking above
+0 dBFS) is written as 32-bit float instead, with a "Kept 32-bit float — peaks +N dB…"
+note (`outputContainer.ts::chooseOutputFormat`); the editor and size estimates use the
+preview/source peak to predict it, the table tags it `32f · avoids clip`.
 
 **File-system capability tiers** (`fs/capabilities.ts`): **Full** (Chrome, File System
 Access API) — true overwrite, directory-handle output writing, persisted favorites.

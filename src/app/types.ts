@@ -39,6 +39,8 @@ export interface ProcessStats {
   originalDurationSec: number;
   outputDurationSec: number;
   exceedsKoIILength: boolean;
+  /** Integer output would have clipped, so 32-bit float was written instead. */
+  keptFloatToAvoidClipping: boolean;
   /** Set for WAV output when the source bit depth is known. */
   sourceFormat?: SampleFormat;
   outputFormat?: SampleFormat;

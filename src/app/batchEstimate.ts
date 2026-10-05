@@ -4,6 +4,7 @@ import { decodeAudioFile, type DecodedAudio } from '../audio/decode';
 import { computeAutoTrimBounds } from '../audio/pipeline';
 import { estimateOutputBytes, extrapolateBatchEstimate, type BatchEstimateSample } from '../audio/estimate';
 import { frameCount } from '../audio/channels';
+import { peakAbs } from '../audio/sampleFormat';
 import { extensionOf } from './fileNames';
 
 /** What the estimate needs from one decode, kept instead of the PCM itself. */
@@ -11,8 +12,15 @@ interface DecodeSummary {
   channels: number;
   sampleRate: number;
   frames: number;
+  /** Absolute source peak — trimming only drops silence, so it stands in for the output's. */
+  peak: number;
   /** Auto-trimmed frame count, keyed by the detection settings it was computed with. */
   autoFrames: Map<string, number>;
+}
+
+export interface FileEstimate {
+  bytes: number;
+  peak: number;
 }
 
 export interface BatchEstimate {
@@ -39,7 +47,7 @@ export class BatchEstimator {
   async estimate(
     files: FileEntry[],
     settings: ProcessingSettings,
-    onFile: (id: string, estimatedBytes: number) => void,
+    onFile: (id: string, estimate: FileEstimate) => void,
     onProgress: (progress: BatchEstimate) => void,
   ): Promise<BatchEstimate | null> {
     const generation = ++this.generation;
@@ -68,6 +76,7 @@ export class BatchEstimator {
           channels: decoded.channels.length,
           sampleRate: decoded.sampleRate,
           frames: frameCount(decoded.channels),
+          peak: peakAbs(decoded.channels),
           autoFrames: new Map(),
         };
         const bounds = computeAutoTrimBounds(decoded.channels, decoded.sampleRate, settings);
@@ -84,10 +93,11 @@ export class BatchEstimator {
         sourceSampleRate: info.sampleRate,
         extension: extensionOf(file.name),
         sourceFormat: file.sourceFormat,
+        peak: info.peak,
         settings,
       });
       samples.push({ originalBytes: file.size, estimatedBytes });
-      onFile(file.id, estimatedBytes);
+      onFile(file.id, { bytes: estimatedBytes, peak: info.peak });
       onProgress(summarize());
     }
 

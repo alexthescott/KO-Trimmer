@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clipWarning, resolveOutputFormat, PCM16 } from '../../src/audio/sampleFormat';
+import { clipNote, resolveOutputFormat, PCM16 } from '../../src/audio/sampleFormat';
 import { parseSourceInfo, id3v2Length } from '../../src/audio/sourceHeader';
 import { encodeWav } from '../../src/audio/wavEncoder';
 import { encodeMp3 } from '../../src/audio/mp3Encoder';
@@ -136,23 +136,51 @@ describe('bit depth in estimate + pipeline', () => {
     }
   });
 
-  it('warns about clipping only when integer output would clip', () => {
-    expect(clipWarning(2, PCM16)).toMatch(/\+6\.0 dB.*16-bit/);
-    expect(clipWarning(2, FLOAT32)).toBeUndefined();
-    expect(clipWarning(1, PCM16)).toBeUndefined();
+  it('notes clipping only when integer output would clip', () => {
+    expect(clipNote(2, PCM16)).toMatch(/^Kept 32-bit float — peaks \+6\.0 dB.*16-bit$/);
+    expect(clipNote(2, FLOAT32)).toBeUndefined();
+    expect(clipNote(1, PCM16)).toBeUndefined();
   });
 
-  it('pipeline keeps float when preserving and reports the conversion otherwise', async () => {
-    const loud = Float32Array.from({ length: 4410 }, (_, i) => 1.5 * Math.sin(i / 5));
-    const base = { channels: [loud], sampleRate: 44100, extension: 'wav', baseName: 'x', originalBytes: 1, sourceFormat: FLOAT32 };
+  it('estimates a clipping file at its 32-bit float size', () => {
+    const est = estimateOutputBytes({
+      trimmedFrames: 1000, sourceChannels: 1, sourceSampleRate: 44100, extension: 'wav', sourceFormat: FLOAT32, peak: 1.5,
+      settings: { speedMultiplier: 1, preserveStereo: true, bitrateKbps: 320, preserveBitDepth: false },
+    });
+    expect(est).toBe(encodeWav([new Float32Array(1000)], 44100, FLOAT32).length);
+  });
 
-    const kept = await runPipeline({ ...base, settings: { ...DEFAULT_SETTINGS, preserveBitDepth: true } });
+  it('pipeline keeps float when preserving, silently', async () => {
+    const loud = Float32Array.from({ length: 4410 }, (_, i) => 1.5 * Math.sin(i / 5));
+    const kept = await runPipeline({
+      channels: [loud], sampleRate: 44100, extension: 'wav', baseName: 'x', originalBytes: 1, sourceFormat: FLOAT32,
+      settings: { ...DEFAULT_SETTINGS, preserveBitDepth: true },
+    });
     expect(formatOf(kept.bytes)).toEqual(FLOAT32);
     expect(kept.warning).toBeUndefined();
+    expect(kept.stats.keptFloatToAvoidClipping).toBe(false);
+  });
 
-    const converted = await runPipeline({ ...base, channels: [loud.slice()], settings: DEFAULT_SETTINGS });
-    expect(converted.stats.sourceFormat).toEqual(FLOAT32);
-    expect(converted.stats.outputFormat).toEqual(PCM16);
-    expect(converted.warning).toMatch(/clip at 16-bit/);
+  it('pipeline keeps float instead of clipping, and says why', async () => {
+    const loud = Float32Array.from({ length: 4410 }, (_, i) => 1.5 * Math.sin(i / 5));
+    const result = await runPipeline({
+      channels: [loud], sampleRate: 44100, extension: 'wav', baseName: 'x', originalBytes: 1, sourceFormat: FLOAT32,
+      settings: DEFAULT_SETTINGS,
+    });
+    expect(formatOf(result.bytes)).toEqual(FLOAT32);
+    expect(result.stats.outputFormat).toEqual(FLOAT32);
+    expect(result.stats.keptFloatToAvoidClipping).toBe(true);
+    expect(result.warning).toMatch(/^Kept 32-bit float — peaks \+3\.5 dB over full scale would clip at 16-bit$/);
+  });
+
+  it('pipeline converts float to 16-bit when nothing would clip', async () => {
+    const quiet = Float32Array.from({ length: 4410 }, (_, i) => 0.5 * Math.sin(i / 5));
+    const result = await runPipeline({
+      channels: [quiet], sampleRate: 44100, extension: 'wav', baseName: 'x', originalBytes: 1, sourceFormat: FLOAT32,
+      settings: DEFAULT_SETTINGS,
+    });
+    expect(result.stats.sourceFormat).toEqual(FLOAT32);
+    expect(result.stats.outputFormat).toEqual(PCM16);
+    expect(result.warning).toBeUndefined();
   });
 });

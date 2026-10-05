@@ -185,7 +185,7 @@ export class MainView {
     const result = await this.estimator.estimate(
       files,
       appState.settings,
-      (id, bytes) => this.fileTable.setEstimate(id, bytes),
+      (id, estimate) => this.fileTable.setEstimate(id, estimate),
       (progress) => this.renderBatchEstimate(progress),
     );
     if (result) this.renderBatchEstimate(result);

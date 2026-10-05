@@ -28,6 +28,13 @@ export function renderResultsSummary(
   for (const [conversion, count] of Object.entries(summary.formatConversions)) {
     rows.push(h('p', {}, [`${plural(count, 'file')} converted ${conversion}`]));
   }
+  if (summary.keptFloatCount > 0) {
+    rows.push(
+      h('p', {}, [
+        `${plural(summary.keptFloatCount, 'file')} kept as 32-bit float — peaks over full scale would have clipped at a lower bit depth`,
+      ]),
+    );
+  }
   rows.push(h('p', { class: 'muted' }, [outputDescription]));
 
   const overLength = summary.overKoIILengthNames;

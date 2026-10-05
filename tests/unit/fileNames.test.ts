@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { extensionOf, splitNameAndExtension } from '../../src/app/fileNames';
-import { outputContainerFor, outputSampleFormat } from '../../src/audio/outputContainer';
+import { chooseOutputFormat, outputContainerFor } from '../../src/audio/outputContainer';
 import { canOverwrite } from '../../src/fs/overwriteWriter';
-import { PCM16 } from '../../src/audio/sampleFormat';
+import { FLOAT32, PCM16 } from '../../src/audio/sampleFormat';
 import type { FileEntry } from '../../src/app/types';
 
 describe('splitNameAndExtension', () => {
@@ -21,8 +21,16 @@ describe('outputContainerFor', () => {
     for (const ext of ['wav', 'flac', 'aiff', 'm4a', 'ogg']) expect(outputContainerFor(ext)).toBe('wav');
   });
   it('has a PCM sample format only for wav', () => {
-    expect(outputSampleFormat('wav', undefined, false)).toEqual(PCM16);
-    expect(outputSampleFormat('mp3', PCM16, true)).toBeUndefined();
+    expect(chooseOutputFormat('wav', undefined, false)).toEqual({ format: PCM16 });
+    expect(chooseOutputFormat('mp3', PCM16, true, 2)).toEqual({});
+  });
+
+  it('keeps 32-bit float, with a note, when integer output would clip', () => {
+    expect(chooseOutputFormat('wav', FLOAT32, false, 1)).toEqual({ format: PCM16 });
+    const clipping = chooseOutputFormat('wav', FLOAT32, false, 1.585);
+    expect(clipping.format).toEqual(FLOAT32);
+    expect(clipping.clipNote).toBe('Kept 32-bit float — peaks +4.0 dB over full scale would clip at 16-bit');
+    expect(chooseOutputFormat('wav', FLOAT32, true, 2)).toEqual({ format: FLOAT32 });
   });
 });
 

@@ -16,6 +16,8 @@ export interface BatchSummary {
   outputBytes: number;
   /** Outputs still over the KO II length limit after processing. */
   overKoIILengthNames: string[];
+  /** Written as 32-bit float because 16/24-bit output would have clipped. */
+  keptFloatCount: number;
   /** e.g. { "32-bit float → 16-bit": 14 } */
   formatConversions: Record<string, number>;
   aborted: boolean;
@@ -134,6 +136,7 @@ function tally(summary: BatchSummary, outcome: FileOutcome): void {
   summary.originalBytes += stats.originalBytes;
   summary.outputBytes += stats.outputBytes;
   if (stats.exceedsKoIILength) summary.overKoIILengthNames.push(outputName);
+  if (stats.keptFloatToAvoidClipping) summary.keptFloatCount++;
   const { sourceFormat, outputFormat } = stats;
   if (sourceFormat && outputFormat && !sameFormat(sourceFormat, outputFormat)) {
     const key = `${formatLabel(sourceFormat)} → ${formatLabel(outputFormat)}`;
@@ -149,6 +152,7 @@ function emptySummary(): BatchSummary {
     originalBytes: 0,
     outputBytes: 0,
     overKoIILengthNames: [],
+    keptFloatCount: 0,
     formatConversions: {},
     aborted: false,
   };
