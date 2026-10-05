@@ -143,11 +143,6 @@ button.icon-button:hover {
   align-items: flex-start;
 }
 
-.sidebar {
-  width: 220px;
-  flex-shrink: 0;
-}
-
 .main-column {
   flex: 1;
   display: flex;
@@ -437,29 +432,6 @@ input[type='checkbox'] {
   margin-left: auto;
 }
 
-.favorites-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.favorites-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.favorites-list li:hover {
-  background: var(--bg-elevated-2);
-}
-
 .progress-bar {
   background: var(--bg);
   border: 1px solid var(--text);
@@ -530,9 +502,6 @@ input[type='checkbox'] {
 @media (max-width: 720px) {
   .layout {
     flex-direction: column;
-  }
-  .sidebar {
-    width: 100%;
   }
   .settings-grid {
     grid-template-columns: 1fr;

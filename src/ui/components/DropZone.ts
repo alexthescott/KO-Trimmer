@@ -26,7 +26,7 @@ export class DropZone {
       const dataTransfer = (e as DragEvent).dataTransfer;
       if (!dataTransfer) return;
       const { entries, rootHandle } = await resolveDroppedItems(dataTransfer.items);
-      if (rootHandle) await appState.useSourceRoot(rootHandle);
+      if (rootHandle) appState.useSourceRoot(rootHandle);
       await this.addEntries(entries);
     });
     zone.addEventListener('click', () => this.handleClick());
@@ -55,7 +55,7 @@ export class DropZone {
     if (isFileSystemAccessSupported()) {
       const picked = await pickDirectory();
       if (picked) {
-        await appState.useSourceRoot(picked.handle);
+        appState.useSourceRoot(picked.handle);
         await this.addEntries(picked.entries);
       }
       return;

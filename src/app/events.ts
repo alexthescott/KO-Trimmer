@@ -3,7 +3,6 @@ import type { FileEntry, ProcessingSettings } from './types';
 export interface AppEventMap {
   'files-changed': { files: FileEntry[] };
   'settings-changed': { settings: ProcessingSettings };
-  'favorites-changed': {};
 }
 
 /** Tiny typed pub/sub so UI modules stay decoupled without a framework. */

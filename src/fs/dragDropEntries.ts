@@ -23,12 +23,14 @@ export interface ResolvedDrop {
 
 /**
  * Recursively resolves dropped files/folders. Prefers getAsFileSystemHandle
- * (Chrome; keeps write capability for Overwrite/favorites) and falls back
+ * (Chrome; keeps write capability for Overwrite) and falls back
  * to webkitGetAsEntry (read-only File objects) elsewhere.
  */
 export async function resolveDroppedItems(items: DataTransferItemList): Promise<ResolvedDrop> {
   const results: DroppedEntry[] = [];
-  const topLevel: Array<FileSystemHandle | FileSystemEntry | File> = [];
+  // Chrome empties the DataTransferItemList at the first await, so every
+  // item's handle/entry must be requested synchronously before awaiting any.
+  const pending: Array<Promise<FileSystemHandle | FileSystemEntry | File | null>> = [];
 
   for (const item of Array.from(items)) {
     if (item.kind !== 'file') continue;
@@ -37,16 +39,17 @@ export async function resolveDroppedItems(items: DataTransferItemList): Promise<
       webkitGetAsEntry?: () => FileSystemEntry | null;
     };
     if (typeof anyItem.getAsFileSystemHandle === 'function') {
-      const handle = await anyItem.getAsFileSystemHandle();
-      if (handle) topLevel.push(handle);
+      pending.push(anyItem.getAsFileSystemHandle());
     } else if (typeof anyItem.webkitGetAsEntry === 'function') {
-      const entry = anyItem.webkitGetAsEntry();
-      if (entry) topLevel.push(entry);
+      pending.push(Promise.resolve(anyItem.webkitGetAsEntry()));
     } else {
-      const file = item.getAsFile();
-      if (file) topLevel.push(file);
+      pending.push(Promise.resolve(item.getAsFile()));
     }
   }
+
+  const topLevel = (await Promise.all(pending)).filter(
+    (entryLike): entryLike is FileSystemHandle | FileSystemEntry | File => entryLike !== null,
+  );
 
   for (const entryLike of topLevel) {
     await walk(entryLike, '', results);
@@ -134,7 +137,7 @@ function joinPath(parent: string, name: string): string {
   return parent ? `${parent}/${name}` : name;
 }
 
-/** Recursively walks a directory handle (from showDirectoryPicker or a favorite) into DroppedEntry[]. */
+/** Recursively walks a directory handle (from showDirectoryPicker) into DroppedEntry[]. */
 export async function walkDirectoryHandle(dirHandle: FileSystemDirectoryHandle): Promise<DroppedEntry[]> {
   const results: DroppedEntry[] = [];
   await walk(dirHandle, '', results);

@@ -1,23 +1,20 @@
-import type { FavoriteDirectory, FileEntry, ProcessingSettings } from './types';
+import type { FileEntry, ProcessingSettings } from './types';
 import { appEvents } from './events';
 import { loadSettings, saveSettings } from '../settings/settingsManager';
-import { loadFavorites } from '../fs/favoritesStore';
-import { resolveDefaultOutputRoot } from '../fs/directoryPicker';
+import { defaultOutputFolderName, resolveDefaultOutputRoot } from '../fs/directoryPicker';
+import { ensureReadWrite } from '../fs/permissions';
 
 class AppState {
   settings: ProcessingSettings = loadSettings();
   files: FileEntry[] = [];
-  favorites: FavoriteDirectory[] = [];
-  /** Where outputs are written; undefined means ZIP download. */
+  /** Where the current run writes outputs (set by prepareOutputRoot); undefined means ZIP download. */
   outputRootHandle?: FileSystemDirectoryHandle;
   /** Root folder name of the batch, for naming the ZIP. */
   rootName?: string;
-  private outputRootIsOverride = false;
-
-  async init(): Promise<void> {
-    this.favorites = await loadFavorites();
-    appEvents.emit('favorites-changed', {});
-  }
+  /** Picked/dropped source folder; its `<name>_trimmed` subfolder is the default output. */
+  private sourceRootHandle?: FileSystemDirectoryHandle;
+  /** Explicit "Choose output folder…" — sticks until Clear All. */
+  private outputRootOverride?: FileSystemDirectoryHandle;
 
   setFiles(files: FileEntry[]): void {
     this.files = files;
@@ -35,7 +32,8 @@ class AppState {
     this.files = [];
     this.rootName = undefined;
     this.outputRootHandle = undefined;
-    this.outputRootIsOverride = false;
+    this.sourceRootHandle = undefined;
+    this.outputRootOverride = undefined;
     appEvents.emit('files-changed', { files: this.files });
   }
 
@@ -60,19 +58,39 @@ class AppState {
   }
 
   /** A directory was opened as the source: default output goes inside it, unless the user chose one. */
-  async useSourceRoot(handle: FileSystemDirectoryHandle): Promise<void> {
-    if (!this.outputRootIsOverride) this.outputRootHandle = await resolveDefaultOutputRoot(handle);
+  /**
+   * Remembers the source root without touching disk: a dropped folder's handle
+   * is read-only until permission is requested, which needs a user gesture.
+   */
+  useSourceRoot(handle: FileSystemDirectoryHandle): void {
+    this.sourceRootHandle = handle;
   }
 
-  /** Explicit "Choose output folder…" — sticks until Clear All. */
   setOutputRoot(handle: FileSystemDirectoryHandle): void {
-    this.outputRootHandle = handle;
-    this.outputRootIsOverride = true;
+    this.outputRootOverride = handle;
   }
 
-  async refreshFavorites(): Promise<void> {
-    this.favorites = await loadFavorites();
-    appEvents.emit('favorites-changed', {});
+  /** Folder name outputs will be written to, or undefined for a ZIP download. */
+  get outputFolderName(): string | undefined {
+    if (this.outputRootOverride) return this.outputRootOverride.name;
+    return this.sourceRootHandle && defaultOutputFolderName(this.sourceRootHandle);
+  }
+
+  /**
+   * Resolves outputRootHandle for a run, creating the default `_trimmed`
+   * folder. Call from a user gesture (may prompt for write permission);
+   * falls back to ZIP download if permission is refused.
+   */
+  async prepareOutputRoot(): Promise<void> {
+    this.outputRootHandle = undefined;
+    const target = this.outputRootOverride ?? this.sourceRootHandle;
+    if (!target) return;
+    try {
+      if (!(await ensureReadWrite(target))) return;
+      this.outputRootHandle = this.outputRootOverride ?? (await resolveDefaultOutputRoot(target));
+    } catch (err) {
+      console.warn('Output folder unavailable; falling back to ZIP download.', err);
+    }
   }
 }
 

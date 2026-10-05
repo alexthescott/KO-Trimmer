@@ -34,6 +34,11 @@ export async function pickDirectory(): Promise<PickedDirectory | null> {
  * subfolder created inside the picked root itself; a user who wants a true
  * sibling can use the explicit "choose output folder" override instead.
  */
+export function defaultOutputFolderName(sourceRootHandle: FileSystemDirectoryHandle): string {
+  return `${sourceRootHandle.name}${TRIMMED_SUFFIX}`;
+}
+
+/** Creates the default output folder; needs readwrite permission on the source root. */
 export async function resolveDefaultOutputRoot(sourceRootHandle: FileSystemDirectoryHandle): Promise<FileSystemDirectoryHandle> {
-  return sourceRootHandle.getDirectoryHandle(`${sourceRootHandle.name}${TRIMMED_SUFFIX}`, { create: true });
+  return sourceRootHandle.getDirectoryHandle(defaultOutputFolderName(sourceRootHandle), { create: true });
 }

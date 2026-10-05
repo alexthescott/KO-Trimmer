@@ -39,7 +39,6 @@ function renderBody(viewEl: HTMLElement): void {
 }
 
 async function bootstrap(): Promise<void> {
-  await appState.init();
   showMain();
 
   if (loadShowWelcome()) {

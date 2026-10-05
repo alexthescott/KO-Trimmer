@@ -31,7 +31,7 @@ path is `/KO-Trimmer/` (`vite.config.ts`), matching this repo's Pages project-pa
 
 ```
 src/
-  app/        state.ts (single source of truth for files/settings/favorites/output
+  app/        state.ts (single source of truth for files/settings/output
               root), events.ts (typed pub/sub), processBatch.ts (orchestrates a batch
               run: processFile -> recordOutcome -> tally), decodedCache.ts (3-entry LRU
               of decoded audio for the editor), batchEstimate.ts (progressive per-file
@@ -50,7 +50,7 @@ src/
               thread only)
   fs/         File System Access API: capabilities, directoryPicker
               (pickWritableDirectory), dragDropEntries (TRIMMED_SUFFIX), permissions
-              (ensureReadWrite), favoritesStore (IndexedDB via idb-keyval),
+              (ensureReadWrite),
               outputWriter (FS Access sink + ZIP/fflate fallback sink),
               overwriteWriter (true in-place overwrite; canOverwrite)
   workers/    protocol.ts (message types built on PipelineRequest/PipelineOutput),
@@ -58,7 +58,7 @@ src/
               (pooled, AbortController-based cancellation)
   ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
               WaveformEditor + waveform/ [Viewport, PreviewRenderer, readouts, draw],
-              SettingsPanel, FavoritesSidebar, ResultsSummary, AboutDialog — fixed
+              SettingsPanel, ResultsSummary, AboutDialog — fixed
               bottom-left About button + modal)
   settings/   settingsManager.ts — localStorage persistence
   pwa/        registerSW.ts (vite-plugin-pwa)
@@ -103,7 +103,7 @@ note (`outputContainer.ts::chooseOutputFormat`); the editor and size estimates u
 preview/source peak to predict it, the table tags it `32f · avoids clip`.
 
 **File-system capability tiers** (`fs/capabilities.ts`): **Full** (Chrome, File System
-Access API) — true overwrite, directory-handle output writing, persisted favorites.
+Access API) — true overwrite, directory-handle output writing.
 **Degraded** (other browsers) — `<input webkitdirectory>` + ZIP download, overwrite
 checkbox disabled with an explanatory tooltip rather than silently no-opping.
 
@@ -190,4 +190,4 @@ Canonical source: `src/audio/settingsDefaults.ts`.
   drag-drop folder recursion, large-batch Stop behavior, preview playback, waveform
   editor handles/zoom and manual-trim reaching batch output, output
   byte-correctness (`ffprobe` for actual sample rate / MP3 bitrate), overwrite
-  correctness, ZIP fallback, favorites permission persistence across a relaunch.
+  correctness, ZIP fallback.

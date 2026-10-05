@@ -14,8 +14,7 @@ processing and file reading/writing happens locally in your browser.
 ## How to use
 
 1. **Add samples.** Drop audio files or a folder onto the app, or click to choose a folder.
-   Every supported sample in it (including subfolders) is queued. Favorite folders can be
-   saved in the sidebar for quick access.
+   Every supported sample in it (including subfolders) is queued.
 2. **Adjust settings.** Silence threshold, minimum silence duration, padding, speed-up,
    WAV sample rate, MP3 bitrate (MP3 files only), preserve stereo (off = mono downmix),
    and preserve bit depth (off = 16-bit WAV).
@@ -64,8 +63,8 @@ Actions". The production base path is `/KO-Trimmer/` (`vite.config.ts`); change 
 
 ### Browser support
 
-Full functionality (true in-place overwrite, writing output directly into a folder,
-persisted favorite folders) requires Chrome's File System Access API. Other browsers get a
+Full functionality (true in-place overwrite, writing output directly into a folder)
+requires Chrome's File System Access API. Other browsers get a
 degraded-but-functional tier: a `<input webkitdirectory>` folder picker and a ZIP download.
 
 ## License

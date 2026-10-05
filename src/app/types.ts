@@ -66,9 +66,3 @@ export interface FileEntry {
   /** Manually dragged trim points in source samples (end exclusive); overrides auto-detect. */
   manualTrim?: SampleRange;
 }
-
-export interface FavoriteDirectory {
-  id: string;
-  displayName: string;
-  handle: FileSystemDirectoryHandle;
-}

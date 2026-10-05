@@ -4,7 +4,6 @@ import { appEvents } from '../../app/events';
 import { evictDecoded } from '../../app/decodedCache';
 import { BatchEstimator, type BatchEstimate } from '../../app/batchEstimate';
 import { DropZone } from '../components/DropZone';
-import { FavoritesSidebar } from '../components/FavoritesSidebar';
 import { SettingsPanel } from '../components/SettingsPanel';
 import { FileTable } from '../components/FileTable';
 import { WaveformEditor } from '../components/WaveformEditor';
@@ -36,7 +35,6 @@ export class MainView {
     this.settingsPanel = new SettingsPanel();
 
     const dropZone = new DropZone();
-    const favoritesSidebar = new FavoritesSidebar();
 
     this.outputLocationEl = h('p', { class: 'muted' });
     this.batchEstimateEl = h('span', { class: 'readout muted' });
@@ -44,7 +42,7 @@ export class MainView {
     this.processButton = h('button', {
       class: 'primary',
       disabled: true,
-      onclick: () => this.handleProcess(onProcess),
+      onclick: () => void this.handleProcess(onProcess),
     }, ['Process Files']) as HTMLButtonElement;
 
     const clearButton = h('button', { onclick: () => this.handleClear() }, ['Clear All']);
@@ -66,7 +64,6 @@ export class MainView {
     const actionRow = h('div', { class: 'action-row' }, [this.batchEstimateEl, this.processButton]);
 
     this.element = h('div', { class: 'layout' }, [
-      favoritesSidebar.element,
       h('div', { class: 'main-column' }, [
         filePanel,
         this.waveformEditor.element,
@@ -149,7 +146,9 @@ export class MainView {
 
   // ---- processing ---------------------------------------------------------
 
-  private handleProcess(onProcess: () => void): void {
+  private async handleProcess(onProcess: () => void): Promise<void> {
+    // Before any confirm(): the permission prompt needs the click's user activation.
+    await appState.prepareOutputRoot();
     if (appState.settings.overwrite) {
       const count = appState.files.filter(canOverwrite).length;
       if (
@@ -206,8 +205,9 @@ export class MainView {
       this.outputLocationEl.textContent = '';
       return;
     }
-    if (appState.outputRootHandle) {
-      this.outputLocationEl.textContent = `Output: ${appState.outputRootHandle.name}/`;
+    const folder = appState.outputFolderName;
+    if (folder) {
+      this.outputLocationEl.textContent = `Output: ${folder}/`;
     } else {
       this.outputLocationEl.textContent = 'Output: will download as a ZIP';
     }
