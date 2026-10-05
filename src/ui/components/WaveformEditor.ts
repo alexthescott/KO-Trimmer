@@ -4,15 +4,15 @@ import { appEvents } from '../../app/events';
 import { getDecoded } from '../../app/decodedCache';
 import { errorMessage } from '../../app/errors';
 import { extensionOf } from '../../app/fileNames';
-import type { FileEntry, SampleRange } from '../../app/types';
-import type { TrimBounds } from '../../audio/trim';
-import { computeAutoTrimBounds, type RenderInput } from '../../audio/pipeline';
+import type { FileEntry } from '../../app/types';
+import type { RenderInput } from '../../audio/pipeline';
 import { frameCount, type PcmAudio } from '../../audio/channels';
 import { outputContainerFor, type OutputContainer } from '../../audio/outputContainer';
 import { playChannels, stopPlayback, type PlaybackHandle } from '../../audio/player';
 import { Viewport } from './waveform/Viewport';
 import { PreviewRenderer, type ProcessedPreview } from './waveform/PreviewRenderer';
 import { trimInfoText, sizeSummaryText } from './waveform/readouts';
+import { TrimState, type TrimHandle } from './waveform/TrimState';
 import {
   dimOutside,
   drawHandle,
@@ -30,11 +30,18 @@ const ZOOM_OUT_FACTOR = 1.25;
 const NO_FILE_TEXT = 'Select a file to see its waveform and trim points.';
 
 type PlaybackTarget = 'original' | 'processed';
-type DragTarget = 'start' | 'end' | null;
 
 interface Playback {
   target: PlaybackTarget;
   handle: PlaybackHandle;
+}
+
+/** Everything known about the shown file once it has decoded; all set together. */
+interface LoadedFile {
+  audio: PcmAudio;
+  original: Waveform;
+  trim: TrimState;
+  container: OutputContainer;
 }
 
 /**
@@ -48,16 +55,12 @@ export class WaveformEditor {
 
   private file?: FileEntry;
   private loadToken = 0;
-  private audio?: PcmAudio;
-  private container: OutputContainer = 'wav';
-  private original?: Waveform;
-  private autoBounds?: TrimBounds;
-  private trim: SampleRange = { start: 0, end: 0 };
+  private loaded?: LoadedFile;
   private viewport = new Viewport();
   private processed?: ProcessedPreview;
   private preview: PreviewRenderer;
 
-  private drag: DragTarget = null;
+  private drag?: TrimHandle;
   private playback?: Playback;
   private rafId?: number;
 
@@ -139,7 +142,7 @@ export class WaveformEditor {
   }
 
   get hasFile(): boolean {
-    return this.audio !== undefined;
+    return this.loaded !== undefined;
   }
 
   async show(file: FileEntry | undefined): Promise<void> {
@@ -147,10 +150,8 @@ export class WaveformEditor {
     this.preview.cancel();
     const token = ++this.loadToken;
     this.file = file;
-    this.audio = undefined;
-    this.original = undefined;
+    this.loaded = undefined;
     this.processed = undefined;
-    this.autoBounds = undefined;
 
     if (!file) {
       this.titleEl.textContent = 'Preview';
@@ -174,12 +175,13 @@ export class WaveformEditor {
     }
     if (token !== this.loadToken) return;
 
-    this.audio = audio;
-    this.container = outputContainerFor(extensionOf(file.name));
-    this.original = waveformOf(audio.channels);
-    this.recomputeAuto();
-    this.trim = file.manualTrim ? { ...file.manualTrim } : this.autoTrim();
-    this.viewport.reset(this.length, audio.sampleRate);
+    this.loaded = {
+      audio,
+      original: waveformOf(audio.channels),
+      trim: new TrimState(audio, appState.settings, file.manualTrim),
+      container: outputContainerFor(extensionOf(file.name)),
+    };
+    this.viewport.reset(this.loaded.trim.frames, audio.sampleRate);
 
     this.placeholderEl.style.display = 'none';
     this.bodyEl.style.display = '';
@@ -212,60 +214,37 @@ export class WaveformEditor {
     this.bodyEl.style.display = 'none';
   }
 
-  // ---- trim state ---------------------------------------------------------
-
-  private get length(): number {
-    return this.audio ? frameCount(this.audio.channels) : 0;
-  }
-
-  private get hasManual(): boolean {
-    return this.file?.manualTrim !== undefined;
-  }
-
-  private recomputeAuto(): void {
-    if (!this.audio) return;
-    this.autoBounds = computeAutoTrimBounds(this.audio.channels, this.audio.sampleRate, appState.settings);
-  }
-
-  private autoTrim(): SampleRange {
-    return this.autoBounds ? { start: this.autoBounds.start, end: this.autoBounds.end } : { start: 0, end: this.length };
-  }
+  // ---- trim ---------------------------------------------------------------
 
   private onSettingsChanged(): void {
-    if (!this.audio) return;
-    this.recomputeAuto();
-    // Threshold changes only move handles on files without a manual override.
-    if (!this.hasManual) this.trim = this.autoTrim();
+    if (!this.loaded) return;
+    this.loaded.trim.redetect(appState.settings);
     this.updateReadouts();
     this.draw();
     this.preview.schedule();
   }
 
   private commitManualTrim(): void {
-    if (!this.file) return;
-    appState.updateFile(this.file.id, { manualTrim: { ...this.trim } });
+    if (!this.file || !this.loaded) return;
+    this.loaded.trim.commitManual();
+    appState.updateFile(this.file.id, { manualTrim: this.loaded.trim.range });
     this.updateReadouts();
     this.preview.schedule(0);
   }
 
-  private clearManualTrim(): void {
-    if (!this.file) return;
+  private revertToAutoTrim(): void {
+    if (!this.file || !this.loaded) return;
+    this.loaded.trim.revertToAuto();
     appState.updateFile(this.file.id, { manualTrim: undefined });
-    this.trim = this.autoTrim();
     this.updateReadouts();
     this.draw();
     this.preview.schedule(0);
   }
 
   private previewInput(): RenderInput | undefined {
-    if (!this.audio) return undefined;
-    return {
-      channels: this.audio.channels,
-      sampleRate: this.audio.sampleRate,
-      bounds: { ...this.trim },
-      container: this.container,
-      settings: appState.settings,
-    };
+    if (!this.loaded) return undefined;
+    const { audio, trim, container } = this.loaded;
+    return { ...audio, bounds: trim.range, container, settings: appState.settings };
   }
 
   // ---- playback -----------------------------------------------------------
@@ -275,9 +254,9 @@ export class WaveformEditor {
       this.stop();
       return;
     }
-    if (!this.audio) return;
+    if (!this.loaded) return;
 
-    let source = this.audio;
+    let source = this.loaded.audio;
     if (target === 'processed') {
       await this.preview.flush();
       if (!this.processed) return;
@@ -323,16 +302,17 @@ export class WaveformEditor {
   // ---- readouts -----------------------------------------------------------
 
   private updateReadouts(): void {
-    if (!this.audio || !this.file) return;
+    if (!this.loaded || !this.file) return;
+    const { audio, trim, container } = this.loaded;
     const input = {
       file: this.file,
-      container: this.container,
-      sampleRate: this.audio.sampleRate,
-      channelCount: this.audio.channels.length,
-      totalFrames: this.length,
-      trim: this.trim,
-      isManual: this.hasManual,
-      autoWarning: this.autoBounds?.warning,
+      container,
+      sampleRate: audio.sampleRate,
+      channelCount: audio.channels.length,
+      totalFrames: trim.frames,
+      trim: trim.range,
+      isManual: trim.isManual,
+      autoWarning: trim.autoWarning,
       processedPeak: this.processed?.peak,
       settings: appState.settings,
     };
@@ -348,12 +328,15 @@ export class WaveformEditor {
     return (clientX - rect.left) / Math.max(1, rect.width);
   }
 
-  private hitTestHandle(clientX: number): DragTarget {
+  /** The handle within HANDLE_HIT_PX of the pointer, if any. */
+  private hitTestHandle(clientX: number): TrimHandle | undefined {
+    if (!this.loaded) return undefined;
+    const { start, end } = this.loaded.trim.range;
     const width = this.originalCanvas.getBoundingClientRect().width;
     const x = this.pointerProportion(clientX) * width;
-    const startDist = Math.abs(x - this.viewport.proportionOf(this.trim.start) * width);
-    const endDist = Math.abs(x - this.viewport.proportionOf(this.trim.end) * width);
-    if (Math.min(startDist, endDist) > HANDLE_HIT_PX) return null;
+    const startDist = Math.abs(x - this.viewport.proportionOf(start) * width);
+    const endDist = Math.abs(x - this.viewport.proportionOf(end) * width);
+    if (Math.min(startDist, endDist) > HANDLE_HIT_PX) return undefined;
     return startDist <= endDist ? 'start' : 'end';
   }
 
@@ -361,23 +344,25 @@ export class WaveformEditor {
     const canvas = this.originalCanvas;
 
     canvas.addEventListener('pointerdown', (e) => {
-      if (!this.audio) return;
+      if (!this.loaded) return;
       this.drag = this.hitTestHandle(e.clientX);
       if (this.drag) canvas.setPointerCapture(e.pointerId);
     });
 
     canvas.addEventListener('pointermove', (e) => {
-      if (!this.audio) return;
+      if (!this.loaded) return;
       if (!this.drag) {
         canvas.style.cursor = this.hitTestHandle(e.clientX) ? 'ew-resize' : 'default';
         return;
       }
-      this.moveHandle(this.drag, this.viewport.sampleAt(this.pointerProportion(e.clientX)));
+      this.loaded.trim.moveHandle(this.drag, this.viewport.sampleAt(this.pointerProportion(e.clientX)));
+      this.updateReadouts();
+      this.draw();
     });
 
     const endDrag = (e: PointerEvent) => {
       if (!this.drag) return;
-      this.drag = null;
+      this.drag = undefined;
       if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
       this.commitManualTrim();
     };
@@ -385,9 +370,9 @@ export class WaveformEditor {
     canvas.addEventListener('pointercancel', endDrag);
 
     canvas.addEventListener('dblclick', (e) => {
-      if (!this.audio) return;
+      if (!this.loaded) return;
       if (this.hitTestHandle(e.clientX)) {
-        this.clearManualTrim();
+        this.revertToAutoTrim();
       } else {
         this.viewport.reset();
         this.draw();
@@ -397,16 +382,8 @@ export class WaveformEditor {
     canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
   }
 
-  private moveHandle(handle: 'start' | 'end', sample: number): void {
-    const clamped = Math.round(Math.max(0, Math.min(this.length, sample)));
-    if (handle === 'start') this.trim.start = Math.min(clamped, this.trim.end - 1);
-    else this.trim.end = Math.max(clamped, this.trim.start + 1);
-    this.updateReadouts();
-    this.draw();
-  }
-
   private handleWheel(e: WheelEvent): void {
-    if (!this.audio) return;
+    if (!this.loaded) return;
     e.preventDefault();
     if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
       this.viewport.pan(e.deltaX !== 0 ? e.deltaX : e.deltaY);
@@ -419,21 +396,23 @@ export class WaveformEditor {
   // ---- drawing ------------------------------------------------------------
 
   private draw(): void {
-    if (!this.audio || !this.original) return;
+    if (!this.loaded) return;
+    const { original, trim } = this.loaded;
+    const { start, end } = trim.range;
     const colors = readColors(this.element);
 
     const top = prepareCanvas(this.originalCanvas);
     if (top) {
       const { ctx, dpr } = top;
       const width = ctx.canvas.width;
-      drawWave(ctx, this.original, this.viewport, colors.wave);
-      const xStart = this.viewport.proportionOf(this.trim.start) * width;
-      const xEnd = this.viewport.proportionOf(this.trim.end) * width;
+      drawWave(ctx, original, this.viewport, colors.wave);
+      const xStart = this.viewport.proportionOf(start) * width;
+      const xEnd = this.viewport.proportionOf(end) * width;
       dimOutside(ctx, xStart, xEnd, colors.dim);
       drawHandle(ctx, xStart, dpr, colors.success);
       drawHandle(ctx, xEnd, dpr, colors.danger);
       if (this.playback?.target === 'original') {
-        const playheadSample = this.playbackProportion() * this.length;
+        const playheadSample = this.playbackProportion() * trim.frames;
         drawPlayhead(ctx, this.viewport.proportionOf(playheadSample) * width, dpr, colors.accent);
       }
     }
