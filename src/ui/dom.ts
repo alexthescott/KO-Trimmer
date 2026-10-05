@@ -1,7 +1,12 @@
 type Attrs = Record<string, string | number | boolean | undefined | ((e: Event) => void)>;
 type Child = Node | string | null | undefined;
 
-export function h(tag: string, attrs: Attrs = {}, children: Child[] = []): HTMLElement {
+/** Creates an element typed by its tag: h('input') is an HTMLInputElement. */
+export function h<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  attrs: Attrs = {},
+  children: Child[] = [],
+): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
     if (value === undefined || value === false) continue;

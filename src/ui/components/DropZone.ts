@@ -36,7 +36,7 @@ export class DropZone {
       multiple: true,
       webkitdirectory: true,
       style: 'display:none',
-    }) as HTMLInputElement;
+    });
     this.fallbackInput.addEventListener('change', async () => {
       const files = Array.from(this.fallbackInput.files ?? []);
       const entries = files.map((file) => ({

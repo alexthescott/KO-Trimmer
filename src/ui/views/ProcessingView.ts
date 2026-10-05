@@ -38,10 +38,10 @@ export class ProcessingView {
 
     this.stopButton = h('button', { class: 'danger', onclick: () => this.handleStop() }, [
       'Stop Processing',
-    ]) as HTMLButtonElement;
+    ]);
     this.closeButton = h('button', { disabled: true, onclick: () => this.onDone() }, [
       'Close',
-    ]) as HTMLButtonElement;
+    ]);
 
     this.element = h('div', { class: 'main-column' }, [
       h('div', { class: 'panel' }, [

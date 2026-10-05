@@ -93,7 +93,7 @@ function numberInput(
     max: range.max,
     step: range.step,
     value: String(value),
-  }) as HTMLInputElement;
+  });
   input.addEventListener('change', () => {
     const v = Math.min(range.max, Math.max(range.min, Number(input.value)));
     onChange(v);
@@ -116,7 +116,7 @@ function sliderInput(
     max: range.max,
     step: range.step,
     value: String(value),
-  }) as HTMLInputElement;
+  });
   const readout = h('span', { class: 'readout' }, [format(value)]);
   input.addEventListener('input', () => {
     const v = Number(input.value);
@@ -133,7 +133,7 @@ function bitrateSelect(value: BitrateKbps, onChange: (v: BitrateKbps) => void): 
     BITRATE_OPTIONS.map((kbps) =>
       h('option', { value: String(kbps), selected: kbps === value }, [`${kbps} kbps`]),
     ),
-  ) as HTMLSelectElement;
+  );
   select.addEventListener('change', () => onChange(Number(select.value) as BitrateKbps));
   return select;
 }
@@ -144,7 +144,7 @@ function sampleRateSelect(value: number | null, onChange: (v: number | null) => 
     ...WAV_SAMPLE_RATE_OPTIONS.map((hz) =>
       h('option', { value: String(hz), selected: hz === value }, [`${hz / 1000} kHz`]),
     ),
-  ]) as HTMLSelectElement;
+  ]);
   select.addEventListener('change', () => onChange(select.value === '' ? null : Number(select.value)));
   return select;
 }
@@ -155,7 +155,7 @@ function checkboxRow(
   helpText: string,
   onChange: (checked: boolean) => void,
 ): HTMLElement {
-  const checkbox = h('input', { type: 'checkbox', checked }) as HTMLInputElement;
+  const checkbox = h('input', { type: 'checkbox', checked });
   checkbox.addEventListener('change', () => onChange(checkbox.checked));
   return h('div', { class: 'checkbox-row' }, [checkbox, h('label', {}, [labelText]), h('small', {}, [helpText])]);
 }

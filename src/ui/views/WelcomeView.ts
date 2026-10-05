@@ -5,7 +5,7 @@ export class WelcomeView {
   element: HTMLElement;
 
   constructor(onDone: () => void) {
-    const showOnStartupCheckbox = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement;
+    const showOnStartupCheckbox = h('input', { type: 'checkbox', checked: true });
 
     const finish = () => {
       saveShowWelcome(showOnStartupCheckbox.checked);

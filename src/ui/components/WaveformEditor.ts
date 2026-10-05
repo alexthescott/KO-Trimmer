@@ -79,15 +79,15 @@ export class WaveformEditor {
     this.trimInfoEl = h('div', { class: 'readout muted' });
     this.placeholderEl = h('p', { class: 'muted' }, [NO_FILE_TEXT]);
 
-    this.originalCanvas = h('canvas', { class: 'wave-canvas wave-original' }) as HTMLCanvasElement;
-    this.processedCanvas = h('canvas', { class: 'wave-canvas wave-processed' }) as HTMLCanvasElement;
+    this.originalCanvas = h('canvas', { class: 'wave-canvas wave-original' });
+    this.processedCanvas = h('canvas', { class: 'wave-canvas wave-processed' });
 
     this.playOriginalButton = h('button', { onclick: () => this.togglePlay('original') }, [
       'Play Original',
-    ]) as HTMLButtonElement;
+    ]);
     this.playProcessedButton = h('button', { onclick: () => this.togglePlay('processed') }, [
       'Play Processed',
-    ]) as HTMLButtonElement;
+    ]);
 
     this.bodyEl = h('div', { class: 'wave-body', style: 'display:none' }, [
       h('div', { class: 'wave-label' }, ['Original']),

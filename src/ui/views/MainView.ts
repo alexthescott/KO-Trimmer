@@ -44,7 +44,7 @@ export class MainView {
       class: 'primary',
       disabled: true,
       onclick: () => void this.handleProcess(onProcess),
-    }, ['Process Files']) as HTMLButtonElement;
+    }, ['Process Files']);
 
     const clearButton = h('button', { onclick: () => this.handleClear() }, ['Clear All']);
     const chooseOutputButton = h('button', { onclick: () => this.handleChooseOutputDirectory() }, [
