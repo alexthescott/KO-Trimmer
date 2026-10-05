@@ -1,6 +1,12 @@
 import type { ProcessingStage } from '../app/types';
 import type { PipelineOutput } from '../audio/pipeline';
-import type { CancelJobRequest, ProcessJobRequest, QueuedJob, WorkerOutMessage } from './protocol';
+import {
+  UnsupportedWavError,
+  type CancelJobRequest,
+  type ProcessJobRequest,
+  type QueuedJob,
+  type WorkerOutMessage,
+} from './protocol';
 
 export type { QueuedJob } from './protocol';
 
@@ -17,9 +23,15 @@ interface PendingEntry {
   reject: (err: Error) => void;
 }
 
+/**
+ * One worker per core, leaving one for the main thread. Capped because each
+ * busy worker holds a whole file's PCM plus pipeline intermediates.
+ */
+const MAX_WORKERS = 8;
+
 function defaultPoolSize(): number {
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : 4;
-  return Math.min(4, Math.max(1, (cores || 4) - 1));
+  return Math.min(MAX_WORKERS, Math.max(1, (cores || 4) - 1));
 }
 
 /**
@@ -82,7 +94,7 @@ export class WorkerPool {
     if (!entry) return;
 
     if (msg.type === 'error') {
-      entry.reject(new Error(msg.message));
+      entry.reject(msg.unsupportedWav ? new UnsupportedWavError() : new Error(msg.message));
       return;
     }
 
@@ -113,7 +125,7 @@ export class WorkerPool {
     this.pendingByJobId.set(jobId, entry);
 
     worker.postMessage({ type: 'process', jobId, ...entry.job } satisfies ProcessJobRequest, {
-      transfer: entry.job.channels.map((c) => c.buffer),
+      transfer: entry.job.source.kind === 'pcm' ? entry.job.source.channels.map((c) => c.buffer) : [],
     });
   }
 

@@ -6,7 +6,7 @@ import { WorkerPool, type JobResult } from '../workers/workerPool';
 import type { OutputSink } from '../fs/outputWriter';
 import { overwriteSourceFile, canOverwrite } from '../fs/overwriteWriter';
 import { formatLabel, sameFormat } from '../audio/sampleFormat';
-import { errorMessage } from '../workers/protocol';
+import { errorMessage, UnsupportedWavError, type JobSource, type QueuedJob } from '../workers/protocol';
 import { forEachConcurrent } from './concurrency';
 
 /**
@@ -61,7 +61,11 @@ export async function processBatch(
   return summary;
 }
 
-/** Decode (main thread) -> pipeline (worker) -> write. Never throws: failures become an outcome. */
+/**
+ * Decode -> pipeline (worker) -> write. WAV is decoded in the worker; other
+ * formats (and WAV the worker can't read) via decodeAudioData on the main
+ * thread. Never throws: failures become an outcome.
+ */
 async function processFile(
   file: FileEntry,
   settings: ProcessingSettings,
@@ -72,22 +76,31 @@ async function processFile(
   if (signal.aborted) return { kind: 'skipped' };
   appState.updateFile(file.id, { status: 'processing' });
   try {
-    const { channels, sampleRate } = await decodeAudioFile(await file.file.arrayBuffer(), file.sourceSampleRate);
-    const result = await pool.enqueue({
+    const job: Omit<QueuedJob, 'source'> = {
       fileId: file.id,
-      channels,
-      sampleRate,
       ...splitNameAndExtension(file.name),
       settings,
       originalBytes: file.size,
       sourceFormat: file.sourceFormat,
       manualTrim: file.manualTrim,
-    });
+    };
+    const source: JobSource = job.extension === 'wav' ? { kind: 'wav', file: file.file } : await decodeOnMainThread(file);
+    const result = await pool
+      .enqueue({ ...job, source })
+      .catch(async (err) => {
+        if (!(err instanceof UnsupportedWavError)) throw err;
+        return pool.enqueue({ ...job, source: await decodeOnMainThread(file) });
+      });
     if (result.aborted) return { kind: 'skipped' };
     return { kind: 'done', result: await writeOutput(file, result, settings, outputSink) };
   } catch (err) {
     return signal.aborted ? { kind: 'skipped' } : { kind: 'error', message: errorMessage(err) };
   }
+}
+
+async function decodeOnMainThread(file: FileEntry): Promise<JobSource> {
+  const { channels, sampleRate } = await decodeAudioFile(await file.file.arrayBuffer(), file.sourceSampleRate);
+  return { kind: 'pcm', channels, sampleRate };
 }
 
 /** Overwrites the source when enabled and possible, else writes to the sink; returns the result with any added warning. */

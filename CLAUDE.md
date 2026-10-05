@@ -47,7 +47,8 @@ src/
               pipeline.ts (renderAudible = trim/mono/speed/resample, shared by
               runPipeline and the editor preview; computeAutoTrimBounds shared with
               the estimator), audioContext.ts + player.ts (preview playback, main
-              thread only)
+              thread only), wavDecoder.ts (worker-side WAV decode),
+              decode.ts (main-thread decodeAudioData)
   fs/         File System Access API: capabilities, directoryPicker
               (pickWritableDirectory), dragDropEntries (TRIMMED_SUFFIX), permissions
               (ensureReadWrite),
@@ -70,16 +71,22 @@ scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.
 ```
 
 **Processing pipeline (fixed order, `audio/pipeline.ts`):**
-decode (main thread, `decodeAudioData` at the file's native rate — see below) → trim →
-mono/stereo → speed-up → WAV sample-rate reduction → encode at bit depth / MP3 bitrate
-(worker thread). Decode is isolated per-file (try/catch) so one bad file never aborts
-the batch.
+decode → trim → mono/stereo → speed-up → WAV sample-rate reduction → encode at bit
+depth / MP3 bitrate (worker thread). WAV is decoded in the worker by the pure-JS
+`audio/wavDecoder.ts` (PCM 8–32-bit int / 32–64-bit float; scaling matches
+`decodeAudioData`); other formats, and WAV it can't read (ADPCM etc. — the worker
+replies `unsupportedWav` and the file is retried), decode on the main thread via
+`decodeAudioData` at the file's native rate (see below). Decode is isolated per-file
+(try/catch) so one bad file never aborts the batch. `processBatch` keeps at most
+pool size + 2 files in flight (`app/concurrency.ts`) so memory stays flat on
+thousand-file batches; the pool is `min(8, cores − 1)` workers. Per-file status changes
+emit `file-updated` (not `files-changed`), and tables patch that one row in place.
 
 **Output container:** always `.wav` or `.mp3`, matching input when the input is mp3,
 else `.wav` — there's no browser encoder for flac/aiff/m4a/ogg, so anything else decodes
 fine but re-encodes as lossless WAV.
 
-**Native-rate decode:** `decodeAudioData` resamples to its context's rate, and a live
+**Native-rate decode** (non-WAV, and the editor/estimate): `decodeAudioData` resamples to its context's rate, and a live
 `AudioContext` runs at the output device's rate (often 48 kHz) — so decoding through it
 made "Original" output depend on the user's audio interface. `audio/decode.ts` instead
 decodes through an `OfflineAudioContext` at `FileEntry.sourceSampleRate` (read from the
