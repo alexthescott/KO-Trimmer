@@ -56,6 +56,8 @@ export interface FileEntry {
   stage?: ProcessingStage;
   /** Bit depth read from the file header; undefined for lossy/unknown formats. */
   sourceFormat?: SampleFormat;
+  /** Native sample rate from the header; decode runs at this rate instead of the device's. */
+  sourceSampleRate?: number;
   /** Manually dragged trim points in source samples (end exclusive); overrides auto-detect. */
   manualTrim?: { start: number; end: number };
 }

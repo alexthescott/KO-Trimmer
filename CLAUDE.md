@@ -38,7 +38,8 @@ src/
               fileEntries.ts, types.ts
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
               sampleRateResample, wavEncoder, mp3Encoder, naming, sampleFormat.ts
-              (source bit-depth header parsing + output format), estimate.ts
+              (source header parsing: bit depth + native sample rate; output format),
+              estimate.ts
               (output-size prediction), pipeline.ts (orchestrates the fixed stage
               order below; also exports computeAutoTrimBounds + renderPreview, the
               shared code paths the editor and estimator use), player.ts (preview
@@ -59,13 +60,21 @@ scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.
 ```
 
 **Processing pipeline (fixed order, `audio/pipeline.ts`):**
-decode (main thread, `AudioContext.decodeAudioData`) → trim → mono/stereo → speed-up →
-WAV sample-rate reduction → encode at bit depth / MP3 bitrate (worker thread). Decode is
-isolated per-file (try/catch) so one bad file never aborts the batch.
+decode (main thread, `decodeAudioData` at the file's native rate — see below) → trim →
+mono/stereo → speed-up → WAV sample-rate reduction → encode at bit depth / MP3 bitrate
+(worker thread). Decode is isolated per-file (try/catch) so one bad file never aborts
+the batch.
 
 **Output container:** always `.wav` or `.mp3`, matching input when the input is mp3,
 else `.wav` — there's no browser encoder for flac/aiff/m4a/ogg, so anything else decodes
 fine but re-encodes as lossless WAV.
+
+**Native-rate decode:** `decodeAudioData` resamples to its context's rate, and a live
+`AudioContext` runs at the output device's rate (often 48 kHz) — so decoding through it
+made "Original" output depend on the user's audio interface. `audio/decode.ts` instead
+decodes through an `OfflineAudioContext` at `FileEntry.sourceSampleRate` (read from the
+header: WAV/AIFF/FLAC/MP3/Ogg; Opus = 48 kHz). M4A is deliberately left unparsed (HE-AAC
+under-reports its rate) and falls back to the device rate.
 
 **WAV sample rate vs. MP3 bitrate** are separate settings (they used to be one
 "bitrate" control that silently meant sample-rate reduction for WAV).
@@ -74,11 +83,12 @@ once.
 
 **Bit depth:** `decodeAudioData` always yields float32, so the source bit depth is read
 from the file header (`audio/sampleFormat.ts`: WAV incl. EXTENSIBLE/RF64, AIFF/AIFC,
-FLAC; first 64 KB, probed once in `app/fileEntries.ts` → `FileEntry.sourceFormat`). WAV
-output is 16-bit PCM by default; "Preserve Bit Depth" keeps the source format
-(8/16/24/32-bit int or 32-bit float). Conversions are surfaced in the editor size line,
-a `32f→16` tag in the file table, and the results summary; integer output of a float
-source peaking above 0 dBFS gets a clip warning.
+FLAC; first 64 KB, probed once in `app/fileEntries.ts` → `FileEntry.sourceFormat`, with
+a second small read past oversized MP3 ID3 tags). WAV output is 16-bit PCM by default;
+"Preserve Bit Depth" keeps the source format (8/16/24/32-bit int or 32-bit float).
+Conversions are surfaced in the editor size line, a `32f→16` tag in the file table, and
+the results summary; integer output of a float source peaking above 0 dBFS gets a clip
+warning.
 
 **File-system capability tiers** (`fs/capabilities.ts`): **Full** (Chrome, File System
 Access API) — true overwrite, directory-handle output writing, persisted favorites.

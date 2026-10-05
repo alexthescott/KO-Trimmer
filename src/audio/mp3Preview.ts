@@ -30,5 +30,6 @@ export async function mp3RoundTrip(channels: Float32Array[], sampleRate: number,
     pending.set(id, { resolve, reject });
     getWorker().postMessage({ id, channels, sampleRate, kbps } satisfies Mp3PreviewRequest);
   });
-  return decodeAudioFile(bytes.buffer as ArrayBuffer);
+  // Decode at the encoded rate so the preview isn't resampled to the device rate.
+  return decodeAudioFile(bytes.buffer as ArrayBuffer, sampleRate);
 }

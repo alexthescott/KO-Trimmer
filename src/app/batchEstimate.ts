@@ -104,7 +104,7 @@ export class BatchEstimator {
 
 /** Reuses the editor's decoded audio when it's already in memory. */
 async function decodeForEstimate(file: FileEntry): Promise<DecodedAudio> {
-  return peekDecoded(file.id) ?? decodeAudioFile(await file.file!.arrayBuffer());
+  return peekDecoded(file.id) ?? decodeAudioFile(await file.file!.arrayBuffer(), file.sourceSampleRate);
 }
 
 function extensionOf(name: string): string {

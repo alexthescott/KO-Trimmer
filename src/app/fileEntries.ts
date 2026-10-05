@@ -1,6 +1,6 @@
 import type { DroppedEntry } from '../fs/dragDropEntries';
 import type { FileEntry } from './types';
-import { FORMAT_PROBE_BYTES, parseSampleFormat } from '../audio/sampleFormat';
+import { FORMAT_PROBE_BYTES, id3v2Length, parseSourceInfo, type SourceInfo } from '../audio/sampleFormat';
 
 export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[]> {
   const result: FileEntry[] = [];
@@ -16,7 +16,7 @@ export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[
       fileHandle: entry.fileHandle,
       file,
       status: 'queued',
-      sourceFormat: await probeSampleFormat(file),
+      ...(await probeSource(file)),
     });
   }
   return result;
@@ -28,11 +28,22 @@ export function deriveRootName(entries: DroppedEntry[]): string | undefined {
   return withSlash?.relativePath.split('/')[0];
 }
 
-/** Reads just the header bytes; a probe failure only means no bit-depth info. */
-async function probeSampleFormat(file: File) {
+/**
+ * Reads just the header bytes for bit depth + native sample rate. An MP3 whose
+ * ID3 tag (e.g. embedded artwork) outgrows the probe gets a second small read
+ * past the tag. A probe failure only means no header info.
+ */
+async function probeSource(file: File): Promise<{ sourceFormat?: SourceInfo['format']; sourceSampleRate?: number }> {
   try {
-    return parseSampleFormat(new Uint8Array(await file.slice(0, FORMAT_PROBE_BYTES).arrayBuffer()));
+    const extension = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase();
+    let bytes = new Uint8Array(await file.slice(0, FORMAT_PROBE_BYTES).arrayBuffer());
+    const tagLength = id3v2Length(bytes);
+    if (tagLength > FORMAT_PROBE_BYTES - 4096) {
+      bytes = new Uint8Array(await file.slice(tagLength, tagLength + 4096).arrayBuffer());
+    }
+    const info = parseSourceInfo(bytes, extension);
+    return { sourceFormat: info.format, sourceSampleRate: info.sampleRate };
   } catch {
-    return undefined;
+    return {};
   }
 }

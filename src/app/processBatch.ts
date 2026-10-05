@@ -71,7 +71,7 @@ export async function processBatch(
     appState.updateFile(file.id, { status: 'processing' });
     try {
       const arrayBuffer = await file.file!.arrayBuffer();
-      const { channels, sampleRate } = await decodeAudioFile(arrayBuffer);
+      const { channels, sampleRate } = await decodeAudioFile(arrayBuffer, file.sourceSampleRate);
       const { baseName, extension } = splitNameAndExtension(file.name);
 
       const result = await pool.enqueue({
