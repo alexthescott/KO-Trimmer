@@ -1,4 +1,4 @@
-# KO Trimmer
+# Sample Trimmer
 
 Batch silence-trimmer for beatmakers with limited sample storage on hardware devices
 (Teenage Engineering OP-1/OP-Z/EP series, Pocket Operators, MPC). Trims silence from the
@@ -9,7 +9,7 @@ reduction, and tape-style speed-up to squeeze samples into tight device memory.
 installable from Chrome, works offline, no download or FFmpeg required. All audio
 processing and file reading/writing happens locally in your browser.
 
-![KO Trimmer web app — file list and waveform editor](docs/screenshots/main.png)
+![Sample Trimmer web app — file list and waveform editor](docs/screenshots/main.png)
 
 ## How to use
 

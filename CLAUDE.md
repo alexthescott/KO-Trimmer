@@ -1,4 +1,4 @@
-# KO Trimmer
+# Sample Trimmer
 
 Batch audio silence-trimmer for beatmakers with limited sample storage on hardware
 devices (Teenage Engineering OP-1/OP-Z/EP series, Pocket Operators, MPC). Detects and
@@ -8,10 +8,10 @@ fit tight device memory limits.
 
 ## Overview
 
-Progressive Web App — installable from Chrome, works offline, and does all audio
-decode/trim/resample/encode and all file reading/writing locally in the browser. No
-server, no install, no FFmpeg dependency. Vanilla TypeScript + Vite, no UI framework
-runtime; lives at the repo root.
+Progressive Web App (formerly "KO Trimmer") — installable from Chrome, works offline,
+and does all audio decode/trim/resample/encode and all file reading/writing locally in
+the browser. No server, no install, no FFmpeg dependency. Vanilla TypeScript + Vite, no
+UI framework runtime; lives at the repo root.
 
 ```bash
 npm install
@@ -47,7 +47,8 @@ src/
   workers/    processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
               (pooled, AbortController-based cancellation)
   ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
-              WaveformEditor, SettingsPanel, FavoritesSidebar, ResultsSummary)
+              WaveformEditor, SettingsPanel, FavoritesSidebar, ResultsSummary,
+              AboutDialog — fixed bottom-left About button + modal)
   settings/   settingsManager.ts — localStorage persistence
   pwa/        registerSW.ts (vite-plugin-pwa)
 tests/unit/       Vitest specs for every pure audio/ module — run these first when
@@ -121,7 +122,7 @@ Canonical source: `src/audio/settingsDefaults.ts`.
 | Setting | Range | Default |
 |---|---|---|
 | Silence threshold | -60 to 0 dB | -50 dB |
-| Min silence duration | 100–10000 ms | 1000 ms |
+| Min silence duration | 10–10000 ms | 10 ms |
 | Padding | 0–1000 ms | 20 ms |
 | Speed-up | 1.0x–3.0x | 1.0x (off) |
 | Bitrate | 320/192/160/128/96/64 kbps | 320 (no reduction) |

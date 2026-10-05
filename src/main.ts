@@ -5,13 +5,14 @@ import { WelcomeView } from './ui/views/WelcomeView';
 import { MainView } from './ui/views/MainView';
 import { ProcessingView } from './ui/views/ProcessingView';
 import { registerServiceWorker } from './pwa/registerSW';
+import { renderAboutButton } from './ui/components/AboutDialog';
 
 const root = document.getElementById('app')!;
 
 function renderHeader(): HTMLElement {
   const header = document.createElement('div');
   header.className = 'app-header';
-  header.innerHTML = `<h1>KO Trimmer</h1><span class="muted">Runs entirely in your browser — nothing is uploaded.</span>`;
+  header.innerHTML = `<h1>Sample Trimmer</h1>`;
   return header;
 }
 
@@ -33,7 +34,7 @@ function showProcessing(): void {
 }
 
 function renderBody(viewEl: HTMLElement): void {
-  root.replaceChildren(renderHeader(), viewEl);
+  root.replaceChildren(renderHeader(), viewEl, renderAboutButton());
   if (welcomeOverlay) root.append(welcomeOverlay);
 }
 

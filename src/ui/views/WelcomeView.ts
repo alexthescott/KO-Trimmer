@@ -30,7 +30,7 @@ export class WelcomeView {
 
     this.element = h('div', { class: 'modal-overlay' }, [
       h('div', { class: 'modal' }, [
-        h('h2', {}, ['Welcome to KO Trimmer']),
+        h('h2', {}, ['Welcome to Sample Trimmer']),
         h('p', {}, [
           'Batch-trim silence from your samples right in the browser — no install, nothing ever leaves your device. Built for sample-limited hardware like the OP-1/OP-Z, Pocket Operators, and MPC.',
         ]),

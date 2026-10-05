@@ -39,7 +39,7 @@ body {
 #app {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px 16px;
+  padding: 24px 16px 64px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -479,6 +479,14 @@ input[type='checkbox'] {
   font-family: var(--mono);
   font-size: 0.78rem;
   white-space: pre-wrap;
+}
+
+.about-button {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 5;
+  background: var(--bg);
 }
 
 .modal-overlay {

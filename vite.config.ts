@@ -18,8 +18,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png'],
       manifest: {
-        name: 'KO Trimmer',
-        short_name: 'KO Trimmer',
+        name: 'Sample Trimmer',
+        short_name: 'Sample Trimmer',
         description:
           'Batch audio silence trimmer for sample-limited hardware (OP-1/OP-Z, Pocket Operators, MPC). Runs entirely offline in your browser.',
         start_url: '.',

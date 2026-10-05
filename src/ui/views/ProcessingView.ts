@@ -92,7 +92,7 @@ export class ProcessingView {
     if (appState.outputRootHandle) {
       return new FsAccessOutputSink(appState.outputRootHandle);
     }
-    const zipName = `${appState.rootName ?? 'ko-trimmer-output'}_trimmed.zip`;
+    const zipName = `${appState.rootName ?? 'sample-trimmer-output'}_trimmed.zip`;
     return new ZipOutputSink(zipName);
   }
 
