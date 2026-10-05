@@ -33,17 +33,22 @@ path is `/KO-Trimmer/` (`vite.config.ts`), matching this repo's Pages project-pa
 src/
   app/        state.ts (single source of truth for files/settings/output
               root), events.ts (typed pub/sub), processBatch.ts (orchestrates a batch
-              run: processFile -> recordOutcome -> tally), decodedCache.ts (3-entry LRU
-              of decoded audio for the editor), batchEstimate.ts (progressive per-file
-              + whole-batch size estimate), fileNames.ts (the one name/extension
-              splitter), fileEntries.ts, types.ts (incl. SampleRange)
+              run: processFile -> outcomePatch -> tally; takes an onFileUpdate callback
+              + injectable pool, never touches appState), decodedCache.ts (3-entry LRU
+              of decoded audio for the editor; decodeEntry), batchEstimate.ts
+              (progressive per-file + whole-batch size estimate), fileNames.ts (the one
+              name/extension splitter), errors.ts (errorMessage), fileEntries.ts,
+              types.ts (incl. SampleRange)
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
               sampleRateResample, wavEncoder, mp3Encoder, naming (filename + KO II
-              length rule), channels.ts (frameCount/sampleAt/floatToInt helpers),
+              length rule), channels.ts (PcmAudio type, frameCount/sampleAt/floatToInt,
+              AudioBuffer copies), iffChunks.ts (RIFF/AIFF chunk walk + WAV format
+              tags, shared by sourceHeader/wavDecoder/wavEncoder),
               outputContainer.ts (the one "mp3 stays mp3, else wav" rule + output
               sample format), sourceHeader.ts (header parsing: bit depth + native
               sample rate), sampleFormat.ts (SampleFormat, output bit-depth policy,
-              labels, clip warning), estimate.ts (output-size prediction),
+              labels, clip warning), estimate.ts (output-size prediction; reuses
+              speedUpLength/resampledLength so it can't drift from the pipeline),
               pipeline.ts (renderAudible = trim/mono/speed/resample, shared by
               runPipeline and the editor preview; computeAutoTrimBounds shared with
               the estimator), audioContext.ts + player.ts (preview playback, main
@@ -54,6 +59,7 @@ src/
               (ensureReadWrite),
               outputWriter (FS Access sink; OPFS-backed ZIP sink; in-memory
               split-ZIP fallback), asyncQueue (backpressured producer→stream),
+              archivePaths (de-duplicated ZIP entry names), writeFile,
               overwriteWriter (true in-place overwrite; canOverwrite)
   workers/    protocol.ts (message types built on PipelineRequest/PipelineOutput),
               processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
@@ -61,11 +67,13 @@ src/
   ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
               WaveformEditor + waveform/ [Viewport, PreviewRenderer, readouts, draw],
               SettingsPanel, ResultsSummary, AboutDialog — fixed
-              bottom-left About button + modal)
+              bottom-left About button + modal); dom.ts (h() element helper),
+              format.ts (bytes/percent/plural/duration formatting)
   settings/   settingsManager.ts — localStorage persistence
   pwa/        registerSW.ts (vite-plugin-pwa)
 tests/unit/       Vitest specs for every pure audio/ module plus the pure logic pulled
-                  out of the UI (Viewport, readouts, fileNames, settings migration) —
+                  out of the UI (Viewport, readouts, fileNames, settings migration),
+                  plus processBatch/BatchEstimator with faked pool/decoder —
                   run these first when touching DSP logic; they encode the exact
                   algorithms below.
 scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.svg)
