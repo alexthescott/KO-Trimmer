@@ -7,6 +7,8 @@ import type { DecodedAudio } from '../../audio/decode';
 import type { TrimBounds } from '../../audio/trim';
 import { computeAutoTrimBounds, renderPreview } from '../../audio/pipeline';
 import { estimateOutputBytes } from '../../audio/estimate';
+import { mp3RoundTrip } from '../../audio/mp3Preview';
+import { resolveWavSampleRate } from '../../audio/sampleRateResample';
 import { clipWarning, formatLabel, peakAbs, resolveOutputFormat, sameFormat } from '../../audio/sampleFormat';
 import { playChannels, stopPlayback, type PlaybackHandle } from '../../audio/player';
 
@@ -22,8 +24,6 @@ interface Peaks {
 interface Playback {
   target: 'original' | 'processed';
   handle: PlaybackHandle;
-  /** Trim region at play time, so dragging handles mid-playback doesn't move the playhead. */
-  trimSnapshot: { start: number; end: number };
 }
 
 type DragTarget = 'start' | 'end' | null;
@@ -250,13 +250,22 @@ export class WaveformEditor {
   private async renderProcessed(): Promise<void> {
     if (!this.audio) return;
     const token = ++this.previewToken;
-    const result = await renderPreview(
+    const settings = appState.settings;
+    let result = await renderPreview(
       this.audio.channels,
       this.audio.sampleRate,
       { start: this.trim.start, end: this.trim.end },
       this.extension,
-      appState.settings,
+      settings,
     );
+    // MP3 output: preview what the encoder will actually produce at this bitrate.
+    if (this.extension === 'mp3' && settings.bitrateKbps < 320 && (result.channels[0]?.length ?? 0) > 0) {
+      try {
+        result = await mp3RoundTrip(result.channels, result.sampleRate, settings.bitrateKbps);
+      } catch {
+        // Fall back to the un-encoded preview rather than showing nothing.
+      }
+    }
     if (token !== this.previewToken) return;
     this.processed = { ...result, peaks: computePeaks(result.channels), peak: peakAbs(result.channels) };
     this.updateReadouts();
@@ -290,12 +299,11 @@ export class WaveformEditor {
       sampleRate = this.processed.sampleRate;
     }
 
-    const trimSnapshot = { ...this.trim };
     const handle = playChannels(channels, sampleRate, () => {
       if (this.playback?.handle === handle) this.endPlayback();
     });
     if (!handle) return;
-    this.playback = { target, handle, trimSnapshot };
+    this.playback = { target, handle };
     this.updateButtons();
     this.tick();
   }
@@ -353,7 +361,11 @@ export class WaveformEditor {
           ? ` · ${formatLabel(source)}${appState.settings.preserveBitDepth ? ' (kept)' : ''}`
           : ` · ${formatLabel(source)} → ${formatLabel(outputFormat)}`
         : '';
-    this.sizeEl.textContent = `${formatBytes(this.file.size)} → ~${formatBytes(estimate)} (${pct >= 0 ? '−' : '+'}${Math.abs(pct)}%)${depth}`;
+    const targetRate = outputFormat ? resolveWavSampleRate(sr, appState.settings.wavSampleRateHz) : undefined;
+    const rate = targetRate !== undefined ? ` · ${sr / 1000} → ${targetRate / 1000} kHz` : '';
+    const mp3 = this.extension === 'mp3' ? ` · ${appState.settings.bitrateKbps} kbps MP3` : '';
+    this.sizeEl.textContent =
+      `${formatBytes(this.file.size)} → ~${formatBytes(estimate)} (${pct >= 0 ? '−' : '+'}${Math.abs(pct)}%)${depth}${rate}${mp3}`;
   }
 
   // ---- zoom / pan / drag --------------------------------------------------
@@ -480,13 +492,8 @@ export class WaveformEditor {
       drawHandle(ctx, xStart, height, dpr, colors.success);
       drawHandle(ctx, xEnd, height, dpr, colors.danger);
 
-      if (this.playback) {
-        const p = this.playbackProportion();
-        const sample =
-          this.playback.target === 'original'
-            ? p * this.length
-            : this.playback.trimSnapshot.start + p * (this.playback.trimSnapshot.end - this.playback.trimSnapshot.start);
-        drawPlayhead(ctx, this.sampleToCssX(sample) * dpr, height, dpr, colors.accent);
+      if (this.playback?.target === 'original') {
+        drawPlayhead(ctx, this.sampleToCssX(this.playbackProportion() * this.length) * dpr, height, dpr, colors.accent);
       }
     }
 

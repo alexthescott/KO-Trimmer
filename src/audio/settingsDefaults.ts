@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: ProcessingSettings = {
   preserveStereo: true,
   preserveBitDepth: false,
   bitrateKbps: 320,
+  wavSampleRateHz: null,
   speedMultiplier: 1.0,
   overwrite: false,
 };
@@ -19,5 +20,7 @@ export const SETTINGS_RANGES = {
 } as const;
 
 export const BITRATE_OPTIONS = [320, 192, 160, 128, 96, 64] as const;
+
+export const WAV_SAMPLE_RATE_OPTIONS = [44100, 22050, 16000, 11025, 8000] as const;
 
 export const SUPPORTED_EXTENSIONS = ['wav', 'mp3', 'flac', 'aiff', 'm4a', 'ogg'] as const;

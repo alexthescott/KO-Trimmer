@@ -1,5 +1,5 @@
-import type { BitrateKbps, ProcessingSettings } from '../app/types';
-import { getTargetSampleRate } from './sampleRateResample';
+import type { ProcessingSettings } from '../app/types';
+import { resolveWavSampleRate } from './sampleRateResample';
 import { resolveOutputFormat, type SampleFormat } from './sampleFormat';
 import { wavHeaderBytes } from './wavEncoder';
 
@@ -12,13 +12,13 @@ export interface EstimateInput {
   /** Source bit depth from the file header, if known. */
   sourceFormat?: SampleFormat;
   settings: Pick<ProcessingSettings, 'speedMultiplier' | 'preserveStereo' | 'bitrateKbps'> &
-    Partial<Pick<ProcessingSettings, 'preserveBitDepth'>>;
+    Partial<Pick<ProcessingSettings, 'preserveBitDepth' | 'wavSampleRateHz'>>;
 }
 
 /**
  * Predicts output bytes with the same rules runPipeline applies after the
- * trim: mono downmix, speed-up length rounding, WAV sample-rate reduction
- * as a bitrate proxy, then WAV at the resolved output bit depth or CBR MP3.
+ * trim: mono downmix, speed-up length rounding, WAV sample-rate reduction,
+ * then WAV at the resolved output bit depth or CBR MP3.
  * Ported from the JUCE KOTrimmer's estimateOutputSize.
  */
 export function estimateOutputBytes(input: EstimateInput): number {
@@ -35,14 +35,8 @@ export function estimateOutputBytes(input: EstimateInput): number {
     return Math.round((durationSec * settings.bitrateKbps * 1000) / 8);
   }
 
-  let sampleRate = input.sourceSampleRate;
-  if (settings.bitrateKbps < 320) {
-    const target = getTargetSampleRate(settings.bitrateKbps as BitrateKbps);
-    if (target !== sampleRate) {
-      frames = Math.ceil((frames * target) / sampleRate);
-      sampleRate = target;
-    }
-  }
+  const target = resolveWavSampleRate(input.sourceSampleRate, settings.wavSampleRateHz ?? null);
+  if (target !== undefined) frames = Math.ceil((frames * target) / input.sourceSampleRate);
 
   const format = resolveOutputFormat(input.sourceFormat, settings.preserveBitDepth ?? false);
   return wavHeaderBytes(format) + frames * channels * (format.bits / 8);

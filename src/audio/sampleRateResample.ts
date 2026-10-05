@@ -1,16 +1,9 @@
-import type { BitrateKbps } from '../app/types';
-
 /**
- * Port of audio_utils.py's _get_target_sample_rate lookup table, used as a
- * WAV-only size-reduction proxy for the "bitrate" setting (WAV has no real
- * bitrate concept, so desktop approximates it via sample-rate reduction).
+ * WAV output sample rate for a "max sample rate" setting: returns the target
+ * only when it actually lowers the rate (never upsamples), else undefined.
  */
-export function getTargetSampleRate(bitrateKbps: BitrateKbps): number {
-  if (bitrateKbps >= 192) return 44100;
-  if (bitrateKbps >= 128) return 22050;
-  if (bitrateKbps >= 96) return 16000;
-  if (bitrateKbps >= 64) return 11025;
-  return 8000;
+export function resolveWavSampleRate(sourceRate: number, setting: number | null): number | undefined {
+  return setting !== null && setting < sourceRate ? setting : undefined;
 }
 
 /**

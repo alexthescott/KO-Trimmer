@@ -4,7 +4,7 @@ import { detectSilenceRegions } from './silenceDetector';
 import { computeTrimBounds, sliceChannels, type TrimBounds } from './trim';
 import { downmixToMono } from './mono';
 import { speedUp } from './speedResample';
-import { getTargetSampleRate, resampleToRate } from './sampleRateResample';
+import { resolveWavSampleRate, resampleToRate } from './sampleRateResample';
 import { encodeWav } from './wavEncoder';
 import { encodeMp3 } from './mp3Encoder';
 import { buildOutputFilename } from './naming';
@@ -72,8 +72,9 @@ export async function renderPreview(
   if (!settings.preserveStereo) out = downmixToMono(out);
   if (settings.speedMultiplier > 1.0) out = speedUp(out, settings.speedMultiplier);
   let rate = sampleRate;
-  if (extension !== 'mp3' && settings.bitrateKbps < 320 && (out[0]?.length ?? 0) > 0) {
-    rate = getTargetSampleRate(settings.bitrateKbps);
+  const target = extension === 'mp3' ? undefined : resolveWavSampleRate(sampleRate, settings.wavSampleRateHz);
+  if (target !== undefined && (out[0]?.length ?? 0) > 0) {
+    rate = target;
     out = await resampleToRate(out, sampleRate, rate);
   }
   return { channels: out, sampleRate: rate };
@@ -110,9 +111,9 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   const outputExtension = input.extension === 'mp3' ? 'mp3' : 'wav';
 
   let sampleRate = input.sampleRate;
-  let targetSampleRate: number | undefined;
-  if (outputExtension === 'wav' && settings.bitrateKbps < 320) {
-    targetSampleRate = getTargetSampleRate(settings.bitrateKbps);
+  const targetSampleRate =
+    outputExtension === 'wav' ? resolveWavSampleRate(sampleRate, settings.wavSampleRateHz) : undefined;
+  if (targetSampleRate !== undefined) {
     input.onStage?.('resample');
     channels = await resampleToRate(channels, sampleRate, targetSampleRate);
     sampleRate = targetSampleRate;

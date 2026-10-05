@@ -36,10 +36,23 @@ describe('estimateOutputBytes', () => {
     }
   });
 
-  it('applies WAV sample-rate reduction for bitrate < 320', () => {
+  it('applies the WAV sample-rate setting, ignoring MP3 bitrate', () => {
     const est = estimateOutputBytes({
       trimmedFrames: 44100, sourceChannels: 1, sourceSampleRate: 44100, extension: 'wav',
-      settings: { ...base, bitrateKbps: 128 },
+      settings: { ...base, wavSampleRateHz: 22050 },
+    });
+    expect(est).toBe(44 + 22050 * 2);
+    const bitrateOnly = estimateOutputBytes({
+      trimmedFrames: 44100, sourceChannels: 1, sourceSampleRate: 44100, extension: 'wav',
+      settings: { ...base, bitrateKbps: 64 },
+    });
+    expect(bitrateOnly).toBe(44 + 44100 * 2);
+  });
+
+  it('never upsamples WAV', () => {
+    const est = estimateOutputBytes({
+      trimmedFrames: 22050, sourceChannels: 1, sourceSampleRate: 22050, extension: 'wav',
+      settings: { ...base, wavSampleRateHz: 44100 },
     });
     expect(est).toBe(44 + 22050 * 2);
   });

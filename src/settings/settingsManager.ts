@@ -9,7 +9,8 @@ export function loadSettings(): ProcessingSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const stored = JSON.parse(raw);
+    return migrate({ ...DEFAULT_SETTINGS, ...stored }, stored);
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -38,4 +39,15 @@ export function saveShowWelcome(show: boolean): void {
   } catch {
     // ignore
   }
+}
+
+/**
+ * Settings saved before WAV sample rate was split out of "bitrate" carried
+ * the rate implicitly in bitrateKbps; carry that choice over once.
+ */
+function migrate(settings: ProcessingSettings, stored: Record<string, unknown>): ProcessingSettings {
+  if ('wavSampleRateHz' in stored || settings.bitrateKbps >= 320) return settings;
+  const legacyRate =
+    settings.bitrateKbps >= 192 ? 44100 : settings.bitrateKbps >= 128 ? 22050 : settings.bitrateKbps >= 96 ? 16000 : 11025;
+  return { ...settings, wavSampleRateHz: legacyRate };
 }

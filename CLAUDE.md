@@ -60,12 +60,17 @@ scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.
 
 **Processing pipeline (fixed order, `audio/pipeline.ts`):**
 decode (main thread, `AudioContext.decodeAudioData`) → trim → mono/stereo → speed-up →
-sample-rate/bitrate reduction → encode (worker thread). Decode is isolated per-file
-(try/catch) so one bad file never aborts the batch.
+WAV sample-rate reduction → encode at bit depth / MP3 bitrate (worker thread). Decode is
+isolated per-file (try/catch) so one bad file never aborts the batch.
 
 **Output container:** always `.wav` or `.mp3`, matching input when the input is mp3,
 else `.wav` — there's no browser encoder for flac/aiff/m4a/ogg, so anything else decodes
 fine but re-encodes as lossless WAV.
+
+**WAV sample rate vs. MP3 bitrate** are separate settings (they used to be one
+"bitrate" control that silently meant sample-rate reduction for WAV).
+`settingsManager.ts::migrate` maps an old saved `bitrateKbps` onto `wavSampleRateHz`
+once.
 
 **Bit depth:** `decodeAudioData` always yields float32, so the source bit depth is read
 from the file header (`audio/sampleFormat.ts`: WAV incl. EXTENSIBLE/RF64, AIFF/AIFC,
@@ -114,7 +119,10 @@ folded into the web app rather than maintained separately:
 - **Per-file manual trim overrides**: `FileEntry.manualTrim` (source samples, end
   exclusive) is passed through the worker to `runPipeline`, which uses it in place of
   auto-detection. Settings changes only move handles on files without an override.
-- **Live preview playback before processing** (`audio/player.ts`), with playhead;
+- **Live preview playback before processing** (`audio/player.ts`), with a playhead on
+  whichever waveform is playing; for MP3 inputs below 320 kbps the processed preview is
+  round-tripped through the real encoder (`audio/mp3Preview.ts` +
+  `workers/mp3Preview.worker.ts`) so artifacts are audible;
   Space plays/stops, Up/Down moves the file selection, Delete/Backspace removes the
   selected file (with confirm).
 - **Size estimates**: per-file in the editor and in the file table's Size column
@@ -139,7 +147,8 @@ Canonical source: `src/audio/settingsDefaults.ts`.
 | Min silence duration | 10–10000 ms | 10 ms |
 | Padding | 0–1000 ms | 20 ms |
 | Speed-up | 1.0x–3.0x | 1.0x (off) |
-| Bitrate | 320/192/160/128/96/64 kbps | 320 (no reduction) |
+| WAV sample rate (max; never upsamples) | Original/44.1/22.05/16/11.025/8 kHz | Original |
+| MP3 bitrate (MP3 inputs only) | 320/192/160/128/96/64 kbps | 320 |
 | Preserve stereo | — | on |
 | Preserve bit depth | — | off (16-bit WAV) |
 | Overwrite | — | off |

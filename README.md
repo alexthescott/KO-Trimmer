@@ -17,8 +17,8 @@ processing and file reading/writing happens locally in your browser.
    Every supported sample in it (including subfolders) is queued. Favorite folders can be
    saved in the sidebar for quick access.
 2. **Adjust settings.** Silence threshold, minimum silence duration, padding, speed-up,
-   bitrate, preserve stereo (off = mono downmix), and preserve bit depth (off = 16-bit
-   WAV).
+   WAV sample rate, MP3 bitrate (MP3 files only), preserve stereo (off = mono downmix),
+   and preserve bit depth (off = 16-bit WAV).
 3. **Check the trim.** Selecting a file opens the waveform editor: the green and red handles
    show where leading and trailing silence will be cut. Drag them to override the automatic
    trim for that file (double-click a handle to revert to auto). Press Space to preview, and

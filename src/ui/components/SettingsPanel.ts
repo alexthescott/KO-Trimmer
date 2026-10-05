@@ -1,6 +1,6 @@
 import { h } from '../dom';
 import { appState } from '../../app/state';
-import { BITRATE_OPTIONS, SETTINGS_RANGES } from '../../audio/settingsDefaults';
+import { BITRATE_OPTIONS, SETTINGS_RANGES, WAV_SAMPLE_RATE_OPTIONS } from '../../audio/settingsDefaults';
 import { canOverwrite } from '../../fs/overwriteWriter';
 import type { FileEntry } from '../../app/types';
 
@@ -32,7 +32,16 @@ export class SettingsPanel {
           appState.updateSettings({ speedMultiplier: v }),
         ),
       ),
-      field('Bitrate (kbps)', bitrateSelect(s.bitrateKbps, (v) => appState.updateSettings({ bitrateKbps: v }))),
+      field(
+        'WAV Sample Rate',
+        sampleRateSelect(s.wavSampleRateHz, (v) => appState.updateSettings({ wavSampleRateHz: v })),
+        'Lower = smaller and duller: removes everything above half the rate. Never raises the rate.',
+      ),
+      field(
+        'MP3 Bitrate',
+        bitrateSelect(s.bitrateKbps, (v) => appState.updateSettings({ bitrateKbps: v })),
+        'MP3 files only (they stay MP3). Lower = smaller, more compression artifacts.',
+      ),
     ]);
 
     const checkboxes = h('div', { class: 'settings-grid', style: 'margin-top:12px' }, [
@@ -59,8 +68,12 @@ export class SettingsPanel {
   }
 }
 
-function field(labelText: string, input: HTMLElement): HTMLElement {
-  return h('div', { class: 'field' }, [h('label', {}, [labelText]), input]);
+function field(labelText: string, input: HTMLElement, helpText?: string): HTMLElement {
+  return h('div', { class: 'field' }, [
+    h('label', {}, [labelText]),
+    input,
+    helpText ? h('small', { class: 'muted' }, [helpText]) : null,
+  ]);
 }
 
 function numberInput(
@@ -118,6 +131,17 @@ function bitrateSelect(value: number, onChange: (v: (typeof BITRATE_OPTIONS)[num
     ),
   ) as HTMLSelectElement;
   select.addEventListener('change', () => onChange(Number(select.value) as (typeof BITRATE_OPTIONS)[number]));
+  return select;
+}
+
+function sampleRateSelect(value: number | null, onChange: (v: number | null) => void): HTMLElement {
+  const select = h('select', {}, [
+    h('option', { value: '', selected: value === null }, ['Original']),
+    ...WAV_SAMPLE_RATE_OPTIONS.map((hz) =>
+      h('option', { value: String(hz), selected: hz === value }, [`${hz / 1000} kHz`]),
+    ),
+  ]) as HTMLSelectElement;
+  select.addEventListener('change', () => onChange(select.value === '' ? null : Number(select.value)));
   return select;
 }
 

@@ -9,7 +9,10 @@ export interface ProcessingSettings {
   preserveStereo: boolean;
   /** Keep the source's bit depth (e.g. 32-bit float) instead of writing 16-bit WAV. */
   preserveBitDepth: boolean;
+  /** MP3 output only. */
   bitrateKbps: BitrateKbps;
+  /** WAV output only: max sample rate (only ever lowers it); null = keep original. */
+  wavSampleRateHz: number | null;
   speedMultiplier: number;
   overwrite: boolean;
 }
