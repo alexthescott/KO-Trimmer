@@ -1,6 +1,6 @@
 import type { BitrateKbps } from '../app/types';
 import type { OutputContainer } from './outputContainer';
-import { FULL_MP3_BITRATE } from './settingsDefaults';
+import { FULL_MP3_BITRATE } from './formats';
 
 export interface NamingInput {
   baseName: string; // filename without extension

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { migrateLegacyBitrate } from '../../src/settings/settingsManager';
-import { DEFAULT_SETTINGS } from '../../src/audio/settingsDefaults';
+import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 import type { BitrateKbps } from '../../src/app/types';
 
 const legacy = (bitrateKbps: BitrateKbps) =>

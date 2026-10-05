@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { sizeSummaryText, trimInfoText, type ReadoutInput } from '../../src/ui/components/waveform/readouts';
-import { DEFAULT_SETTINGS } from '../../src/audio/settingsDefaults';
+import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 import type { FileEntry } from '../../src/app/types';
 
 const input = (overrides: Partial<ReadoutInput> = {}): ReadoutInput => ({

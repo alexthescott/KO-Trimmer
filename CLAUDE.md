@@ -45,7 +45,8 @@ src/
               AudioBuffer copies), iffChunks.ts (RIFF/AIFF chunk walk + WAV format
               tags, shared by sourceHeader/wavDecoder/wavEncoder),
               outputContainer.ts (the one "mp3 stays mp3, else wav" rule + output
-              sample format), sourceHeader.ts (header parsing: bit depth + native
+              sample format), formats.ts (MP3 bitrate / WAV rate options),
+              sourceHeader.ts (header parsing: bit depth + native
               sample rate), sampleFormat.ts (SampleFormat, output bit-depth policy,
               labels, clip warning), estimate.ts (output-size prediction; reuses
               speedUpLength/resampledLength so it can't drift from the pipeline),
@@ -69,7 +70,8 @@ src/
               SettingsPanel, ResultsSummary, AboutDialog — fixed
               bottom-left About button + modal); dom.ts (h() element helper),
               format.ts (bytes/percent/plural/duration formatting)
-  settings/   settingsManager.ts — localStorage persistence
+  settings/   defaults.ts (DEFAULT_SETTINGS, SETTINGS_RANGES), settingsManager.ts —
+              localStorage persistence
   pwa/        registerSW.ts (vite-plugin-pwa)
 tests/unit/       Vitest specs for every pure audio/ module plus the pure logic pulled
                   out of the UI (Viewport, readouts, fileNames, settings migration),
@@ -184,7 +186,8 @@ The JUCE app's detector (first/last sample above a peak threshold) was deliberat
 
 ### Settings defaults
 
-Canonical source: `src/audio/settingsDefaults.ts`.
+Canonical source: `src/settings/defaults.ts` (MP3 bitrate / WAV rate option lists:
+`src/audio/formats.ts`).
 
 | Setting | Range | Default |
 |---|---|---|

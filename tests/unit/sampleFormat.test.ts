@@ -5,7 +5,7 @@ import { encodeWav } from '../../src/audio/wavEncoder';
 import { encodeMp3 } from '../../src/audio/mp3Encoder';
 import { estimateOutputBytes } from '../../src/audio/estimate';
 import { runPipeline } from '../../src/audio/pipeline';
-import { DEFAULT_SETTINGS } from '../../src/audio/settingsDefaults';
+import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
 const FLOAT32 = { bits: 32, float: true };
 const PCM24 = { bits: 24, float: false };

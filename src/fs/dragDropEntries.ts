@@ -1,5 +1,7 @@
-import { SUPPORTED_EXTENSIONS } from '../audio/settingsDefaults';
 import { extensionOf } from '../app/fileNames';
+
+/** Audio files picked up from drops and folder walks; everything else is ignored. */
+export const SUPPORTED_EXTENSIONS = ['wav', 'mp3', 'flac', 'aiff', 'm4a', 'ogg'] as const;
 
 /** Suffix of the output folder; folders ending in it are skipped so a re-scan never reprocesses output. */
 export const TRIMMED_SUFFIX = '_trimmed';

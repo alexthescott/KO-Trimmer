@@ -1,6 +1,7 @@
 import { h } from '../dom';
 import { appState } from '../../app/state';
-import { BITRATE_OPTIONS, SETTINGS_RANGES, WAV_SAMPLE_RATE_OPTIONS } from '../../audio/settingsDefaults';
+import { BITRATE_OPTIONS, WAV_SAMPLE_RATE_OPTIONS } from '../../audio/formats';
+import { SETTINGS_RANGES } from '../../settings/defaults';
 import { canOverwrite } from '../../fs/overwriteWriter';
 import type { BitrateKbps } from '../../app/types';
 

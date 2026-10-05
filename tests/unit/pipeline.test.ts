@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderAudible, runPipeline } from '../../src/audio/pipeline';
-import { DEFAULT_SETTINGS } from '../../src/audio/settingsDefaults';
+import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
 const ramp = (n: number) => Float32Array.from({ length: n }, (_, i) => i / n);
 const base = { sampleRate: 44100, container: 'wav' as const, settings: DEFAULT_SETTINGS };

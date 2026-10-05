@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { FileEntry, ProcessStats } from '../../src/app/types';
 import type { JobResult } from '../../src/workers/workerPool';
 import { UnsupportedWavError, type QueuedJob } from '../../src/workers/protocol';
-import { DEFAULT_SETTINGS } from '../../src/audio/settingsDefaults';
+import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
 vi.mock('../../src/app/decodedCache', () => ({
   decodeEntry: async () => ({ channels: [new Float32Array(4)], sampleRate: 44100 }),

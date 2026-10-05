@@ -1,5 +1,6 @@
 import type { ProcessingSettings } from '../app/types';
-import { DEFAULT_SETTINGS, FULL_MP3_BITRATE } from '../audio/settingsDefaults';
+import { FULL_MP3_BITRATE } from '../audio/formats';
+import { DEFAULT_SETTINGS } from './defaults';
 
 // Keys keep the app's old "KO Trimmer" name so saved settings survive the rename.
 const SETTINGS_KEY = 'koTrimmer.settings';

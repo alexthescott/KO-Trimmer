@@ -3,7 +3,7 @@ import { estimateOutputBytes, extrapolateBatchEstimate } from '../../src/audio/e
 import { encodeWav } from '../../src/audio/wavEncoder';
 import { speedUp } from '../../src/audio/speedResample';
 import { runPipeline } from '../../src/audio/pipeline';
-import { DEFAULT_SETTINGS } from '../../src/audio/settingsDefaults';
+import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
 const base = { speedMultiplier: 1.0, preserveStereo: true, bitrateKbps: 320 as const };
 

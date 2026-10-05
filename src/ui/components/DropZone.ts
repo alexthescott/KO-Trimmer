@@ -1,5 +1,5 @@
 import { h } from '../dom';
-import { resolveDroppedItems, type DroppedEntry } from '../../fs/dragDropEntries';
+import { resolveDroppedItems, SUPPORTED_EXTENSIONS, type DroppedEntry } from '../../fs/dragDropEntries';
 import { pickDirectory } from '../../fs/directoryPicker';
 import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import { toFileEntries, deriveRootName } from '../../app/fileEntries';
@@ -12,7 +12,7 @@ export class DropZone {
   constructor() {
     const zone = h('div', { class: 'drop-zone', tabindex: '0' }, [
       h('p', {}, ['Drop audio files or folders here, or click to choose a folder.']),
-      h('p', { class: 'muted' }, ['.wav .mp3 .flac .aiff .m4a .ogg']),
+      h('p', { class: 'muted' }, [SUPPORTED_EXTENSIONS.map((ext) => `.${ext}`).join(' ')]),
     ]);
 
     zone.addEventListener('dragover', (e) => {

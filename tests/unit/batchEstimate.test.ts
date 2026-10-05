@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { FileEntry } from '../../src/app/types';
-import { DEFAULT_SETTINGS } from '../../src/audio/settingsDefaults';
+import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 import { computeAutoTrimBounds } from '../../src/audio/pipeline';
 
 const decodeEntry = vi.fn();

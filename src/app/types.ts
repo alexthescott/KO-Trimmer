@@ -1,5 +1,5 @@
 import type { SampleFormat } from '../audio/sampleFormat';
-import type { BITRATE_OPTIONS } from '../audio/settingsDefaults';
+import type { BITRATE_OPTIONS } from '../audio/formats';
 
 export type BitrateKbps = (typeof BITRATE_OPTIONS)[number];
 
