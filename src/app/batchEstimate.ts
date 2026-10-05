@@ -4,8 +4,6 @@ import { decodeAudioFile, type DecodedAudio } from '../audio/decode';
 import { computeAutoTrimBounds } from '../audio/pipeline';
 import { estimateOutputBytes, extrapolateBatchEstimate } from '../audio/estimate';
 
-const SAMPLE_LIMIT = 20;
-
 interface FileInfo {
   channels: number;
   sampleRate: number;
@@ -14,25 +12,44 @@ interface FileInfo {
   autoFrames: Map<string, number>;
 }
 
+export interface BatchEstimate {
+  originalBytes: number;
+  /** Sum of per-file estimates, extrapolated by bytes over any not yet (or not) decodable. */
+  estimatedBytes: number;
+  /** Files with a per-file estimate so far. */
+  analysed: number;
+  total: number;
+}
+
 /**
- * Whole-batch output size estimate (port of the JUCE BatchEstimateThread):
- * decodes up to 20 files, runs the same auto-trim the pipeline uses, and
- * extrapolates by bytes for the rest. Per-file decode results are reduced
- * to a few numbers and cached, so changing speed/bitrate/stereo never
- * re-decodes; only detection-setting changes do.
+ * Whole-batch output size estimate: decodes every file (one at a time), runs
+ * the same auto-trim the pipeline uses, and reports each file's estimate as
+ * it lands via `onFile`, plus a running total via `onProgress`. Per-file
+ * decode results are reduced to a few numbers and cached, so changing
+ * speed/bitrate/stereo never re-decodes; only detection-setting changes do.
  */
 export class BatchEstimator {
   private info = new Map<string, FileInfo>();
   private generation = 0;
 
+  /** Resolves with the final total, or null if superseded by a newer call / cancel(). */
   async estimate(
     files: FileEntry[],
     settings: ProcessingSettings,
-  ): Promise<{ originalBytes: number; estimatedBytes: number; sampled: number } | null> {
+    onFile: (id: string, estimatedBytes: number) => void,
+    onProgress: (progress: BatchEstimate) => void,
+  ): Promise<BatchEstimate | null> {
     const generation = ++this.generation;
     const detectKey = `${settings.thresholdDb}|${settings.minDurationMs}|${settings.paddingMs}`;
-    const candidates = files.filter((f) => f.file).slice(0, SAMPLE_LIMIT);
+    const candidates = files.filter((f) => f.file);
+    const originalBytes = files.reduce((sum, f) => sum + f.size, 0);
     const samples: Array<{ originalBytes: number; estimatedBytes: number }> = [];
+    const summarize = (): BatchEstimate => ({
+      originalBytes,
+      estimatedBytes: extrapolateBatchEstimate(samples, originalBytes),
+      analysed: samples.length,
+      total: files.length,
+    });
 
     for (const file of candidates) {
       let info = this.info.get(file.id);
@@ -59,25 +76,20 @@ export class BatchEstimator {
       const trimmedFrames = file.manualTrim
         ? file.manualTrim.end - file.manualTrim.start
         : info.autoFrames.get(detectKey) ?? info.frames;
-      samples.push({
-        originalBytes: file.size,
-        estimatedBytes: estimateOutputBytes({
-          trimmedFrames,
-          sourceChannels: info.channels,
-          sourceSampleRate: info.sampleRate,
-          extension: extensionOf(file.name),
-          settings,
-        }),
+      const estimatedBytes = estimateOutputBytes({
+        trimmedFrames,
+        sourceChannels: info.channels,
+        sourceSampleRate: info.sampleRate,
+        extension: extensionOf(file.name),
+        settings,
       });
+      samples.push({ originalBytes: file.size, estimatedBytes });
+      onFile(file.id, estimatedBytes);
+      onProgress(summarize());
     }
 
     if (generation !== this.generation) return null;
-    const originalBytes = files.reduce((sum, f) => sum + f.size, 0);
-    return {
-      originalBytes,
-      estimatedBytes: extrapolateBatchEstimate(samples, originalBytes),
-      sampled: samples.length,
-    };
+    return summarize();
   }
 
   forget(liveIds: Set<string>): void {

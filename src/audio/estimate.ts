@@ -48,9 +48,9 @@ export interface BatchEstimateSample {
 }
 
 /**
- * Extrapolates a whole-batch total from a decoded sample of files, scaling
- * the sample's output/input byte ratio to the undecoded remainder — the
- * JUCE BatchEstimateThread approach, so 1000-file batches stay cheap.
+ * Extrapolates a whole-batch total from the files analysed so far, scaling
+ * their output/input byte ratio to the remainder (files not yet analysed,
+ * or that failed to decode).
  */
 export function extrapolateBatchEstimate(
   samples: BatchEstimateSample[],

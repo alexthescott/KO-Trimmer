@@ -2,7 +2,7 @@ import { h, formatBytes } from '../dom';
 import { appState } from '../../app/state';
 import { appEvents } from '../../app/events';
 import { evictDecoded } from '../../app/decodedCache';
-import { BatchEstimator } from '../../app/batchEstimate';
+import { BatchEstimator, type BatchEstimate } from '../../app/batchEstimate';
 import { DropZone } from '../components/DropZone';
 import { FavoritesSidebar } from '../components/FavoritesSidebar';
 import { SettingsPanel } from '../components/SettingsPanel';
@@ -101,7 +101,11 @@ export class MainView {
     if (target?.closest('input, select, textarea, button, [contenteditable]')) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-    if (e.key === ' ') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (appState.files.length === 0) return;
+      e.preventDefault();
+      this.fileTable.selectAdjacent(e.key === 'ArrowDown' ? 1 : -1);
+    } else if (e.key === ' ') {
       if (!this.waveformEditor.hasFile) return;
       e.preventDefault();
       this.waveformEditor.toggleDefaultPlayback();
@@ -170,13 +174,22 @@ export class MainView {
   private async runEstimate(): Promise<void> {
     const files = appState.files;
     this.estimator.forget(new Set(files.map((f) => f.id)));
-    const result = await this.estimator.estimate(files, appState.settings);
-    if (!result) return;
-    const pct = Math.round((1 - result.estimatedBytes / Math.max(1, result.originalBytes)) * 100);
-    const approx = result.sampled < files.length ? ` (from ${result.sampled} sampled)` : '';
+    const result = await this.estimator.estimate(
+      files,
+      appState.settings,
+      (id, bytes) => this.fileTable.setEstimate(id, bytes),
+      (progress) => this.renderBatchEstimate(progress),
+    );
+    if (result) this.renderBatchEstimate(result);
+  }
+
+  private renderBatchEstimate(estimate: BatchEstimate): void {
+    const { originalBytes, estimatedBytes, analysed, total } = estimate;
+    const pct = Math.round((1 - estimatedBytes / Math.max(1, originalBytes)) * 100);
+    const partial = analysed < total ? ` (analysed ${analysed}/${total})` : '';
     this.batchEstimateEl.textContent =
-      `${files.length} file${files.length === 1 ? '' : 's'} · ${formatBytes(result.originalBytes)} → ` +
-      `~${formatBytes(result.estimatedBytes)} (${pct >= 0 ? '−' : '+'}${Math.abs(pct)}%)${approx}`;
+      `${total} file${total === 1 ? '' : 's'} · ${formatBytes(originalBytes)} → ` +
+      `~${formatBytes(estimatedBytes)} (${pct >= 0 ? '−' : '+'}${Math.abs(pct)}%)${partial}`;
   }
 
   // ---- output location ----------------------------------------------------

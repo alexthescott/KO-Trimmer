@@ -344,6 +344,10 @@ input[type='checkbox'] {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+.file-table .size-cell {
+  white-space: nowrap;
+}
+
 .file-table .row-action {
   width: 1%;
   text-align: right;

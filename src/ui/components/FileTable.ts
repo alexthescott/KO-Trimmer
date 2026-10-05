@@ -21,6 +21,8 @@ export class FileTable {
   selectedId: string | null = null;
   private options: FileTableOptions;
   private lastFiles: FileEntry[] = [];
+  private estimates = new Map<string, number>();
+  private sizeCells = new Map<string, HTMLElement>();
 
   constructor(options: FileTableOptions = {}) {
     this.options = options;
@@ -34,8 +36,27 @@ export class FileTable {
     if (file) this.options.onSelect?.(file);
   }
 
+  /** Moves the selection `delta` rows up/down, clamped to the list. */
+  selectAdjacent(delta: number): void {
+    if (this.lastFiles.length === 0) return;
+    const current = this.lastFiles.findIndex((f) => f.id === this.selectedId);
+    const next = current === -1 ? 0 : Math.min(this.lastFiles.length - 1, Math.max(0, current + delta));
+    if (next === current) return;
+    this.select(this.lastFiles[next].id);
+    this.element.querySelector('tr.selected')?.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** Records one file's estimated output bytes and updates its Size cell in place. */
+  setEstimate(id: string, estimatedBytes: number): void {
+    this.estimates.set(id, estimatedBytes);
+    const file = this.lastFiles.find((f) => f.id === id);
+    const cell = this.sizeCells.get(id);
+    if (file && cell) cell.textContent = sizeText(file, estimatedBytes);
+  }
+
   render(files: FileEntry[]): void {
     this.lastFiles = files;
+    this.sizeCells.clear();
     if (files.length === 0) {
       this.element.replaceChildren(
         h('tbody', {}, [h('tr', {}, [h('td', {}, ['No files added yet.'])])]),
@@ -61,9 +82,11 @@ export class FileTable {
             ),
           ])
         : null;
+      const sizeCell = h('td', { class: 'readout size-cell' }, [sizeText(file, this.estimates.get(file.id))]);
+      this.sizeCells.set(file.id, sizeCell);
       const row = h('tr', { class: file.id === this.selectedId ? 'selected' : '' }, [
         h('td', {}, [file.relativePath, file.manualTrim ? h('span', { class: 'tag' }, ['manual trim']) : null]),
-        h('td', { class: 'readout' }, [formatBytes(file.size)]),
+        sizeCell,
         h('td', { class: `status status-${file.status}` }, [statusText(file)]),
         removeCell,
       ]);
@@ -75,7 +98,7 @@ export class FileTable {
       h('thead', {}, [
         h('tr', {}, [
           h('th', {}, ['File']),
-          h('th', {}, ['Size']),
+          h('th', { title: 'Original → new size (~ = estimate)' }, ['Size']),
           h('th', {}, ['Status']),
           this.options.onRemove ? h('th', {}, []) : null,
         ]),
@@ -106,4 +129,12 @@ function statusText(file: FileEntry): string {
     default:
       return file.status;
   }
+}
+
+/** "old → new": actual output size once processed, otherwise the estimate (prefixed ~). */
+function sizeText(file: FileEntry, estimate: number | undefined): string {
+  const original = formatBytes(file.size);
+  if (file.status === 'done' && file.stats) return `${original} → ${formatBytes(file.stats.outputBytes)}`;
+  if (estimate !== undefined) return `${original} → ~${formatBytes(estimate)}`;
+  return `${original} → —`;
 }

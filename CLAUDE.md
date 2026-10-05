@@ -34,7 +34,8 @@ src/
   app/        state.ts (single source of truth for files/settings/favorites),
               events.ts (typed pub/sub), processBatch.ts (orchestrates a batch run),
               decodedCache.ts (3-entry LRU of decoded audio for the editor),
-              batchEstimate.ts (sampled whole-batch size estimate), fileEntries.ts, types.ts
+              batchEstimate.ts (progressive per-file + whole-batch size estimate),
+              fileEntries.ts, types.ts
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
               sampleRateResample, wavEncoder, mp3Encoder, naming, estimate.ts
               (output-size prediction), pipeline.ts (orchestrates the fixed stage
@@ -105,9 +106,13 @@ folded into the web app rather than maintained separately:
   exclusive) is passed through the worker to `runPipeline`, which uses it in place of
   auto-detection. Settings changes only move handles on files without an override.
 - **Live preview playback before processing** (`audio/player.ts`), with playhead;
-  Space plays/stops, Delete/Backspace removes the selected file (with confirm).
-- **Size estimates**: per-file in the editor, whole-batch next to Process (decodes up to
-  20 files, extrapolates by bytes for the rest).
+  Space plays/stops, Up/Down moves the file selection, Delete/Backspace removes the
+  selected file (with confirm).
+- **Size estimates**: per-file in the editor and in the file table's Size column
+  (`old → ~new`, actual size once processed), whole-batch next to Process.
+  `app/batchEstimate.ts` decodes every file one at a time, streaming each row's estimate
+  and a running total (extrapolated by bytes over files not yet analysed); decode
+  results are cached so only detection-setting changes re-decode.
 - **Overwrite confirmation** dialog before any in-place overwrite.
 - **KO II visual theme** (cream `#F5F0E8` / orange `#FF6B2B`, flat hairline chrome,
   uppercase labels, monospace readouts) — tokens in `ui/styles/app.css` `:root`.
