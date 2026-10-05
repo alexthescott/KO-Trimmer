@@ -43,20 +43,22 @@ export class FsAccessOutputSink implements OutputSink {
 }
 
 /**
- * Streams outputs into a ZIP as they complete, for browsers without FS Access,
- * then offers it as one download. Entries are stored uncompressed — audio
- * barely deflates — and each is appended at write time, so finalize() only
- * writes the central directory: no long main-thread block at the end of a
- * big batch, and no single multi-GB buffer (the Blob is built from chunks).
+ * ZIP parts roll over at this size. Keeps every archive well under fflate's
+ * non-ZIP64 4 GB limit and Firefox's 2 GB-per-buffer limits, and lets each
+ * part download (and its memory go) while the batch is still running.
+ */
+const ZIP_PART_LIMIT_BYTES = 1024 ** 3;
+
+/**
+ * Streams outputs into ZIPs as they complete, for browsers without FS Access.
+ * Entries are stored uncompressed — audio barely deflates — and appended at
+ * write time, so there's no long main-thread block at the end of a big batch.
+ * A batch over ZIP_PART_LIMIT_BYTES downloads as "<name>-part1.zip", "-part2", …
  */
 export class ZipOutputSink implements OutputSink {
-  private chunks: Uint8Array[] = [];
+  private part?: ZipPart;
+  private partsDownloaded = 0;
   private paths = new Set<string>();
-  private error?: Error;
-  private zip = new Zip((err, chunk) => {
-    if (err) this.error ??= err;
-    else this.chunks.push(chunk);
-  });
   private downloadName: string;
 
   constructor(downloadName: string) {
@@ -64,26 +66,58 @@ export class ZipOutputSink implements OutputSink {
   }
 
   async write(relativePath: string, bytes: Uint8Array): Promise<void> {
-    const entry = new ZipPassThrough(uniquePath(relativePath, this.paths));
-    this.zip.add(entry);
-    entry.push(bytes, true);
-    if (this.error) throw this.error;
+    if (this.part && this.part.bytes + bytes.length > ZIP_PART_LIMIT_BYTES) this.downloadPart(false);
+    this.part ??= new ZipPart();
+    this.part.add(uniquePath(relativePath, this.paths), bytes);
   }
 
   async finalize(): Promise<void> {
-    if (this.paths.size === 0) return;
+    this.downloadPart(true);
+  }
+
+  private downloadPart(isLast: boolean): void {
+    if (!this.part) return;
+    const blob = this.part.end();
+    this.part = undefined;
+    const stem = this.downloadName.replace(/\.zip$/i, '');
+    const single = isLast && this.partsDownloaded === 0;
+    download(blob, single ? `${stem}.zip` : `${stem}-part${++this.partsDownloaded}.zip`);
+  }
+}
+
+/** One store-only ZIP being streamed into memory chunks. */
+class ZipPart {
+  bytes = 0;
+  private chunks: Uint8Array[] = [];
+  private error?: Error;
+  private zip = new Zip((err, chunk) => {
+    if (err) this.error ??= err;
+    else this.chunks.push(chunk);
+  });
+
+  add(path: string, data: Uint8Array): void {
+    const entry = new ZipPassThrough(path);
+    this.zip.add(entry);
+    entry.push(data, true);
+    this.bytes += data.length;
+    if (this.error) throw this.error;
+  }
+
+  end(): Blob {
     this.zip.end();
     if (this.error) throw this.error;
-    const blob = new Blob(this.chunks as Uint8Array<ArrayBuffer>[], { type: 'application/zip' });
-    this.chunks = [];
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = this.downloadName;
-    anchor.click();
-    // Revoking straight away can cancel a large download before it starts (Firefox).
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return new Blob(this.chunks as Uint8Array<ArrayBuffer>[], { type: 'application/zip' });
   }
+}
+
+function download(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  // Revoking straight away can cancel a large download before it starts (Firefox).
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /** A path not yet in `taken` (and records it): "a.wav", then "a (2).wav", … — entries can't be replaced once streamed. */

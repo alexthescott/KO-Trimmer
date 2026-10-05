@@ -103,7 +103,7 @@ export class ProcessingView {
     if (appState.outputRootHandle) {
       return `Written to "${appState.outputRootHandle.name}/"`;
     }
-    return 'Downloaded as a ZIP file';
+    return 'Downloaded as a ZIP file (split into ~1 GB parts when larger)';
   }
 
   private async run(files: FileEntry[]): Promise<void> {
