@@ -18,10 +18,29 @@
   --danger: #c62828;
   --warning: #ff6b2b;
   --trim-dim: rgba(213, 208, 200, 0.78);
+  --backdrop: rgba(26, 26, 26, 0.35);
   --radius: 2px;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
+}
+
+/* Dark chassis for dark-mode systems: same single orange accent and flat hairlines. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1b19;
+    --bg-elevated: #262421;
+    --bg-elevated-2: #302e2a;
+    --border: #3d3a35;
+    --text: #ece7df;
+    --text-dim: #a39d93;
+    --accent-hover: #ff8350;
+    --success: #66bb6a;
+    --danger: #ef5350;
+    --trim-dim: rgba(20, 19, 17, 0.72);
+    --backdrop: rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
 }
 
 * {
@@ -474,7 +493,7 @@ input[type='checkbox'] {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(26, 26, 26, 0.35);
+  background: var(--backdrop);
   display: flex;
   align-items: center;
   justify-content: center;

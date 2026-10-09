@@ -78,6 +78,8 @@ export class WaveformEditor {
   private playOriginalButton: HTMLButtonElement;
   private playProcessedButton: HTMLButtonElement;
   private resizeObserver: ResizeObserver;
+  private darkScheme: MediaQueryList;
+  private redraw = (): void => this.draw();
   private unsubscribers: Array<() => void> = [];
 
   constructor() {
@@ -126,6 +128,9 @@ export class WaveformEditor {
 
     this.bindCanvasEvents();
     this.resizeObserver = new ResizeObserver(() => this.draw());
+    // Waveform colours come from CSS tokens, which change with the system theme.
+    this.darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+    this.darkScheme.addEventListener('change', this.redraw);
     this.resizeObserver.observe(this.originalCanvas);
     this.resizeObserver.observe(this.processedCanvas);
 
@@ -205,6 +210,7 @@ export class WaveformEditor {
   destroy(): void {
     this.stop();
     this.resizeObserver.disconnect();
+    this.darkScheme.removeEventListener('change', this.redraw);
     this.preview.cancel();
     this.unsubscribers.forEach((u) => u());
   }
