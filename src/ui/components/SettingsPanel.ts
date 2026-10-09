@@ -1,20 +1,32 @@
 import { h } from '../dom';
 import { appState } from '../../app/state';
+import { appEvents } from '../../app/events';
 import { BITRATE_OPTIONS, WAV_SAMPLE_RATE_OPTIONS } from '../../audio/formats';
 import { SETTINGS_RANGES } from '../../settings/defaults';
 import { canOverwrite } from '../../fs/overwriteWriter';
 import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import type { BitrateKbps } from '../../app/types';
 import { NORMALIZE_PEAK_DB } from '../../audio/gain';
+import { matchingPreset, PRESETS, type Preset } from '../../settings/presets';
 
 export class SettingsPanel {
   element: HTMLElement;
   private overwriteRow: HTMLElement;
+  private presetSelect?: HTMLSelectElement;
+  private unsubscribe: () => void;
 
   constructor() {
     this.element = h('div', { class: 'panel' });
     this.overwriteRow = renderOverwriteRow();
     this.render();
+    // Any individual change can make the settings match a preset, or stop matching one.
+    this.unsubscribe = appEvents.on('settings-changed', ({ settings }) => {
+      if (this.presetSelect) this.presetSelect.value = matchingPreset(settings)?.id ?? '';
+    });
+  }
+
+  destroy(): void {
+    this.unsubscribe();
   }
 
   /** The file list changed: only the overwrite row depends on it. */
@@ -96,7 +108,17 @@ export class SettingsPanel {
       this.overwriteRow,
     ]);
 
-    this.element.replaceChildren(h('h3', {}, ['Settings']), el, checkboxes);
+    this.presetSelect = presetSelect(matchingPreset(s)?.id, (preset) => {
+      appState.updateSettings(preset.settings);
+      this.render(); // the controls below show the preset's values
+    });
+    const preset = field(
+      'Preset',
+      this.presetSelect,
+      'Sets channels, bit depth, WAV rate and MP3 bitrate; trim and speed stay as they are.',
+    );
+
+    this.element.replaceChildren(h('h3', {}, ['Settings']), preset, el, checkboxes);
   }
 }
 
@@ -152,6 +174,19 @@ function sliderInput(
     onChange(v);
   });
   return h('div', { class: 'slider-row' }, [input, readout]);
+}
+
+function presetSelect(currentId: string | undefined, onChange: (preset: Preset) => void): HTMLSelectElement {
+  const select = h('select', { id: 'preset' }, [
+    h('option', { value: '', selected: currentId === undefined, disabled: true }, ['Custom']),
+    ...PRESETS.map((preset) => h('option', { value: preset.id, selected: preset.id === currentId }, [preset.label])),
+  ]);
+  select.value = currentId ?? '';
+  select.addEventListener('change', () => {
+    const preset = PRESETS.find((p) => p.id === select.value);
+    if (preset) onChange(preset);
+  });
+  return select;
 }
 
 function bitrateSelect(value: BitrateKbps, onChange: (v: BitrateKbps) => void): HTMLElement {

@@ -223,6 +223,7 @@ export class MainView {
     this.estimates.cancel();
     document.removeEventListener('keydown', this.handleKeyDown);
     this.waveformEditor.destroy();
+    this.settingsPanel.destroy();
     this.unsubscribers.forEach((u) => u());
   }
 }

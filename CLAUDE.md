@@ -92,7 +92,8 @@ src/
               bottom-left About button + modal); dom.ts (h() element helper),
               format.ts (bytes/percent/plural/duration formatting)
   settings/   defaults.ts (DEFAULT_SETTINGS, SETTINGS_RANGES), settingsManager.ts —
-              localStorage persistence
+              localStorage persistence, presets.ts (goal-based output presets —
+              deliberately not device-named; matchingPreset drives the select)
   pwa/        registerSW.ts (vite-plugin-pwa)
 tests/unit/       Vitest specs for every pure audio/ module plus the pure logic pulled
                   out of the UI (Viewport, readouts, fileNames, settings migration),
