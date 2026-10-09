@@ -1,7 +1,7 @@
 import type { ProcessingStage } from '../app/types';
 import type { PipelineOutput } from '../audio/pipeline';
 import {
-  UnsupportedWavError,
+  UnsupportedFileError,
   type CancelJobRequest,
   type ProcessJobRequest,
   type QueuedJob,
@@ -102,7 +102,7 @@ export class WorkerPool {
     if (!entry) return;
 
     if (msg.type === 'error') {
-      entry.reject(msg.unsupportedWav ? new UnsupportedWavError() : new Error(msg.message));
+      entry.reject(msg.unsupportedFile ? new UnsupportedFileError() : new Error(msg.message));
       return;
     }
 

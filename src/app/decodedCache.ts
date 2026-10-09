@@ -1,6 +1,8 @@
 import type { FileEntry } from './types';
 import { decodeAudioFile } from '../audio/decode';
 import type { PcmAudio } from '../audio/channels';
+import { AIFF_EXTENSIONS, decodePcmFile } from '../audio/pcmFileDecoder';
+import { extensionOf } from './fileNames';
 
 const MAX_ENTRIES = 3;
 const cache = new Map<string, Promise<PcmAudio>>();
@@ -35,7 +37,16 @@ export function evictDecoded(id: string): void {
   cache.delete(id);
 }
 
-/** Decodes a file entry on the main thread at its native sample rate (uncached). */
+/**
+ * Decodes a file entry on the main thread at its native sample rate
+ * (uncached). AIFF goes through the pure-JS decoder first, since only
+ * Safari's decodeAudioData reads it.
+ */
 export async function decodeEntry(file: FileEntry): Promise<PcmAudio> {
-  return decodeAudioFile(await file.file.arrayBuffer(), file.sourceSampleRate);
+  const bytes = await file.file.arrayBuffer();
+  if (AIFF_EXTENSIONS.has(extensionOf(file.name))) {
+    const decoded = decodePcmFile(new Uint8Array(bytes));
+    if (decoded) return decoded;
+  }
+  return decodeAudioFile(bytes, file.sourceSampleRate);
 }

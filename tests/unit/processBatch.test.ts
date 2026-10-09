@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FileEntry, ProcessStats } from '../../src/app/types';
 import type { JobResult } from '../../src/workers/workerPool';
-import { UnsupportedWavError, type QueuedJob } from '../../src/workers/protocol';
+import { UnsupportedFileError, type QueuedJob } from '../../src/workers/protocol';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
 vi.mock('../../src/app/decodedCache', () => ({
@@ -89,20 +89,21 @@ describe('processBatch', () => {
     expect(pool.terminate).toHaveBeenCalledOnce();
   });
 
-  it('sends WAV to the worker as a file and other formats as main-thread PCM', async () => {
-    const { jobs } = await run([entry('a.wav'), entry('b.flac')], async (job) => result(job.fileId));
-    expect(jobs.map((j) => [j.fileId, j.source.kind])).toEqual([
-      ['a.wav', 'wav'],
-      ['b.flac', 'pcm'],
-    ]);
+  it('sends WAV and AIFF to the worker as a file and other formats as main-thread PCM', async () => {
+    const { jobs } = await run([entry('a.wav'), entry('b.flac'), entry('c.aif')], async (job) => result(job.fileId));
+    expect(Object.fromEntries(jobs.map((j) => [j.fileId, j.source.kind]))).toEqual({
+      'a.wav': 'file',
+      'b.flac': 'pcm',
+      'c.aif': 'file',
+    });
   });
 
   it('retries a WAV the worker cannot decode with main-thread PCM', async () => {
     const { jobs, summary } = await run([entry('adpcm.wav')], async (job) => {
-      if (job.source.kind === 'wav') throw new UnsupportedWavError();
+      if (job.source.kind === 'file') throw new UnsupportedFileError();
       return result(job.fileId);
     });
-    expect(jobs.map((j) => j.source.kind)).toEqual(['wav', 'pcm']);
+    expect(jobs.map((j) => j.source.kind)).toEqual(['file', 'pcm']);
     expect(summary.processedCount).toBe(1);
   });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { WorkerPool } from '../../src/workers/workerPool';
-import { UnsupportedWavError, type QueuedJob, type WorkerInMessage, type WorkerOutMessage } from '../../src/workers/protocol';
+import { UnsupportedFileError, type QueuedJob, type WorkerInMessage, type WorkerOutMessage } from '../../src/workers/protocol';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
 /** Stand-in Worker: records what it's sent; the test plays the worker's replies. */
@@ -43,7 +43,7 @@ class FakeWorker {
     });
   }
 
-  fail(extra: { unsupportedWav?: boolean } = {}): void {
+  fail(extra: { unsupportedFile?: boolean } = {}): void {
     const { jobId, fileId } = this.job;
     this.onmessage?.({ data: { type: 'error', jobId, fileId, message: 'bad data', ...extra } });
   }
@@ -63,7 +63,7 @@ function makePool(size: number) {
   return { pool, workers, onProgress };
 }
 
-function job(fileId: string, source: QueuedJob['source'] = { kind: 'wav', file: new File([], `${fileId}.wav`) }): QueuedJob {
+function job(fileId: string, source: QueuedJob['source'] = { kind: 'file', file: new File([], `${fileId}.wav`) }): QueuedJob {
   return { fileId, source, extension: 'wav', baseName: fileId, settings: DEFAULT_SETTINGS, originalBytes: 10 };
 }
 
@@ -110,9 +110,9 @@ describe('WorkerPool', () => {
     const { pool, workers } = makePool(2);
     const unsupported = pool.enqueue(job('adpcm'));
     const broken = pool.enqueue(job('broken'));
-    workers.find((w) => w.job.fileId === 'adpcm')!.fail({ unsupportedWav: true });
+    workers.find((w) => w.job.fileId === 'adpcm')!.fail({ unsupportedFile: true });
     workers.find((w) => w.job.fileId === 'broken')!.fail();
-    await expect(unsupported).rejects.toBeInstanceOf(UnsupportedWavError);
+    await expect(unsupported).rejects.toBeInstanceOf(UnsupportedFileError);
     await expect(broken).rejects.toThrow('bad data');
   });
 

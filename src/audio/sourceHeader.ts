@@ -3,7 +3,9 @@ import {
   ascii,
   dataView,
   iffChunks,
+  isAiff,
   isWave,
+  readExtended80,
   waveFormatTag,
   WAVE_FORMAT_EXTENSIBLE,
   WAVE_FORMAT_IEEE_FLOAT,
@@ -33,8 +35,8 @@ export const FORMAT_PROBE_BYTES = 64 * 1024;
 /** `extension` gates MP3 frame-sync scanning, which could false-match inside other binary formats. */
 export function parseSourceInfo(bytes: Uint8Array, extension = ''): SourceInfo {
   if (isWave(bytes)) return parseWav(bytes);
+  if (isAiff(bytes)) return parseAiff(bytes);
   const tag = ascii(bytes, 0, 4);
-  if (tag === 'FORM' && ['AIFF', 'AIFC'].includes(ascii(bytes, 8, 4))) return parseAiff(bytes);
   if (tag === 'fLaC') return parseFlac(bytes);
   if (tag === 'OggS') return parseOgg(bytes);
   return extension === 'mp3' ? parseMp3(bytes) : {};
@@ -122,12 +124,4 @@ function parseMp3(bytes: Uint8Array): SourceInfo {
     return { sampleRate: MP3_RATES[version][rateIndex] };
   }
   return {};
-}
-
-/** IEEE 754 80-bit extended (AIFF sample rate). */
-function readExtended80(view: DataView, offset: number): number {
-  const exponent = (view.getUint16(offset, false) & 0x7fff) - 16383;
-  const hi = view.getUint32(offset + 2, false);
-  const lo = view.getUint32(offset + 6, false);
-  return hi * 2 ** (exponent - 31) + lo * 2 ** (exponent - 63);
 }

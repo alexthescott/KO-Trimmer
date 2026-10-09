@@ -5,8 +5,9 @@ import { WorkerPool, type JobResult, type ProgressHandler } from '../workers/wor
 import type { OutputSink } from '../fs/outputWriter';
 import { overwriteSourceFile, canOverwrite } from '../fs/overwriteWriter';
 import { formatLabel, sameFormat } from '../audio/sampleFormat';
-import { UnsupportedWavError, type JobSource, type QueuedJob } from '../workers/protocol';
+import { UnsupportedFileError, type JobSource, type QueuedJob } from '../workers/protocol';
 import { errorMessage } from './errors';
+import { PCM_FILE_EXTENSIONS } from '../audio/pcmFileDecoder';
 import { forEachConcurrent } from './concurrency';
 
 /**
@@ -80,9 +81,9 @@ export async function processBatch(request: BatchRequest): Promise<BatchSummary>
 }
 
 /**
- * Decode -> pipeline (worker) -> write. WAV is decoded in the worker; other
- * formats (and WAV the worker can't read) via decodeAudioData on the main
- * thread. Never throws: failures become an outcome.
+ * Decode -> pipeline (worker) -> write. WAV and AIFF are decoded in the
+ * worker; other formats (and WAV/AIFF the worker can't read) via
+ * decodeAudioData on the main thread. Never throws: failures become an outcome.
  */
 async function processFile(file: FileEntry, run: BatchRun): Promise<FileOutcome> {
   if (run.signal.aborted) return { kind: 'skipped' };
@@ -95,7 +96,7 @@ async function processFile(file: FileEntry, run: BatchRun): Promise<FileOutcome>
   }
 }
 
-/** Runs the pipeline job, retrying with main-thread PCM when the worker can't decode the WAV itself. */
+/** Runs the pipeline job, retrying with main-thread PCM when the worker can't decode the file itself. */
 async function runJob(file: FileEntry, { settings, pool }: BatchRun): Promise<JobResult> {
   const job: Omit<QueuedJob, 'source'> = {
     fileId: file.id,
@@ -105,11 +106,13 @@ async function runJob(file: FileEntry, { settings, pool }: BatchRun): Promise<Jo
     sourceFormat: file.sourceFormat,
     manualTrim: file.manualTrim,
   };
-  const source: JobSource = job.extension === 'wav' ? { kind: 'wav', file: file.file } : await decodeOnMainThread(file);
+  const source: JobSource = PCM_FILE_EXTENSIONS.has(job.extension)
+    ? { kind: 'file', file: file.file }
+    : await decodeOnMainThread(file);
   try {
     return await pool.enqueue({ ...job, source });
   } catch (err) {
-    if (!(err instanceof UnsupportedWavError)) throw err;
+    if (!(err instanceof UnsupportedFileError)) throw err;
     return pool.enqueue({ ...job, source: await decodeOnMainThread(file) });
   }
 }

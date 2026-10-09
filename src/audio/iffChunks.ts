@@ -1,7 +1,8 @@
 /**
  * Shared byte-level helpers for the IFF-family containers (RIFF/RF64/BW64
  * WAV, little-endian; AIFF/AIFC, big-endian): header tags, the chunk walk,
- * and WAV format tags. Used by header probing, the WAV decoder and encoder.
+ * and WAV format tags. Used by header probing, the WAV/AIFF decoders and
+ * the WAV encoder.
  */
 
 /** WAV `fmt ` format tags. */
@@ -33,6 +34,11 @@ export function isWave(bytes: Uint8Array): boolean {
   return (tag === 'RIFF' || tag === 'RF64' || tag === 'BW64') && ascii(bytes, 8, 4) === 'WAVE';
 }
 
+/** FORM container holding AIFF or AIFC data. */
+export function isAiff(bytes: Uint8Array): boolean {
+  return ascii(bytes, 0, 4) === 'FORM' && ['AIFF', 'AIFC'].includes(ascii(bytes, 8, 4));
+}
+
 /** Top-level chunks after the 12-byte container header, padded to even sizes. */
 export function* iffChunks(bytes: Uint8Array, littleEndian: boolean): Generator<IffChunk> {
   const view = dataView(bytes);
@@ -54,4 +60,12 @@ export function waveFormatTag(view: DataView, body: number, size: number): numbe
   const tag = view.getUint16(body, true);
   if (tag !== WAVE_FORMAT_EXTENSIBLE || size < 40 || body + 26 > view.byteLength) return tag;
   return view.getUint16(body + 24, true); // first 2 bytes of the SubFormat GUID
+}
+
+/** IEEE 754 80-bit extended (AIFF sample rate). */
+export function readExtended80(view: DataView, offset: number): number {
+  const exponent = (view.getUint16(offset, false) & 0x7fff) - 16383;
+  const hi = view.getUint32(offset + 2, false);
+  const lo = view.getUint32(offset + 6, false);
+  return hi * 2 ** (exponent - 31) + lo * 2 ** (exponent - 63);
 }

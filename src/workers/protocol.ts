@@ -4,11 +4,12 @@ import type { PcmAudio } from '../audio/channels';
 
 /**
  * Where the job's audio comes from: PCM already decoded on the main thread,
- * or a WAV file the worker reads and decodes itself (no main-thread work).
+ * or an uncompressed WAV/AIFF file the worker reads and decodes itself (no
+ * main-thread work).
  */
 export type JobSource =
   | ({ kind: 'pcm' } & PcmAudio)
-  | { kind: 'wav'; file: File };
+  | { kind: 'file'; file: File };
 
 export interface QueuedJob extends Omit<PipelineRequest, 'channels' | 'sampleRate'> {
   fileId: string;
@@ -45,8 +46,8 @@ export interface ErrorMessage {
   jobId: string;
   fileId: string;
   message: string;
-  /** A `wav` source the worker's decoder can't read (e.g. ADPCM); decode it on the main thread instead. */
-  unsupportedWav?: boolean;
+  /** A `file` source the worker's decoders can't read (e.g. ADPCM); decode it on the main thread instead. */
+  unsupportedFile?: boolean;
 }
 
 export type WorkerOutMessage = ProgressMessage | DoneMessage | ErrorMessage;
@@ -56,10 +57,10 @@ export function postFromWorker<T>(message: T, transfer: Transferable[] = []): vo
   (self as unknown as Worker).postMessage(message, { transfer });
 }
 
-/** Rejection for an `unsupportedWav` worker error, so the caller can retry with a `pcm` source. */
-export class UnsupportedWavError extends Error {
+/** Rejection for an `unsupportedFile` worker error, so the caller can retry with a `pcm` source. */
+export class UnsupportedFileError extends Error {
   constructor() {
-    super('WAV encoding not supported by the worker decoder');
-    this.name = 'UnsupportedWavError';
+    super('Encoding not supported by the worker decoder');
+    this.name = 'UnsupportedFileError';
   }
 }

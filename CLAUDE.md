@@ -44,7 +44,7 @@ src/
               sampleRateResample, wavEncoder, mp3Encoder, naming (filename + KO II
               length rule), channels.ts (PcmAudio type, frameCount/sampleAt/floatToInt,
               AudioBuffer copies), iffChunks.ts (RIFF/AIFF chunk walk + WAV format
-              tags, shared by sourceHeader/wavDecoder/wavEncoder),
+              tags, shared by sourceHeader/wav+aiff decoders/wavEncoder),
               outputContainer.ts (the one "mp3 stays mp3, else wav" rule + output
               sample format), formats.ts (MP3 bitrate / WAV rate options),
               sourceHeader.ts (header parsing: bit depth + native
@@ -54,8 +54,9 @@ src/
               pipeline.ts (renderAudible = trim/mono/speed/resample, shared by
               runPipeline and the editor preview; computeAutoTrimBounds shared with
               the estimator), audioContext.ts + player.ts (preview playback, main
-              thread only), wavDecoder.ts (worker-side WAV decode),
-              decode.ts (main-thread decodeAudioData)
+              thread only), wavDecoder.ts + aiffDecoder.ts (pure-JS PCM decode;
+              pcmFileDecoder.ts sniffs which), decode.ts (main-thread
+              decodeAudioData)
   fs/         File System Access API: capabilities, directoryPicker
               (pickWritableDirectory), dragDropEntries (TRIMMED_SUFFIX), permissions
               (ensureReadWrite),
@@ -88,11 +89,16 @@ scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.
 
 **Processing pipeline (fixed order, `audio/pipeline.ts`):**
 decode → trim → mono/stereo → speed-up → WAV sample-rate reduction → encode at bit
-depth / MP3 bitrate (worker thread). WAV is decoded in the worker by the pure-JS
-`audio/wavDecoder.ts` (PCM 8–32-bit int / 32–64-bit float; scaling matches
-`decodeAudioData`); other formats, and WAV it can't read (ADPCM etc. — the worker
-replies `unsupportedWav` and the file is retried), decode on the main thread via
-`decodeAudioData` at the file's native rate (see below). Decode is isolated per-file
+depth / MP3 bitrate (worker thread). WAV and AIFF are decoded in the worker by the
+pure-JS `audio/wavDecoder.ts` / `audio/aiffDecoder.ts` (PCM 8–32-bit int / 32–64-bit
+float; scaling matches `decodeAudioData`). AIFF (the OP-1's format) must stay pure-JS:
+only Safari's `decodeAudioData` reads it, so the editor/estimate decode it that way
+too (`decodedCache.ts::decodeEntry`). Other formats, and WAV/AIFF the worker can't
+read (ADPCM, ulaw etc. — the worker replies `unsupportedFile` and the file is
+retried), decode on the main thread via `decodeAudioData` at the file's native rate
+(see below). WAV sample-rate reduction is a pure-JS Kaiser-windowed sinc
+(`sampleRateResample.ts`) — `OfflineAudioContext` isn't exposed to workers, and one
+filter keeps preview and output identical. Decode is isolated per-file
 (try/catch) so one bad file never aborts the batch. `processBatch` keeps at most
 pool size + 2 files in flight (`app/concurrency.ts`) so memory stays flat on
 thousand-file batches; the pool is `min(8, cores − 1)` workers. Per-file status changes
