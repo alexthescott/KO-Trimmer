@@ -91,7 +91,7 @@ export async function renderAudible(input: RenderInput): Promise<PcmAudio> {
     return { channels, sampleRate: input.sampleRate };
   }
   onStage?.('resample');
-  return { channels: await resampleToRate(channels, input.sampleRate, targetSampleRate), sampleRate: targetSampleRate };
+  return { channels: resampleToRate(channels, input.sampleRate, targetSampleRate), sampleRate: targetSampleRate };
 }
 
 /**
