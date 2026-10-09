@@ -72,8 +72,9 @@ src/
   fs/         File System Access API: capabilities, directoryPicker
               (pickWritableDirectory), dragDropEntries (TRIMMED_SUFFIX), permissions
               (ensureReadWrite),
-              outputWriter (FS Access sink; OPFS-backed ZIP sink; in-memory
-              split-ZIP fallback), zipStream (client-zip over asyncQueue, shared
+              outputWriter (FS Access sink; OPFS-backed ZIP sink; worker-written
+              OPFS ZIP sink; in-memory split-ZIP fallback), opfsZip
+              (SyncZipWriter for zipWriter.worker.ts; stale-ZIP cleanup), zipStream (client-zip over asyncQueue, shared
               by both ZIP sinks), asyncQueue (backpressured producer→stream),
               archivePaths (de-duplicated ZIP entry names), writeFile,
               overwriteWriter (true in-place overwrite; canOverwrite)
@@ -152,7 +153,9 @@ checkbox disabled with an explanatory tooltip rather than silently no-opping. Th
 is one archive of the whole batch, streamed store-only to the Origin Private File
 System as outputs complete (`DiskZipOutputSink`, client-zip, ZIP64 past 4 GB) and
 downloaded from disk — so batch size isn't bounded by RAM or Firefox's 2 GB Blob-part
-limit. Without OPFS (e.g. Firefox private windows) it falls back to in-memory ZIPs
+limit. Where OPFS has no `createWritable` (older Safari), `WorkerZipOutputSink` writes
+the same ZIP from `workers/zipWriter.worker.ts` through `createSyncAccessHandle`
+(worker-only, Safari 15.2+). Without OPFS (e.g. Firefox private windows) it falls back to in-memory ZIPs
 split into ~1 GB parts (`ZipOutputSink`). Both use the same client-zip `ZipStream`;
 fflate is a devDependency only, for unzipping in tests.
 

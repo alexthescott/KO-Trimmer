@@ -62,6 +62,14 @@ export interface AnalysisRequest {
 export type AnalysisResponse =
   { id: number; analysis: AudioAnalysis } | { id: number; error: string; unsupportedFile: boolean };
 
+/** Disk-backed batch ZIP written in a worker (zipWriter.worker.ts); requests are answered in order. */
+export type ZipWriterRequest =
+  | { type: 'open'; id: number }
+  | { type: 'add'; id: number; path: string; bytes: Uint8Array }
+  | { type: 'end'; id: number };
+
+export type ZipWriterResponse = { id: number; fileName?: string } | { id: number; error: string };
+
 /** Typed postMessage from inside a worker (the DOM lib types `self` as Window). */
 export function postFromWorker<T>(message: T, transfer: Transferable[] = []): void {
   (self as unknown as Worker).postMessage(message, { transfer });

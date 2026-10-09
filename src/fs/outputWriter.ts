@@ -2,6 +2,8 @@ import { ensureReadWrite } from './permissions';
 import { ArchivePaths } from './archivePaths';
 import { writeFile } from './writeFile';
 import { ZipStream } from './zipStream';
+import { createBatchZipFile } from './opfsZip';
+import type { ZipWriterRequest, ZipWriterResponse } from '../workers/protocol';
 
 export interface OutputSink {
   write(relativePath: string, bytes: Uint8Array): Promise<void>;
@@ -41,27 +43,21 @@ export class FsAccessOutputSink implements OutputSink {
   }
 }
 
-/** OPFS file names for disk-backed ZIPs; stale ones from earlier batches are deleted at the next batch. */
-const DISK_ZIP_PREFIX = 'batch-output-';
-
 /**
  * One ZIP of the whole batch, streamed to the Origin Private File System as
  * each output completes and downloaded from disk at the end — for browsers
- * without FS Access but with OPFS (Firefox, Safari). Any size, flat memory:
- * outputs are never held together in RAM or a single buffer.
+ * without FS Access but with OPFS writable streams (Firefox, recent Safari).
+ * Any size, flat memory: outputs are never held together in RAM or a
+ * single buffer.
  */
 export class DiskZipOutputSink implements OutputSink {
   private paths = new ArchivePaths();
   private zip: ZipStream;
 
-  /** Undefined when OPFS isn't available (e.g. Firefox private windows) — use ZipOutputSink instead. */
+  /** Undefined when OPFS writable streams aren't available — try WorkerZipOutputSink next. */
   static async create(downloadName: string): Promise<DiskZipOutputSink | undefined> {
     try {
-      const dir = await navigator.storage.getDirectory();
-      for await (const name of dir.keys()) {
-        if (name.startsWith(DISK_ZIP_PREFIX)) await dir.removeEntry(name).catch(() => {});
-      }
-      const handle = await dir.getFileHandle(`${DISK_ZIP_PREFIX}${Date.now()}.zip`, { create: true });
+      const handle = await createBatchZipFile(await navigator.storage.getDirectory());
       return new DiskZipOutputSink(handle, await handle.createWritable(), downloadName);
     } catch {
       return undefined;
@@ -86,6 +82,73 @@ export class DiskZipOutputSink implements OutputSink {
     download(await this.handle.getFile(), this.downloadName);
   }
 }
+
+/**
+ * The same disk-backed batch ZIP, written from a worker through a
+ * synchronous access handle — for browsers with OPFS but no writable
+ * streams on it (Safari before createWritable).
+ */
+export class WorkerZipOutputSink implements OutputSink {
+  private paths = new ArchivePaths();
+  private nextId = 0;
+  private pending = new Map<number, { resolve: (fileName?: string) => void; reject: (err: Error) => void }>();
+
+  /** Undefined when the worker can't open a sync access handle (no OPFS, e.g. Firefox private windows). */
+  static async create(downloadName: string): Promise<WorkerZipOutputSink | undefined> {
+    if (typeof navigator === 'undefined' || !navigator.storage?.getDirectory) return undefined;
+    const worker = new Worker(new URL('../workers/zipWriter.worker.ts', import.meta.url), { type: 'module' });
+    const sink = new WorkerZipOutputSink(worker, downloadName);
+    try {
+      await sink.request({ type: 'open' });
+      return sink;
+    } catch {
+      worker.terminate();
+      return undefined;
+    }
+  }
+
+  private constructor(
+    private worker: Worker,
+    private downloadName: string,
+  ) {
+    worker.onmessage = (event: MessageEvent<ZipWriterResponse>) => {
+      const entry = this.pending.get(event.data.id);
+      this.pending.delete(event.data.id);
+      if ('error' in event.data) entry?.reject(new Error(event.data.error));
+      else entry?.resolve(event.data.fileName);
+    };
+    // A worker that fails to load or crashes must fail pending requests, not hang them.
+    worker.onerror = (event) => {
+      for (const { reject } of this.pending.values()) reject(new Error(event.message || 'ZIP worker failed'));
+      this.pending.clear();
+    };
+  }
+
+  private request(msg: DistributiveOmit<ZipWriterRequest, 'id'>): Promise<string | undefined> {
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      this.worker.postMessage({ ...msg, id } as ZipWriterRequest);
+    });
+  }
+
+  async write(relativePath: string, bytes: Uint8Array): Promise<void> {
+    await this.request({ type: 'add', path: this.paths.claim(relativePath), bytes });
+  }
+
+  async finalize(): Promise<void> {
+    try {
+      const fileName = await this.request({ type: 'end' });
+      if (this.paths.isEmpty || !fileName) return;
+      const dir = await navigator.storage.getDirectory();
+      download(await (await dir.getFileHandle(fileName)).getFile(), this.downloadName);
+    } finally {
+      this.worker.terminate();
+    }
+  }
+}
+
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 
 /**
  * ZipOutputSink starts a new part past this size: Firefox caps a single

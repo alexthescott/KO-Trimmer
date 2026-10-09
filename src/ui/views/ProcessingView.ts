@@ -5,7 +5,13 @@ import { errorMessage } from '../../app/errors';
 import { FileTable } from '../components/FileTable';
 import { renderResultsSummary } from '../components/ResultsSummary';
 import { processBatch, type BatchSummary } from '../../app/processBatch';
-import { DiskZipOutputSink, FsAccessOutputSink, ZipOutputSink, type OutputSink } from '../../fs/outputWriter';
+import {
+  DiskZipOutputSink,
+  FsAccessOutputSink,
+  WorkerZipOutputSink,
+  ZipOutputSink,
+  type OutputSink,
+} from '../../fs/outputWriter';
 import type { FileEntry } from '../../app/types';
 import { TRIMMED_SUFFIX } from '../../fs/dragDropEntries';
 
@@ -93,7 +99,11 @@ export class ProcessingView {
       return new FsAccessOutputSink(appState.outputRootHandle);
     }
     const zipName = `${appState.rootName ?? 'sample-trimmer-output'}${TRIMMED_SUFFIX}.zip`;
-    return (await DiskZipOutputSink.create(zipName)) ?? new ZipOutputSink(zipName);
+    return (
+      (await DiskZipOutputSink.create(zipName)) ??
+      (await WorkerZipOutputSink.create(zipName)) ??
+      new ZipOutputSink(zipName)
+    );
   }
 
   private describeOutput(): string {
