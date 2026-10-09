@@ -1,18 +1,31 @@
 import { h } from '../dom';
 import { resolveDroppedItems, SUPPORTED_EXTENSIONS, type DroppedEntry } from '../../fs/dragDropEntries';
-import { pickDirectory } from '../../fs/directoryPicker';
+import { pickDirectory, pickFiles } from '../../fs/directoryPicker';
 import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import { toFileEntries, deriveRootName } from '../../app/fileEntries';
 import { appState } from '../../app/state';
 
+/** `accept` for the file input: extensions as well as audio/*, since .aif etc. often lack a MIME type. */
+const ACCEPT = ['audio/*', ...SUPPORTED_EXTENSIONS.map((ext) => `.${ext}`)].join(',');
+
 export class DropZone {
   element: HTMLElement;
-  private fallbackInput: HTMLInputElement;
+  private folderInput: HTMLInputElement;
+  private filesInput: HTMLInputElement;
 
   constructor() {
-    const zone = h('div', { class: 'drop-zone', tabindex: '0' }, [
+    const chooseFilesButton = h('button', {
+      type: 'button',
+      onclick: (e: Event) => {
+        e.stopPropagation();
+        void this.handleChooseFiles();
+      },
+    }, ['Choose files…']);
+
+    const zone = h('div', { class: 'drop-zone', tabindex: '0', role: 'button' }, [
       h('p', {}, ['Drop audio files or folders here, or click to choose a folder.']),
       h('p', { class: 'muted' }, [SUPPORTED_EXTENSIONS.map((ext) => `.${ext}`).join(' ')]),
+      chooseFilesButton,
     ]);
 
     zone.addEventListener('dragover', (e) => {
@@ -30,25 +43,32 @@ export class DropZone {
       await this.addEntries(entries);
     });
     zone.addEventListener('click', () => this.handleClick());
-
-    this.fallbackInput = h('input', {
-      type: 'file',
-      multiple: true,
-      webkitdirectory: true,
-      style: 'display:none',
+    zone.addEventListener('keydown', (e) => {
+      if (e.target !== zone || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      e.stopPropagation(); // else MainView's Space shortcut also starts playback
+      void this.handleClick();
     });
-    this.fallbackInput.addEventListener('change', async () => {
-      const files = Array.from(this.fallbackInput.files ?? []);
-      const entries = files.map((file) => ({
+
+    this.folderInput = this.hiddenInput({ webkitdirectory: true });
+    // No folder picking on iOS, so plain multi-file selection must always be available.
+    this.filesInput = this.hiddenInput({ accept: ACCEPT });
+
+    this.element = h('div', {}, [zone, this.folderInput, this.filesInput]);
+  }
+
+  private hiddenInput(attrs: Record<string, string | boolean>): HTMLInputElement {
+    const input = h('input', { type: 'file', multiple: true, style: 'display:none', ...attrs });
+    input.addEventListener('change', async () => {
+      const entries = Array.from(input.files ?? [], (file) => ({
         name: file.name,
         relativePath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name,
         file,
       }));
       await this.addEntries(entries);
-      this.fallbackInput.value = '';
+      input.value = '';
     });
-
-    this.element = h('div', {}, [zone, this.fallbackInput]);
+    return input;
   }
 
   private async handleClick(): Promise<void> {
@@ -60,7 +80,17 @@ export class DropZone {
       }
       return;
     }
-    this.fallbackInput.click();
+    this.folderInput.click();
+  }
+
+  /** The native picker where available (keeps handles for Overwrite), else the file input. */
+  private async handleChooseFiles(): Promise<void> {
+    if (!('showOpenFilePicker' in window)) {
+      this.filesInput.click();
+      return;
+    }
+    const entries = await pickFiles();
+    if (entries) await this.addEntries(entries);
   }
 
   private async addEntries(entries: DroppedEntry[]): Promise<void> {

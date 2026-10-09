@@ -196,6 +196,10 @@ button.icon-button:hover {
   transition: border-color 0.15s, color 0.15s;
 }
 
+.drop-zone button {
+  margin-top: 8px;
+}
+
 .drop-zone.drag-over {
   border-color: var(--accent);
   border-style: solid;

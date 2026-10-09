@@ -1,4 +1,4 @@
-import { TRIMMED_SUFFIX, walkDirectoryHandle, type DroppedEntry } from './dragDropEntries';
+import { SUPPORTED_EXTENSIONS, TRIMMED_SUFFIX, walkDirectoryHandle, type DroppedEntry } from './dragDropEntries';
 import { isFileSystemAccessSupported } from './capabilities';
 
 export interface PickedDirectory {
@@ -25,6 +25,24 @@ export async function pickDirectory(): Promise<PickedDirectory | null> {
   const handle = await pickWritableDirectory();
   if (!handle) return null;
   return { handle, entries: await walkDirectoryHandle(handle) };
+}
+
+/**
+ * Native multi-file picker (Chrome): keeps each file's handle, so Overwrite
+ * still works for files picked one by one. Null when unsupported or cancelled.
+ */
+export async function pickFiles(): Promise<DroppedEntry[] | null> {
+  if (!('showOpenFilePicker' in window)) return null;
+  try {
+    const handles = await window.showOpenFilePicker({
+      multiple: true,
+      types: [{ description: 'Audio', accept: { 'audio/*': SUPPORTED_EXTENSIONS.map((ext) => `.${ext}` as const) } }],
+    });
+    return handles.map((handle) => ({ name: handle.name, relativePath: handle.name, fileHandle: handle }));
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return null;
+    throw err;
+  }
 }
 
 /**
