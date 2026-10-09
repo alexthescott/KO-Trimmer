@@ -11,25 +11,7 @@ export function computeEnergyEnvelope(channels: Float32Array[], frameLength = 20
   if (n === 0) return new Float32Array(0);
 
   const numFrames = Math.max(1, Math.ceil(n / hopLength));
-  const frameRms = new Float32Array(numFrames);
-
-  for (let k = 0; k < numFrames; k++) {
-    const start = k * hopLength;
-    const end = Math.min(start + frameLength, n);
-    const frameLen = Math.max(1, end - start);
-
-    let maxRms = 0;
-    for (const channel of channels) {
-      let sumSquares = 0;
-      for (let i = start; i < end; i++) {
-        const sample = channel[i];
-        sumSquares += sample * sample;
-      }
-      const rms = Math.sqrt(sumSquares / frameLen);
-      if (rms > maxRms) maxRms = rms;
-    }
-    frameRms[k] = maxRms;
-  }
+  const frameRms = frameRmsMaxAcrossChannels(channels, n, numFrames, frameLength, hopLength);
 
   if (numFrames === 1) {
     return new Float32Array(n).fill(frameRms[0]);
@@ -60,4 +42,47 @@ export function computeEnergyEnvelope(channels: Float32Array[], frameLength = 20
   }
 
   return energy;
+}
+
+/**
+ * Windowed RMS per frame, max across channels. When the frame is a whole
+ * number of hops (the default 2048/512), each sample is squared once into a
+ * per-hop block sum and frames add up their blocks — O(n) instead of
+ * re-summing every overlapping window. Same sums, so the same envelope.
+ */
+function frameRmsMaxAcrossChannels(
+  channels: Float32Array[],
+  n: number,
+  numFrames: number,
+  frameLength: number,
+  hopLength: number,
+): Float32Array {
+  const frameRms = new Float32Array(numFrames);
+  const blocksPerFrame = frameLength / hopLength;
+  const blockSums = Number.isInteger(blocksPerFrame) ? new Float64Array(numFrames) : undefined;
+
+  for (const channel of channels) {
+    if (blockSums) {
+      for (let b = 0; b < numFrames; b++) {
+        const end = Math.min((b + 1) * hopLength, n);
+        let sum = 0;
+        for (let i = b * hopLength; i < end; i++) sum += channel[i] * channel[i];
+        blockSums[b] = sum;
+      }
+    }
+    for (let k = 0; k < numFrames; k++) {
+      const start = k * hopLength;
+      const end = Math.min(start + frameLength, n);
+      let sumSquares = 0;
+      if (blockSums) {
+        const lastBlock = Math.min(k + blocksPerFrame, numFrames);
+        for (let b = k; b < lastBlock; b++) sumSquares += blockSums[b];
+      } else {
+        for (let i = start; i < end; i++) sumSquares += channel[i] * channel[i];
+      }
+      const rms = Math.sqrt(sumSquares / Math.max(1, end - start));
+      if (rms > frameRms[k]) frameRms[k] = rms;
+    }
+  }
+  return frameRms;
 }
