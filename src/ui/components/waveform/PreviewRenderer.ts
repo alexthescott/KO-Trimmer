@@ -1,8 +1,7 @@
-import { renderAudible, type RenderInput } from '../../../audio/pipeline';
-import { mp3RoundTrip } from '../../../audio/mp3Preview';
+import type { RenderInput } from '../../../audio/pipeline';
+import { renderPreview } from '../../../audio/preview';
 import { peakAbs } from '../../../audio/sampleFormat';
-import { frameCount, type PcmAudio } from '../../../audio/channels';
-import { FULL_MP3_BITRATE } from '../../../audio/formats';
+import type { PcmAudio } from '../../../audio/channels';
 import { waveformOf, type Waveform } from './draw';
 
 const PREVIEW_DEBOUNCE_MS = 150;
@@ -14,9 +13,9 @@ export interface ProcessedPreview extends PcmAudio {
 }
 
 /**
- * Debounced render of the editor's "Play Processed" preview. MP3 output below
- * full bitrate is round-tripped through the real encoder so its artifacts are
- * audible. A render superseded by a newer one is dropped.
+ * Debounced render of the editor's "Play Processed" preview, in a worker. MP3
+ * output below full bitrate is round-tripped through the real encoder so its
+ * artifacts are audible. A render superseded by a newer one is dropped.
  */
 export class PreviewRenderer {
   private timer?: number;
@@ -54,14 +53,12 @@ export class PreviewRenderer {
     const input = this.currentInput();
     if (!input) return;
     const token = ++this.token;
-    let result = await renderAudible(input);
-    const { bitrateKbps } = input.settings;
-    if (input.container === 'mp3' && bitrateKbps < FULL_MP3_BITRATE && frameCount(result.channels) > 0) {
-      try {
-        result = await mp3RoundTrip(result.channels, result.sampleRate, bitrateKbps);
-      } catch {
-        // Fall back to the un-encoded preview rather than showing nothing.
-      }
+    let result: PcmAudio;
+    try {
+      result = await renderPreview(input);
+    } catch (err) {
+      console.warn('Preview render failed', err);
+      return;
     }
     if (token !== this.token) return;
     this.onRendered({ ...result, wave: waveformOf(result.channels), peak: peakAbs(result.channels) });

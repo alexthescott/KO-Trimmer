@@ -81,7 +81,8 @@ src/
   workers/    protocol.ts (message types built on PipelineRequest/PipelineOutput),
               processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
               (pooled, AbortController-based cancellation), analysis.worker.ts
-              (estimate decode + auto-trim), resolveSource.ts (worker-side decode
+              (estimate decode + auto-trim), preview.worker.ts (editor preview
+              render), zipWriter.worker.ts, resolveSource.ts (worker-side decode
               of a `file` job source)
   ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
               WaveformEditor + waveform/ [Viewport, TrimState (trim rules, no DOM),
@@ -197,8 +198,9 @@ folded into the web app rather than maintained separately:
   auto-detection. Settings changes only move handles on files without an override.
 - **Live preview playback before processing** (`audio/player.ts`), with a playhead on
   whichever waveform is playing; for MP3 inputs below 320 kbps the processed preview is
-  round-tripped through the real encoder (`audio/mp3Preview.ts` +
-  `workers/mp3Preview.worker.ts`) so artifacts are audible;
+  round-tripped through the real encoder so artifacts are audible. The whole preview
+  render (`renderAudible` + that encode) runs in `workers/preview.worker.ts`
+  (`audio/previewJob.ts`, client `audio/preview.ts`) since resampling is pure JS now;
   Space plays/stops, Up/Down moves the file selection, Delete/Backspace removes the
   selected file (with confirm).
 - **Size estimates**: per-file in the editor and in the file table's Size column

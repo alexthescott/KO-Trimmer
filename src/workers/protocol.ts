@@ -3,6 +3,7 @@ import type { ProcessingStage } from '../app/types';
 import type { PcmAudio } from '../audio/channels';
 import type { DetectionSettings } from '../audio/autoTrim';
 import type { AudioAnalysis } from '../audio/analysis';
+import type { PreviewRequestInput, PreviewResult } from '../audio/previewJob';
 
 /**
  * Where the job's audio comes from: PCM already decoded on the main thread,
@@ -61,6 +62,14 @@ export interface AnalysisRequest {
 
 export type AnalysisResponse =
   { id: number; analysis: AudioAnalysis } | { id: number; error: string; unsupportedFile: boolean };
+
+/** The editor's processed preview (preview.worker.ts). */
+export interface PreviewRequest {
+  id: number;
+  input: PreviewRequestInput;
+}
+
+export type PreviewResponse = { id: number; result: PreviewResult } | { id: number; error: string };
 
 /** Disk-backed batch ZIP written in a worker (zipWriter.worker.ts); requests are answered in order. */
 export type ZipWriterRequest =
