@@ -19,18 +19,15 @@
   "devDependencies": {
     "@types/wicg-file-system-access": "^2023.10.7",
     "fflate": "^0.8.3",
-    "sharp": "^0.33.5",
+    "sharp": "^0.35.5",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3",
-    "vite": "^6.0.0",
-    "vite-plugin-pwa": "^0.21.0",
-    "vitest": "^2.1.4"
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.0.3"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
-    "esbuild@0.21.5": true,
-    "esbuild@0.25.12": true,
-    "sharp@0.33.5": true,
     "fsevents@2.3.3": true
   }
 }
