@@ -1,5 +1,6 @@
 import { getSharedContext } from './audioContext';
-import { frameCount, toAudioBuffer } from './channels';
+import { toAudioBuffer } from './audioBuffer';
+import { frameCount } from './channels';
 
 export interface PlaybackHandle {
   /** Seconds elapsed since playback started. */

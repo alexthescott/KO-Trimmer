@@ -17,13 +17,21 @@ UI framework runtime; lives at the repo root.
 npm install
 npm run dev        # local dev server
 npm test           # unit tests (Vitest) — run before any audio/DSP change
-npm run build      # tsc --noEmit && vite build -> dist/
+npm run check      # typecheck + lint + format check + unit tests (what CI runs)
+npm run lint       # ESLint (typescript-eslint, type-aware no-floating-promises)
+npm run format     # Prettier
+npm run build      # typecheck && vite build -> dist/
 npm run preview    # serve the production build locally
 npm run icons      # regenerate PWA icons from assets/Knockout.svg
 ```
 
 Deploys automatically: pushing to `main` triggers `.github/workflows/deploy-pwa.yml`,
-which runs `npm test` + `npm run build` and deploys `dist/` to GitHub Pages. One-time
+which runs typecheck + lint + `npm test` + `npm run build` and deploys `dist/` to GitHub
+Pages. PRs and other branches run `.github/workflows/ci.yml` (same checks, no deploy).
+`npm run typecheck` also checks `src/workers/*.worker.ts` against the WebWorker lib
+alone (`tsconfig.worker.json`), so main-thread-only APIs (Web Audio, DOM) can't creep
+into worker code — keep such helpers in modules the workers don't import
+(e.g. `audio/audioBuffer.ts`). One-time
 repo setting required: Settings → Pages → source = "GitHub Actions". Production base
 path is `/KO-Trimmer/` (`vite.config.ts`), matching this repo's Pages project-page URL.
 
@@ -42,8 +50,8 @@ src/
               types.ts (incl. SampleRange)
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
               sampleRateResample, wavEncoder, mp3Encoder, naming (filename + KO II
-              length rule), channels.ts (PcmAudio type, frameCount/sampleAt/floatToInt,
-              AudioBuffer copies), iffChunks.ts (RIFF/AIFF chunk walk + WAV format
+              length rule), channels.ts (PcmAudio type, frameCount/sampleAt/floatToInt),
+              audioBuffer.ts (AudioBuffer copies; main thread only), iffChunks.ts (RIFF/AIFF chunk walk + WAV format
               tags, shared by sourceHeader/wav+aiff decoders/wavEncoder),
               outputContainer.ts (the one "mp3 stays mp3, else wav" rule + output
               sample format), formats.ts (MP3 bitrate / WAV rate options),

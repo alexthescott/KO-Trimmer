@@ -1,5 +1,6 @@
 import { getSharedContext } from './audioContext';
-import { channelsOf, type PcmAudio } from './channels';
+import { channelsOf } from './audioBuffer';
+import type { PcmAudio } from './channels';
 
 /**
  * Decodes a file's bytes via the Web Audio API. Runs on the main thread
