@@ -55,8 +55,6 @@ function besselI0(x: number): number {
  * and the editor preview run the exact same filter in every browser — no
  * OfflineAudioContext, which isn't exposed to workers. When downsampling,
  * the cutoff sits just below the new Nyquist so nothing above it aliases.
- * Edge samples are held beyond the buffer's ends, so audio that starts on a
- * transient (as trimmed samples do) isn't faded in.
  */
 export function resampleToRate(
   channels: Float32Array[],
@@ -64,17 +62,27 @@ export function resampleToRate(
   targetSampleRate: number,
 ): Float32Array[] {
   if (originalSampleRate === targetSampleRate) return channels;
-
   const outputFrames = resampledFrames(frameCount(channels), originalSampleRate, targetSampleRate);
-  const step = originalSampleRate / targetSampleRate;
+  return resampleByStep(channels, originalSampleRate / targetSampleRate, outputFrames);
+}
+
+/**
+ * Output frame i is the band-limited source at position i·step — a sample-rate
+ * change (step = from/to) or a tape-style speed-up (step = speed). For
+ * step > 1 the cutoff drops to 1/step of the source Nyquist. Edge samples are
+ * held beyond the buffer's ends, so audio that starts on a transient (as
+ * trimmed samples do) isn't faded in.
+ */
+export function resampleByStep(channels: Float32Array[], step: number, outputFrames: number): Float32Array[] {
   // Cutoff in cycles per source sample, times 2: kernel zero crossings per source sample.
-  const cutoff = Math.min(1, targetSampleRate / originalSampleRate) * ROLLOFF;
+  const cutoff = Math.min(1, 1 / step) * ROLLOFF;
   const halfWidth = ZERO_CROSSINGS / cutoff;
   const tableScale = cutoff * TABLE_STEPS;
 
   return channels.map((channel) => {
     const last = channel.length - 1;
     const output = new Float32Array(outputFrames);
+    if (last < 0) return output;
     for (let i = 0; i < outputFrames; i++) {
       const centre = i * step;
       const first = Math.ceil(centre - halfWidth);

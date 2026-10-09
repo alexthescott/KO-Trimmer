@@ -14,23 +14,11 @@ describe('speedUp', () => {
     expect(out.length).toBe(500);
   });
 
-  it('interpolates values along a linear ramp', () => {
-    // ramp(i) = i; the centred anti-alias filter is linear-phase, so interior
-    // samples land exactly on even indices: 2, 4, 6, ... (edges are clamped).
-    const ramp = Float32Array.from({ length: 10 }, (_, i) => i);
-    const [out] = speedUp([ramp], 2.0);
-    expect(out.length).toBe(5);
-    for (let i = 1; i < out.length; i++) {
-      expect(out[i]).toBeCloseTo(i * 2, 5);
-    }
-  });
-
-  it('interpolates without filtering below 1.5x', () => {
-    const ramp = Float32Array.from({ length: 20 }, (_, i) => i);
-    const [out] = speedUp([ramp], 1.25);
-    expect(out.length).toBe(16);
-    for (let i = 0; i < out.length; i++) {
-      expect(out[i]).toBeCloseTo(i * 1.25, 5);
+  it('follows a linear ramp away from the edges (the filter is linear-phase)', () => {
+    for (const speed of [1.25, 2, 2.37]) {
+      const ramp = Float32Array.from({ length: 2000 }, (_, i) => i / 2000);
+      const [out] = speedUp([ramp], speed);
+      for (let i = 200; i < out.length - 200; i++) expect(out[i]).toBeCloseTo((i * speed) / 2000, 4);
     }
   });
 
@@ -38,23 +26,31 @@ describe('speedUp', () => {
     const channel = new Float32Array(900).fill(0.5);
     const [out] = speedUp([channel], 3.0);
     expect(out.length).toBe(300);
-    expect(out[150]).toBeCloseTo(0.5, 5);
+    for (const sample of out) expect(sample).toBeCloseTo(0.5, 5); // DC holds right to the edges
   });
 
-  it('attenuates source-Nyquist content at 2x instead of aliasing it to DC', () => {
-    const nyquist = Float32Array.from({ length: 1000 }, (_, i) => (i % 2 === 0 ? 1 : -1));
-    const [out] = speedUp([nyquist], 2.0);
-    for (let i = 1; i < out.length; i++) {
-      expect(Math.abs(out[i])).toBeLessThan(1e-6);
-    }
+  it.each([1.25, 1.4, 2, 3])('removes content pushed above Nyquist at %sx instead of aliasing it', (speed) => {
+    // 0.45 cycles/sample at the source lands at 0.45·speed > 0.5 after speeding up.
+    const high = Float32Array.from({ length: 8000 }, (_, i) => Math.sin(2 * Math.PI * 0.45 * i));
+    const [out] = speedUp([high], speed);
+    let peak = 0;
+    for (let i = 200; i < out.length - 200; i++) peak = Math.max(peak, Math.abs(out[i]));
+    expect(peak).toBeLessThan(1e-3);
+  });
+
+  it('keeps content that stays below Nyquist', () => {
+    const low = Float32Array.from({ length: 8000 }, (_, i) => Math.sin(2 * Math.PI * 0.05 * i));
+    const [out] = speedUp([low], 2);
+    let sumSquares = 0;
+    for (let i = 200; i < out.length - 200; i++) sumSquares += out[i] * out[i];
+    expect(Math.sqrt(sumSquares / (out.length - 400))).toBeCloseTo(Math.SQRT1_2, 3); // full-level sine
   });
 
   it('applies the same resample to every channel independently', () => {
-    const left = Float32Array.from({ length: 10 }, (_, i) => i);
-    const right = Float32Array.from({ length: 10 }, (_, i) => -i);
+    const left = Float32Array.from({ length: 1000 }, (_, i) => Math.sin(i / 20));
+    const right = left.map((v) => -v);
     const [outLeft, outRight] = speedUp([left, right], 2.0);
-    expect(outLeft[1]).toBeCloseTo(2, 5);
-    expect(outRight[1]).toBeCloseTo(-2, 5);
+    outLeft.forEach((v, i) => expect(outRight[i]).toBeCloseTo(-v, 6));
   });
 });
 

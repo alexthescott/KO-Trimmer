@@ -180,8 +180,10 @@ walk skips any directory named `*_trimmed` to avoid reprocessing its own output.
 3. **KO-II >20s check uses final processed duration** (after trim + speed-up), since
    that's what ends up on the hardware (`audio/pipeline.ts` → `audio/naming.ts`).
 4. **Speed-up**: tape-style resample (`audio/speedResample.ts`, 1.0x–3.0x, default off)
-   that shortens duration and raises pitch. At ≥1.5x it averages `round(speed)` centred
-   taps per output sample (linear-phase box anti-alias).
+   that shortens duration and raises pitch. It reads the source at `speed` samples per
+   output sample through the same Kaiser-windowed sinc as WAV rate reduction
+   (`sampleRateResample.ts::resampleByStep`), cutoff at 1/speed of Nyquist, so nothing
+   aliases at any speed; length is `speedUpFrames` (shared with the estimate).
 5. **MP3 encoding is pure-JS** (`@breezystack/lamejs`, runs in the worker) — zero
    native dependencies.
 
