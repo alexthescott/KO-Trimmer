@@ -25,7 +25,7 @@ export interface FileTableOptions {
 
 export class FileTable {
   element: HTMLElement;
-  selectedId: string | null = null;
+  private selected: string | null = null;
   private options: FileTableOptions;
   private preserveBitDepth: boolean;
   private lastFiles: FileEntry[] = [];
@@ -34,6 +34,7 @@ export class FileTable {
   private nameCells = new Map<string, HTMLElement>();
   private statusCells = new Map<string, HTMLElement>();
   private rowIndexById = new Map<string, number>();
+  private rows = new Map<string, HTMLTableRowElement>();
 
   constructor(options: FileTableOptions) {
     this.options = options;
@@ -41,9 +42,19 @@ export class FileTable {
     this.element = h('table', { class: 'file-table' });
   }
 
+  get selectedId(): string | null {
+    return this.selected;
+  }
+
+  /** Moves the highlight without notifying onSelect — two class toggles, not a re-render. */
+  set selectedId(id: string | null) {
+    if (this.selected !== null) this.rows.get(this.selected)?.classList.remove('selected');
+    this.selected = id;
+    if (id !== null) this.rows.get(id)?.classList.add('selected');
+  }
+
   select(id: string | null): void {
     this.selectedId = id;
-    this.render(this.lastFiles);
     const file = this.lastFiles.find((f) => f.id === id);
     if (file) this.options.onSelect?.(file);
   }
@@ -94,6 +105,7 @@ export class FileTable {
     this.sizeCells.clear();
     this.nameCells.clear();
     this.statusCells.clear();
+    this.rows.clear();
     this.rowIndexById = new Map(files.map((f, i) => [f.id, i]));
     if (files.length === 0) {
       this.element.replaceChildren(h('tbody', {}, [h('tr', {}, [h('td', {}, ['No files added yet.'])])]));
@@ -132,6 +144,7 @@ export class FileTable {
         removeCell,
       ]);
       row.addEventListener('click', () => this.select(file.id));
+      this.rows.set(file.id, row);
       return row;
     });
 
