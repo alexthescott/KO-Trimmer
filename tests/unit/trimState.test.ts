@@ -80,4 +80,19 @@ describe('TrimState', () => {
     range.start = 12345;
     expect(trim.range.start).not.toBe(12345);
   });
+
+  it('nudges a handle by a frame delta, with the same clamping as a drag', () => {
+    const trim = new TrimState({ channels: [new Float32Array(1000)], sampleRate: 1000 }, DEFAULT_SETTINGS, {
+      start: 100,
+      end: 900,
+    });
+    trim.nudgeHandle('start', 50);
+    trim.nudgeHandle('end', -25);
+    expect(trim.range).toEqual({ start: 150, end: 875 });
+    trim.nudgeHandle('start', -10_000);
+    trim.nudgeHandle('end', 10_000);
+    expect(trim.range).toEqual({ start: 0, end: 1000 });
+    trim.nudgeHandle('start', 10_000);
+    expect(trim.range).toEqual({ start: 999, end: 1000 }); // never crosses the end handle
+  });
 });

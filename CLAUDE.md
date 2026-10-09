@@ -206,7 +206,8 @@ folded into the web app rather than maintained separately:
   render (`renderAudible` + that encode) runs in `workers/preview.worker.ts`
   (`audio/previewJob.ts`, client `audio/preview.ts`) since resampling is pure JS now;
   Space plays/stops, Up/Down moves the file selection, Delete/Backspace removes the
-  selected file (with confirm).
+  selected file (with confirm). With the waveform focused, `[`/`]` pick the start/end
+  handle, ←/→ nudge it one screen pixel (Shift ×10), R reverts to auto.
 - **Size estimates**: per-file in the editor and in the file table's Size column
   (`old → ~new`, actual size once processed), whole-batch next to Process.
   `app/batchEstimate.ts` analyses every file one at a time in `analysis.worker.ts` (WAV/

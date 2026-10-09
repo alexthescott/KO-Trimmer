@@ -56,6 +56,11 @@ export class TrimState {
     else this.current.end = Math.max(clamped, this.current.start + 1);
   }
 
+  /** Moves a handle by `deltaFrames` (keyboard nudge), with moveHandle's clamping. */
+  nudgeHandle(handle: TrimHandle, deltaFrames: number): void {
+    this.moveHandle(handle, (handle === 'start' ? this.current.start : this.current.end) + deltaFrames);
+  }
+
   /** A drag ended: the current range becomes the manual override. */
   commitManual(): void {
     this.manual = true;

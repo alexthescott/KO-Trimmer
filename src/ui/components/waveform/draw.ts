@@ -95,6 +95,12 @@ export function drawHandle(ctx: CanvasRenderingContext2D, x: number, dpr: number
   ctx.fillRect(Math.round(x - 5 * dpr), 0, 10 * dpr, 10 * dpr);
 }
 
+/** Marks the handle keyboard nudges will move: a cap at the bottom, mirroring the handle's top cap. */
+export function drawFocusMarker(ctx: CanvasRenderingContext2D, x: number, dpr: number, color: string): void {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.round(x - 5 * dpr), ctx.canvas.height - 10 * dpr, 10 * dpr, 10 * dpr);
+}
+
 export function drawPlayhead(ctx: CanvasRenderingContext2D, x: number, dpr: number, color: string): void {
   ctx.fillStyle = color;
   ctx.fillRect(Math.round(x), 0, Math.max(1, dpr), ctx.canvas.height);

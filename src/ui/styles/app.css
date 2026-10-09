@@ -437,6 +437,11 @@ input[type='checkbox'] {
   touch-action: none;
 }
 
+.wave-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .wave-original {
   height: 160px;
 }

@@ -16,6 +16,7 @@ import { PreviewPlayback, type PlaybackTarget } from './waveform/PreviewPlayback
 import {
   dimOutside,
   drawHandle,
+  drawFocusMarker,
   drawPlayhead,
   drawWave,
   LayeredCanvas,
@@ -29,6 +30,10 @@ const HANDLE_HIT_PX = 8;
 const ZOOM_IN_FACTOR = 0.8;
 const ZOOM_OUT_FACTOR = 1.25;
 const NO_FILE_TEXT = 'Select a file to see its waveform and trim points.';
+/** Shift-nudges move this many times further than a plain nudge (one screen pixel). */
+const COARSE_NUDGE = 10;
+const KEYBOARD_HELP =
+  'Trim handles. [ and ] pick the start or end handle; left and right arrows move it (shift for bigger steps); R resets to auto.';
 
 /** Everything known about the shown file once it has decoded; all set together. */
 interface LoadedFile {
@@ -55,6 +60,8 @@ export class WaveformEditor {
   private preview: PreviewRenderer;
 
   private drag?: TrimHandle;
+  /** The handle keyboard nudges move: the last one picked with [ / ] or grabbed with the pointer. */
+  private activeHandle: TrimHandle = 'start';
   private playback = new PreviewPlayback({
     onStateChange: () => {
       this.updateButtons();
@@ -88,7 +95,11 @@ export class WaveformEditor {
     this.trimInfoEl = h('div', { class: 'readout muted' });
     this.placeholderEl = h('p', { class: 'muted' }, [NO_FILE_TEXT]);
 
-    this.originalCanvas = h('canvas', { class: 'wave-canvas wave-original' });
+    this.originalCanvas = h('canvas', {
+      class: 'wave-canvas wave-original',
+      tabindex: '0',
+      'aria-label': KEYBOARD_HELP,
+    });
     this.processedCanvas = h('canvas', { class: 'wave-canvas wave-processed' });
     this.originalLayer = new LayeredCanvas(this.originalCanvas);
     this.processedLayer = new LayeredCanvas(this.processedCanvas);
@@ -106,7 +117,7 @@ export class WaveformEditor {
         this.playOriginalButton,
         this.playProcessedButton,
         h('small', { class: 'muted' }, [
-          'Drag handles to trim · scroll to zoom · shift-scroll to pan · double-click a handle to reset · space to play',
+          'Drag handles to trim · scroll to zoom · shift-scroll to pan · double-click a handle to reset · space to play · focus the waveform for [ ] ← → keys',
         ]),
       ]),
     ]);
@@ -328,7 +339,10 @@ export class WaveformEditor {
     canvas.addEventListener('pointerdown', (e) => {
       if (!this.loaded) return;
       this.drag = this.hitTestHandle(e.clientX);
-      if (this.drag) canvas.setPointerCapture(e.pointerId);
+      if (this.drag) {
+        this.activeHandle = this.drag;
+        canvas.setPointerCapture(e.pointerId);
+      }
     });
 
     canvas.addEventListener('pointermove', (e) => {
@@ -362,6 +376,33 @@ export class WaveformEditor {
     });
 
     canvas.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
+    canvas.addEventListener('keydown', (e) => this.handleKeyDown(e));
+    canvas.addEventListener('focus', () => this.draw());
+    canvas.addEventListener('blur', () => this.draw());
+  }
+
+  /** Keyboard trim: [ / ] pick a handle, arrows nudge it by one screen pixel of the current zoom, R reverts. */
+  private handleKeyDown(e: KeyboardEvent): void {
+    if (!this.loaded || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === '[' || e.key === ']') {
+      this.activeHandle = e.key === '[' ? 'start' : 'end';
+      this.draw();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const pixelFrames = this.viewport.range / Math.max(1, this.originalCanvas.getBoundingClientRect().width);
+      const step = Math.max(1, Math.round(pixelFrames)) * (e.shiftKey ? COARSE_NUDGE : 1);
+      this.loaded.trim.nudgeHandle(this.activeHandle, e.key === 'ArrowLeft' ? -step : step);
+      this.loaded.trim.commitManual();
+      if (this.file) appState.updateFile(this.file.id, { manualTrim: this.loaded.trim.range });
+      this.updateReadouts();
+      this.draw();
+      this.preview.schedule(); // debounced: key repeat shouldn't render every step
+    } else if (e.key === 'r' || e.key === 'R') {
+      this.revertToAutoTrim();
+    } else {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation(); // keep MainView's shortcuts out of it
   }
 
   private handleWheel(e: WheelEvent): void {
@@ -392,6 +433,9 @@ export class WaveformEditor {
       dimOutside(ctx, xStart, xEnd, colors.dim);
       drawHandle(ctx, xStart, dpr, colors.success);
       drawHandle(ctx, xEnd, dpr, colors.danger);
+      if (document.activeElement === this.originalCanvas) {
+        drawFocusMarker(ctx, this.activeHandle === 'start' ? xStart : xEnd, dpr, colors.accent);
+      }
     });
     const processed = this.processed;
     this.processedLayer.paint((ctx) => {
