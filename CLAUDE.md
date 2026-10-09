@@ -24,6 +24,7 @@ npm run build      # typecheck && vite build -> dist/
 npm run preview    # serve the production build locally
 npm run test:e2e   # Playwright E2E in Chromium/Firefox/WebKit against the build
 npm run icons      # regenerate PWA icons from assets/Knockout.svg
+npm run screenshots # regenerate README screenshots (Playwright + a synthetic Drums kit)
 ```
 
 Deploys automatically: pushing to `main` triggers `.github/workflows/deploy-pwa.yml`,
@@ -104,6 +105,8 @@ tests/unit/       Vitest specs for every pure audio/ module plus the pure logic 
                   run these first when touching DSP logic; they encode the exact
                   algorithms below.
 scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.svg)
+                  screenshots.ts (README images in docs/screenshots/, Chromium +
+                  OPFS-stubbed folder picker)
 ```
 
 **Processing pipeline (fixed order, `audio/pipeline.ts`):**

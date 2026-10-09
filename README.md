@@ -52,6 +52,7 @@ npm run test:e2e   # Playwright end-to-end tests in Chromium, Firefox and WebKit
 npm run build      # typecheck + production build to dist/
 npm run preview    # serve dist/ locally at the /KO-Trimmer/ base path
 npm run icons      # regenerate PWA icons from assets/Knockout.svg
+npm run screenshots # regenerate docs/screenshots/ from the production build
 ```
 
 Unit tests cover the DSP (energy envelope, silence detection, leading+trailing trim,
