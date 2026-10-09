@@ -193,7 +193,9 @@ button.icon-button:hover {
   text-align: center;
   color: var(--text-dim);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .drop-zone button {

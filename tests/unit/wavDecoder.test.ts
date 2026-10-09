@@ -17,7 +17,10 @@ describe('decodeWav', () => {
     const decoded = decodeWav(encodeWav([left, right], 44100, format))!;
     expect(decoded.sampleRate).toBe(44100);
     expect(decoded.channels).toHaveLength(2);
-    for (const [out, src] of [[decoded.channels[0], left], [decoded.channels[1], right]]) {
+    for (const [out, src] of [
+      [decoded.channels[0], left],
+      [decoded.channels[1], right],
+    ]) {
       expect(out).toHaveLength(src.length);
       out.forEach((v, i) => expect(Math.abs(v - src[i])).toBeLessThanOrEqual(tolerance));
     }
@@ -44,14 +47,35 @@ describe('decodeWav', () => {
     const u32 = (v: number) => [...u16(v & 0xffff), ...u16(v >>> 16)];
     const fourcc = (s: string) => Array.from(s, (c) => c.charCodeAt(0));
     const fmt = [
-      ...u16(0xfffe), ...u16(1), ...u32(8000), ...u32(16000), ...u16(2), ...u16(16),
-      ...u16(22), ...u16(16), ...u32(4), ...u16(1), ...new Array(14).fill(0),
+      ...u16(0xfffe),
+      ...u16(1),
+      ...u32(8000),
+      ...u32(16000),
+      ...u16(2),
+      ...u16(16),
+      ...u16(22),
+      ...u16(16),
+      ...u32(4),
+      ...u16(1),
+      ...new Array(14).fill(0),
     ];
     const bytes = new Uint8Array([
-      ...fourcc('RIFF'), ...u32(0), ...fourcc('WAVE'),
-      ...fourcc('JUNK'), ...u32(3), 0, 0, 0, 0,
-      ...fourcc('fmt '), ...u32(fmt.length), ...fmt,
-      ...fourcc('data'), ...u32(4), ...u16(0x4000), ...u16(0xc000),
+      ...fourcc('RIFF'),
+      ...u32(0),
+      ...fourcc('WAVE'),
+      ...fourcc('JUNK'),
+      ...u32(3),
+      0,
+      0,
+      0,
+      0,
+      ...fourcc('fmt '),
+      ...u32(fmt.length),
+      ...fmt,
+      ...fourcc('data'),
+      ...u32(4),
+      ...u16(0x4000),
+      ...u16(0xc000),
     ]);
     const decoded = decodeWav(bytes)!;
     expect(decoded.sampleRate).toBe(8000);

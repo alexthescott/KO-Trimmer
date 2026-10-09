@@ -96,9 +96,7 @@ export class FileTable {
     this.statusCells.clear();
     this.rowIndexById = new Map(files.map((f, i) => [f.id, i]));
     if (files.length === 0) {
-      this.element.replaceChildren(
-        h('tbody', {}, [h('tr', {}, [h('td', {}, ['No files added yet.'])])]),
-      );
+      this.element.replaceChildren(h('tbody', {}, [h('tr', {}, [h('td', {}, ['No files added yet.'])])]));
       return;
     }
 
@@ -164,7 +162,7 @@ function statusText(file: FileEntry): string {
     case 'queued':
       return 'Queued';
     case 'processing':
-      return file.stage ? STAGE_LABEL[file.stage] ?? 'Processing…' : 'Processing…';
+      return file.stage ? (STAGE_LABEL[file.stage] ?? 'Processing…') : 'Processing…';
     case 'done': {
       if (!file.stats) return 'Done';
       const warn = file.warning ? ` — ${file.warning}` : '';

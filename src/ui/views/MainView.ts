@@ -46,14 +46,18 @@ export class MainView {
     this.outputLocationEl = h('p', { class: 'muted' });
     this.batchEstimateEl = h('span', { class: 'readout muted' });
 
-    this.processButton = h('button', {
-      class: 'primary',
-      disabled: true,
-      onclick: () => void this.handleProcess(onProcess),
-    }, ['Process Files']);
+    this.processButton = h(
+      'button',
+      {
+        class: 'primary',
+        disabled: true,
+        onclick: () => void this.handleProcess(onProcess),
+      },
+      ['Process Files'],
+    );
 
     const clearButton = h('button', { onclick: () => this.handleClear() }, ['Clear All']);
-    const chooseOutputButton = h('button', { onclick: () => this.handleChooseOutputDirectory() }, [
+    const chooseOutputButton = h('button', { onclick: () => void this.handleChooseOutputDirectory() }, [
       'Choose output folder…',
     ]);
 

@@ -6,11 +6,7 @@ import { frameCount } from './channels';
  * across frame positions spread evenly over [0, N] (linspace-style), not
  * true frame centers.
  */
-export function computeEnergyEnvelope(
-  channels: Float32Array[],
-  frameLength = 2048,
-  hopLength = 512,
-): Float32Array {
+export function computeEnergyEnvelope(channels: Float32Array[], frameLength = 2048, hopLength = 512): Float32Array {
   const n = frameCount(channels);
   if (n === 0) return new Float32Array(0);
 

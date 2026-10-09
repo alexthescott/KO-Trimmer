@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { WorkerPool } from '../../src/workers/workerPool';
-import { UnsupportedFileError, type QueuedJob, type WorkerInMessage, type WorkerOutMessage } from '../../src/workers/protocol';
+import {
+  UnsupportedFileError,
+  type QueuedJob,
+  type WorkerInMessage,
+  type WorkerOutMessage,
+} from '../../src/workers/protocol';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
 /** Stand-in Worker: records what it's sent; the test plays the worker's replies. */
@@ -63,7 +68,10 @@ function makePool(size: number) {
   return { pool, workers, onProgress };
 }
 
-function job(fileId: string, source: QueuedJob['source'] = { kind: 'file', file: new File([], `${fileId}.wav`) }): QueuedJob {
+function job(
+  fileId: string,
+  source: QueuedJob['source'] = { kind: 'file', file: new File([], `${fileId}.wav`) },
+): QueuedJob {
   return { fileId, source, extension: 'wav', baseName: fileId, settings: DEFAULT_SETTINGS, originalBytes: 10 };
 }
 

@@ -7,13 +7,8 @@ import type { BatchSummary } from '../../app/processBatch';
  * A single consolidated "done" surface: results, errors, and KO-II
  * warnings in one place.
  */
-export function renderResultsSummary(
-  summary: BatchSummary,
-  outputDescription: string,
-): HTMLElement {
-  const rows: HTMLElement[] = [
-    h('p', {}, [`Processed: ${summary.processedCount}`]),
-  ];
+export function renderResultsSummary(summary: BatchSummary, outputDescription: string): HTMLElement {
+  const rows: HTMLElement[] = [h('p', {}, [`Processed: ${summary.processedCount}`])];
   if (summary.skippedCount > 0) rows.push(h('p', {}, [`Skipped: ${summary.skippedCount}`]));
   if (summary.errorCount > 0) {
     rows.push(h('p', { style: 'color:var(--danger)' }, [`Failed: ${summary.errorCount}`]));
@@ -45,7 +40,11 @@ export function renderResultsSummary(
         h('p', {}, [
           `${plural(overLength.length, 'file')} still over ${KO_II_MAX_DURATION_SEC}s — saved with a leading underscore for KO II sorting:`,
         ]),
-        h('ul', {}, overLength.map((name) => h('li', {}, [name]))),
+        h(
+          'ul',
+          {},
+          overLength.map((name) => h('li', {}, [name])),
+        ),
       ]),
     );
   }

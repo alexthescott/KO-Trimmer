@@ -52,4 +52,4 @@ async function bootstrap(): Promise<void> {
   registerServiceWorker();
 }
 
-bootstrap();
+void bootstrap();

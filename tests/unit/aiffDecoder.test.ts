@@ -74,7 +74,15 @@ function aiff(channels: number[][], { bits, sampleRate = 44100, compression, ssn
 
 describe('decodeAiff', () => {
   it('decodes 16-bit big-endian stereo, scaled like decodeAudioData', () => {
-    const decoded = decodeAiff(aiff([[0, 0x4000, -0x8000], [0x7fff, -0x4000, 0]], { bits: 16 }))!;
+    const decoded = decodeAiff(
+      aiff(
+        [
+          [0, 0x4000, -0x8000],
+          [0x7fff, -0x4000, 0],
+        ],
+        { bits: 16 },
+      ),
+    )!;
     expect(decoded.sampleRate).toBe(44100);
     expect(Array.from(decoded.channels[0])).toEqual([0, 0.5, -1]);
     expect(Array.from(decoded.channels[1])).toEqual([Math.fround(0x7fff / 0x8000), -0.5, 0]);

@@ -23,13 +23,17 @@ describe('trimInfoText', () => {
   it('shows the auto warning only without a manual override, plus any clip warning', () => {
     expect(trimInfoText(input({ autoWarning: 'not trimmed' }))).toMatch(/ · not trimmed$/);
     expect(trimInfoText(input({ autoWarning: 'not trimmed', isManual: true }))).not.toMatch(/not trimmed/);
-    expect(trimInfoText(input({ processedPeak: 2 }))).toMatch(/ · Kept 32-bit float — peaks \+6\.0 dB over full scale would clip at 16-bit$/);
+    expect(trimInfoText(input({ processedPeak: 2 }))).toMatch(
+      / · Kept 32-bit float — peaks \+6\.0 dB over full scale would clip at 16-bit$/,
+    );
   });
 });
 
 describe('sizeSummaryText', () => {
   it('shows the estimate, bit-depth conversion and sample-rate reduction', () => {
-    const text = sizeSummaryText(input({ sampleRate: 44100, settings: { ...DEFAULT_SETTINGS, wavSampleRateHz: 22050 } }));
+    const text = sizeSummaryText(
+      input({ sampleRate: 44100, settings: { ...DEFAULT_SETTINGS, wavSampleRateHz: 22050 } }),
+    );
     expect(text).toMatch(/^390\.7 KB → ~/);
     expect(text).toMatch(/ · 32-bit float → 16-bit · 44\.1 → 22\.05 kHz$/);
   });

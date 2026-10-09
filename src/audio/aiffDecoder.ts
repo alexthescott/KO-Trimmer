@@ -41,7 +41,8 @@ export function decodeAiff(bytes: Uint8Array): PcmAudio | undefined {
     }
   }
   if (!fmt) return undefined;
-  if (!data) return { channels: Array.from({ length: fmt.channels }, () => new Float32Array(0)), sampleRate: fmt.sampleRate };
+  if (!data)
+    return { channels: Array.from({ length: fmt.channels }, () => new Float32Array(0)), sampleRate: fmt.sampleRate };
 
   const blockAlign = fmt.channels * fmt.bytesPerSample;
   const frames = Math.min(fmt.frames, Math.floor(data.available / blockAlign));
@@ -65,5 +66,13 @@ function readComm(
 
   const bytesPerSample = layout.float ? (compression.endsWith('64') ? 8 : 4) : Math.ceil(bits / 8);
   if (!layout.float && (bytesPerSample < 1 || bytesPerSample > 4)) return undefined;
-  return { channels, sampleRate, frames, bytesPerSample, float: layout.float, littleEndian: layout.littleEndian, unsigned8: false };
+  return {
+    channels,
+    sampleRate,
+    frames,
+    bytesPerSample,
+    float: layout.float,
+    littleEndian: layout.littleEndian,
+    unsigned8: false,
+  };
 }

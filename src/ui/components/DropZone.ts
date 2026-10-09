@@ -14,13 +14,17 @@ export class DropZone {
   private filesInput: HTMLInputElement;
 
   constructor() {
-    const chooseFilesButton = h('button', {
-      type: 'button',
-      onclick: (e: Event) => {
-        e.stopPropagation();
-        void this.handleChooseFiles();
+    const chooseFilesButton = h(
+      'button',
+      {
+        type: 'button',
+        onclick: (e: Event) => {
+          e.stopPropagation();
+          void this.handleChooseFiles();
+        },
       },
-    }, ['Choose files…']);
+      ['Choose files…'],
+    );
 
     const zone = h('div', { class: 'drop-zone', tabindex: '0', role: 'button' }, [
       h('p', {}, ['Drop audio files or folders here, or click to choose a folder.']),
@@ -33,16 +37,12 @@ export class DropZone {
       zone.classList.add('drag-over');
     });
     zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-    zone.addEventListener('drop', async (e) => {
+    zone.addEventListener('drop', (e) => {
       e.preventDefault();
       zone.classList.remove('drag-over');
-      const dataTransfer = (e as DragEvent).dataTransfer;
-      if (!dataTransfer) return;
-      const { entries, rootHandle } = await resolveDroppedItems(dataTransfer.items);
-      if (rootHandle) appState.useSourceRoot(rootHandle);
-      await this.addEntries(entries);
+      if (e.dataTransfer) void this.handleDrop(e.dataTransfer.items);
     });
-    zone.addEventListener('click', () => this.handleClick());
+    zone.addEventListener('click', () => void this.handleClick());
     zone.addEventListener('keydown', (e) => {
       if (e.target !== zone || (e.key !== 'Enter' && e.key !== ' ')) return;
       e.preventDefault();
@@ -59,16 +59,22 @@ export class DropZone {
 
   private hiddenInput(attrs: Record<string, string | boolean>): HTMLInputElement {
     const input = h('input', { type: 'file', multiple: true, style: 'display:none', ...attrs });
-    input.addEventListener('change', async () => {
+    input.addEventListener('change', () => {
       const entries = Array.from(input.files ?? [], (file) => ({
         name: file.name,
         relativePath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name,
         file,
       }));
-      await this.addEntries(entries);
       input.value = '';
+      void this.addEntries(entries);
     });
     return input;
+  }
+
+  private async handleDrop(items: DataTransferItemList): Promise<void> {
+    const { entries, rootHandle } = await resolveDroppedItems(items);
+    if (rootHandle) appState.useSourceRoot(rootHandle);
+    await this.addEntries(entries);
   }
 
   private async handleClick(): Promise<void> {

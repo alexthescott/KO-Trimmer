@@ -8,10 +8,7 @@ import { writeFile } from './writeFile';
  * True "Overwrite" support: writes directly back to the exact source
  * FileSystemFileHandle, bypassing all derived-name/output-directory logic.
  */
-export async function overwriteSourceFile(
-  fileHandle: FileSystemFileHandle,
-  bytes: Uint8Array,
-): Promise<void> {
+export async function overwriteSourceFile(fileHandle: FileSystemFileHandle, bytes: Uint8Array): Promise<void> {
   if (!(await ensureReadWrite(fileHandle))) {
     throw new Error('Write permission to overwrite the original file was not granted.');
   }

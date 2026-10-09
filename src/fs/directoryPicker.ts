@@ -57,6 +57,8 @@ export function defaultOutputFolderName(sourceRootHandle: FileSystemDirectoryHan
 }
 
 /** Creates the default output folder; needs readwrite permission on the source root. */
-export async function resolveDefaultOutputRoot(sourceRootHandle: FileSystemDirectoryHandle): Promise<FileSystemDirectoryHandle> {
+export async function resolveDefaultOutputRoot(
+  sourceRootHandle: FileSystemDirectoryHandle,
+): Promise<FileSystemDirectoryHandle> {
   return sourceRootHandle.getDirectoryHandle(defaultOutputFolderName(sourceRootHandle), { create: true });
 }

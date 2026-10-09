@@ -3,7 +3,8 @@ import { resolveDroppedItems, walkDirectoryHandle } from '../../src/fs/dragDropE
 
 // Minimal stand-ins for the browser's FileSystemHandle and FileSystemEntry APIs.
 
-type FakeHandle = { kind: 'file'; name: string } | { kind: 'directory'; name: string; values(): AsyncIterable<FakeHandle> };
+type FakeHandle =
+  { kind: 'file'; name: string } | { kind: 'directory'; name: string; values(): AsyncIterable<FakeHandle> };
 
 const fileHandle = (name: string): FakeHandle => ({ kind: 'file', name });
 const dirHandle = (name: string, children: FakeHandle[]): FakeHandle => ({
@@ -57,7 +58,10 @@ describe('walkDirectoryHandle', () => {
   });
 
   it('skips *_trimmed output folders', async () => {
-    const root = dirHandle('kit', [fileHandle('kick.wav'), dirHandle('kit_trimmed', [fileHandle('kick_trimmed_stereo.wav')])]);
+    const root = dirHandle('kit', [
+      fileHandle('kick.wav'),
+      dirHandle('kit_trimmed', [fileHandle('kick_trimmed_stereo.wav')]),
+    ]);
     expect(paths(await walkDirectoryHandle(root as unknown as FileSystemDirectoryHandle))).toEqual(['kit/kick.wav']);
   });
 });

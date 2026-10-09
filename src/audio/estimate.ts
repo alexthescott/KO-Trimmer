@@ -53,10 +53,7 @@ export interface BatchEstimateSample {
  * their output/input byte ratio to the remainder (files not yet analysed,
  * or that failed to decode).
  */
-export function extrapolateBatchEstimate(
-  samples: BatchEstimateSample[],
-  totalOriginalBytes: number,
-): number {
+export function extrapolateBatchEstimate(samples: BatchEstimateSample[], totalOriginalBytes: number): number {
   if (samples.length === 0) return totalOriginalBytes;
   const sampledOriginal = samples.reduce((sum, s) => sum + s.originalBytes, 0);
   const sampledEstimate = samples.reduce((sum, s) => sum + s.estimatedBytes, 0);

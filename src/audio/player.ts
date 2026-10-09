@@ -15,11 +15,7 @@ let current: { source: AudioBufferSourceNode; handle: PlaybackHandle } | null = 
  * SamplePlayer). Only one preview plays at a time; starting a new one
  * stops the previous.
  */
-export function playChannels(
-  channels: Float32Array[],
-  sampleRate: number,
-  onEnded: () => void,
-): PlaybackHandle | null {
+export function playChannels(channels: Float32Array[], sampleRate: number, onEnded: () => void): PlaybackHandle | null {
   stopPlayback();
   if (frameCount(channels) === 0) return null;
 

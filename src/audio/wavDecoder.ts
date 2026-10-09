@@ -59,7 +59,11 @@ function readFmt(view: DataView, body: number, size: number): WavFmt | undefined
   if (channels === 0 || sampleRate === 0 || blockAlign % channels !== 0) return undefined;
   const bytesPerSample = blockAlign / channels;
   const float = formatTag === WAVE_FORMAT_IEEE_FLOAT;
-  if (float ? bytesPerSample !== 4 && bytesPerSample !== 8 : formatTag !== WAVE_FORMAT_PCM || bytesPerSample < 1 || bytesPerSample > 4) {
+  if (
+    float
+      ? bytesPerSample !== 4 && bytesPerSample !== 8
+      : formatTag !== WAVE_FORMAT_PCM || bytesPerSample < 1 || bytesPerSample > 4
+  ) {
     return undefined;
   }
   return { channels, sampleRate, blockAlign, bytesPerSample, float, littleEndian: true, unsigned8: true };

@@ -26,19 +26,36 @@ export class SettingsPanel {
     const s = appState.settings;
 
     const el = h('div', { class: 'settings-grid' }, [
-      field('Silence Threshold', sliderInput('threshold', s.thresholdDb, SETTINGS_RANGES.thresholdDb, (v) => `${v} dB`, (v) =>
-        appState.updateSettings({ thresholdDb: v }),
-      )),
-      field('Min Silence Duration (ms)', numberInput('minDuration', s.minDurationMs, SETTINGS_RANGES.minDurationMs, (v) =>
-        appState.updateSettings({ minDurationMs: v }),
-      )),
-      field('Padding (ms)', numberInput('padding', s.paddingMs, SETTINGS_RANGES.paddingMs, (v) =>
-        appState.updateSettings({ paddingMs: v }),
-      )),
+      field(
+        'Silence Threshold',
+        sliderInput(
+          'threshold',
+          s.thresholdDb,
+          SETTINGS_RANGES.thresholdDb,
+          (v) => `${v} dB`,
+          (v) => appState.updateSettings({ thresholdDb: v }),
+        ),
+      ),
+      field(
+        'Min Silence Duration (ms)',
+        numberInput('minDuration', s.minDurationMs, SETTINGS_RANGES.minDurationMs, (v) =>
+          appState.updateSettings({ minDurationMs: v }),
+        ),
+      ),
+      field(
+        'Padding (ms)',
+        numberInput('padding', s.paddingMs, SETTINGS_RANGES.paddingMs, (v) =>
+          appState.updateSettings({ paddingMs: v }),
+        ),
+      ),
       field(
         'Speed-up (tape-style — raises pitch)',
-        sliderInput('speed', s.speedMultiplier, SETTINGS_RANGES.speedMultiplier, (v) => `${v.toFixed(2)}x`, (v) =>
-          appState.updateSettings({ speedMultiplier: v }),
+        sliderInput(
+          'speed',
+          s.speedMultiplier,
+          SETTINGS_RANGES.speedMultiplier,
+          (v) => `${v.toFixed(2)}x`,
+          (v) => appState.updateSettings({ speedMultiplier: v }),
         ),
       ),
       field(
@@ -54,11 +71,8 @@ export class SettingsPanel {
     ]);
 
     const checkboxes = h('div', { class: 'settings-grid', style: 'margin-top:12px' }, [
-      checkboxRow(
-        'Preserve Stereo',
-        s.preserveStereo,
-        'Unchecked converts to mono.',
-        (checked) => appState.updateSettings({ preserveStereo: checked }),
+      checkboxRow('Preserve Stereo', s.preserveStereo, 'Unchecked converts to mono.', (checked) =>
+        appState.updateSettings({ preserveStereo: checked }),
       ),
       checkboxRow(
         'Preserve Bit Depth',
@@ -131,9 +145,7 @@ function bitrateSelect(value: BitrateKbps, onChange: (v: BitrateKbps) => void): 
   const select = h(
     'select',
     {},
-    BITRATE_OPTIONS.map((kbps) =>
-      h('option', { value: String(kbps), selected: kbps === value }, [`${kbps} kbps`]),
-    ),
+    BITRATE_OPTIONS.map((kbps) => h('option', { value: String(kbps), selected: kbps === value }, [`${kbps} kbps`])),
   );
   select.addEventListener('change', () => onChange(Number(select.value) as BitrateKbps));
   return select;

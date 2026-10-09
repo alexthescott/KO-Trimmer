@@ -72,8 +72,7 @@ export class WorkerPool {
   }
 
   private attach(worker: Worker): Worker {
-    worker.onmessage = (event: MessageEvent<WorkerOutMessage>) =>
-      this.handleMessage(worker, event.data);
+    worker.onmessage = (event: MessageEvent<WorkerOutMessage>) => this.handleMessage(worker, event.data);
     worker.onerror = (event) => {
       const jobId = this.jobIdByWorker.get(worker);
       if (!jobId) return;

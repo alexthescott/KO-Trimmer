@@ -56,7 +56,10 @@ const LEGACY_LOWEST_RATE = 11025;
  * Settings saved before WAV sample rate was split out of "bitrate" carried
  * the rate implicitly in bitrateKbps; carry that choice over once.
  */
-export function migrateLegacyBitrate(settings: ProcessingSettings, stored: Record<string, unknown>): ProcessingSettings {
+export function migrateLegacyBitrate(
+  settings: ProcessingSettings,
+  stored: Record<string, unknown>,
+): ProcessingSettings {
   if ('wavSampleRateHz' in stored || settings.bitrateKbps >= FULL_MP3_BITRATE) return settings;
   const legacyRate =
     LEGACY_RATE_BY_MIN_KBPS.find(([minKbps]) => settings.bitrateKbps >= minKbps)?.[1] ?? LEGACY_LOWEST_RATE;

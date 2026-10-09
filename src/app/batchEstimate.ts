@@ -85,7 +85,7 @@ export class BatchEstimator {
 
       const trimmedFrames = file.manualTrim
         ? file.manualTrim.end - file.manualTrim.start
-        : info.autoFrames.get(detectKey) ?? info.frames;
+        : (info.autoFrames.get(detectKey) ?? info.frames);
       const estimatedBytes = estimateOutputBytes({
         trimmedFrames,
         sourceChannels: info.channels,

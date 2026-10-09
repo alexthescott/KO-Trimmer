@@ -9,7 +9,10 @@ async function contentsOf(zip: Blob): Promise<Record<string, number[]>> {
 
 function sink(partLimitBytes?: number) {
   const saved: Array<{ name: string; zip: Blob }> = [];
-  const zipSink = new ZipOutputSink('kit_trimmed.zip', { save: (zip, name) => saved.push({ name, zip }), partLimitBytes });
+  const zipSink = new ZipOutputSink('kit_trimmed.zip', {
+    save: (zip, name) => saved.push({ name, zip }),
+    partLimitBytes,
+  });
   return { zipSink, saved };
 }
 

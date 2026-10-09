@@ -24,10 +24,7 @@ export class WelcomeView {
           h('li', {}, ['Click Process Files and watch live progress.']),
           h('li', {}, ['Preview the original vs. trimmed result before you use it.']),
         ]),
-        h('div', { class: 'checkbox-row' }, [
-          showOnStartupCheckbox,
-          h('label', {}, ['Show this on startup']),
-        ]),
+        h('div', { class: 'checkbox-row' }, [showOnStartupCheckbox, h('label', {}, ['Show this on startup'])]),
         h('div', { style: 'display:flex; justify-content:flex-end; gap:8px; margin-top:16px' }, [
           h('button', { onclick: finish }, ['Skip for now']),
           h('button', { class: 'primary', onclick: finish }, ['Get Started!']),

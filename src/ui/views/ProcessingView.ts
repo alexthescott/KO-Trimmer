@@ -36,12 +36,8 @@ export class ProcessingView {
     this.logEl = h('div', { class: 'log' });
     this.resultsContainer = h('div');
 
-    this.stopButton = h('button', { class: 'danger', onclick: () => this.handleStop() }, [
-      'Stop Processing',
-    ]);
-    this.closeButton = h('button', { disabled: true, onclick: () => this.onDone() }, [
-      'Close',
-    ]);
+    this.stopButton = h('button', { class: 'danger', onclick: () => this.handleStop() }, ['Stop Processing']);
+    this.closeButton = h('button', { disabled: true, onclick: () => this.onDone() }, ['Close']);
 
     this.element = h('div', { class: 'main-column' }, [
       h('div', { class: 'panel' }, [
@@ -62,7 +58,7 @@ export class ProcessingView {
       this.flushFrame ??= requestAnimationFrame(() => this.flushUpdates());
     });
 
-    this.run(files);
+    void this.run(files);
   }
 
   /** Applies the frame's row updates, logs newly finished files, and advances the progress bar. */

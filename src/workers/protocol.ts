@@ -7,9 +7,7 @@ import type { PcmAudio } from '../audio/channels';
  * or an uncompressed WAV/AIFF file the worker reads and decodes itself (no
  * main-thread work).
  */
-export type JobSource =
-  | ({ kind: 'pcm' } & PcmAudio)
-  | { kind: 'file'; file: File };
+export type JobSource = ({ kind: 'pcm' } & PcmAudio) | { kind: 'file'; file: File };
 
 export interface QueuedJob extends Omit<PipelineRequest, 'channels' | 'sampleRate'> {
   fileId: string;

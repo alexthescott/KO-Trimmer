@@ -28,7 +28,10 @@ function result(fileId: string, stats: Partial<ProcessStats> = {}): JobResult {
     fileId,
     aborted: false,
     bytes: new Uint8Array(100),
-    outputName: `${fileId.split('/').pop()!.replace(/\.\w+$/, '')}_trimmed.wav`,
+    outputName: `${fileId
+      .split('/')
+      .pop()!
+      .replace(/\.\w+$/, '')}_trimmed.wav`,
     outputExtension: 'wav',
     stats: {
       originalBytes: 1000,
@@ -62,7 +65,11 @@ function fakeSink() {
   return { written, write: async (path: string) => void written.push(path), finalize: vi.fn(async () => {}) };
 }
 
-async function run(files: FileEntry[], respond: (job: QueuedJob) => Promise<JobResult>, signal = new AbortController().signal) {
+async function run(
+  files: FileEntry[],
+  respond: (job: QueuedJob) => Promise<JobResult>,
+  signal = new AbortController().signal,
+) {
   const { pool, jobs } = fakePool(respond);
   const sink = fakeSink();
   const updates = new Map<string, Partial<FileEntry>>();
@@ -83,7 +90,13 @@ describe('processBatch', () => {
     const { summary, sink, updates, pool } = await run(files, async (job) => result(job.fileId));
 
     expect(sink.written.sort()).toEqual(['kick_trimmed.wav', 'loose_trimmed.wav', 'snares/snare_trimmed.wav']);
-    expect(summary).toMatchObject({ processedCount: 3, errorCount: 0, originalBytes: 3000, outputBytes: 300, aborted: false });
+    expect(summary).toMatchObject({
+      processedCount: 3,
+      errorCount: 0,
+      originalBytes: 3000,
+      outputBytes: 300,
+      aborted: false,
+    });
     expect(updates.get('kit/kick.wav')).toMatchObject({ status: 'done', outputName: 'kick_trimmed.wav' });
     expect(sink.finalize).toHaveBeenCalledOnce();
     expect(pool.terminate).toHaveBeenCalledOnce();
@@ -132,7 +145,11 @@ describe('processBatch', () => {
   it('skips every file and reports aborted when stopped', async () => {
     const controller = new AbortController();
     controller.abort();
-    const { summary, jobs, updates } = await run([entry('a.wav'), entry('b.wav')], async (job) => result(job.fileId), controller.signal);
+    const { summary, jobs, updates } = await run(
+      [entry('a.wav'), entry('b.wav')],
+      async (job) => result(job.fileId),
+      controller.signal,
+    );
     expect(jobs).toHaveLength(0);
     expect(summary).toMatchObject({ processedCount: 0, skippedCount: 2, aborted: true });
     expect(updates.get('a.wav')?.status).toBe('skipped');

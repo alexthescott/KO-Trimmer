@@ -35,8 +35,17 @@ describe('parseSourceInfo', () => {
 
   it('skips chunks before fmt and reads WAVE_FORMAT_EXTENSIBLE sub-format + valid bits', () => {
     const fmt = [
-      ...u16le(0xfffe), ...u16le(2), ...u32le(48000), ...u32le(0), ...u16le(8), ...u16le(32),
-      ...u16le(22), ...u16le(24), ...u32le(3), ...u16le(1), ...new Array(14).fill(0),
+      ...u16le(0xfffe),
+      ...u16le(2),
+      ...u32le(48000),
+      ...u32le(0),
+      ...u16le(8),
+      ...u16le(32),
+      ...u16le(22),
+      ...u16le(24),
+      ...u32le(3),
+      ...u16le(1),
+      ...new Array(14).fill(0),
     ];
     const wav = bytesOf('RIFF', u32le(0), 'WAVE', 'JUNK', u32le(3), [0, 0, 0, 0], 'fmt ', u32le(40), fmt);
     expect(formatOf(wav)).toEqual(PCM24);
@@ -67,7 +76,8 @@ describe('parseSourceInfo sample rate', () => {
     expect(parseSourceInfo(encodeWav([new Float32Array(4)], 22050)).sampleRate).toBe(22050);
     const comm = [...u16be(1), ...u32be(0), ...u16be(16), 0x40, 0x0e, 0xac, 0x44, 0, 0, 0, 0, 0, 0];
     expect(parseSourceInfo(bytesOf('FORM', u32be(0), 'AIFF', 'COMM', u32be(18), comm))).toEqual({
-      format: PCM16, sampleRate: 44100,
+      format: PCM16,
+      sampleRate: 44100,
     });
     const info = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0a, 0xc4, 0x43, 0x70, ...new Array(20).fill(0)];
     expect(parseSourceInfo(bytesOf('fLaC', [0, 0, 0, 34], info)).sampleRate).toBe(44100);
@@ -112,7 +122,7 @@ describe('encodeWav sample formats', () => {
     expect(f.getFloat32(58, true)).toBe(1.5);
     expect(f.getFloat32(62, true)).toBe(-0.25);
     const i = new DataView(encodeWav(ch, 44100, PCM24).buffer);
-    const s24 = (o: number) => (i.getUint8(o) | (i.getUint8(o + 1) << 8) | (i.getInt8(o + 2) << 16));
+    const s24 = (o: number) => i.getUint8(o) | (i.getUint8(o + 1) << 8) | (i.getInt8(o + 2) << 16);
     expect(s24(44)).toBe(0x7fffff);
     expect(s24(47)).toBe(-0x200000);
   });
@@ -127,7 +137,11 @@ describe('bit depth in estimate + pipeline', () => {
     for (const sourceFormat of [PCM24, FLOAT32]) {
       for (const preserveBitDepth of [false, true]) {
         const est = estimateOutputBytes({
-          trimmedFrames: 1000, sourceChannels: 2, sourceSampleRate: 44100, extension: 'wav', sourceFormat,
+          trimmedFrames: 1000,
+          sourceChannels: 2,
+          sourceSampleRate: 44100,
+          extension: 'wav',
+          sourceFormat,
           settings: { speedMultiplier: 1, preserveStereo: true, bitrateKbps: 320, preserveBitDepth },
         });
         const format = resolveOutputFormat(sourceFormat, preserveBitDepth);
@@ -144,7 +158,12 @@ describe('bit depth in estimate + pipeline', () => {
 
   it('estimates a clipping file at its 32-bit float size', () => {
     const est = estimateOutputBytes({
-      trimmedFrames: 1000, sourceChannels: 1, sourceSampleRate: 44100, extension: 'wav', sourceFormat: FLOAT32, peak: 1.5,
+      trimmedFrames: 1000,
+      sourceChannels: 1,
+      sourceSampleRate: 44100,
+      extension: 'wav',
+      sourceFormat: FLOAT32,
+      peak: 1.5,
       settings: { speedMultiplier: 1, preserveStereo: true, bitrateKbps: 320, preserveBitDepth: false },
     });
     expect(est).toBe(encodeWav([new Float32Array(1000)], 44100, FLOAT32).length);
@@ -153,7 +172,12 @@ describe('bit depth in estimate + pipeline', () => {
   it('pipeline keeps float when preserving, silently', async () => {
     const loud = Float32Array.from({ length: 4410 }, (_, i) => 1.5 * Math.sin(i / 5));
     const kept = await runPipeline({
-      channels: [loud], sampleRate: 44100, extension: 'wav', baseName: 'x', originalBytes: 1, sourceFormat: FLOAT32,
+      channels: [loud],
+      sampleRate: 44100,
+      extension: 'wav',
+      baseName: 'x',
+      originalBytes: 1,
+      sourceFormat: FLOAT32,
       settings: { ...DEFAULT_SETTINGS, preserveBitDepth: true },
     });
     expect(formatOf(kept.bytes)).toEqual(FLOAT32);
@@ -164,7 +188,12 @@ describe('bit depth in estimate + pipeline', () => {
   it('pipeline keeps float instead of clipping, and says why', async () => {
     const loud = Float32Array.from({ length: 4410 }, (_, i) => 1.5 * Math.sin(i / 5));
     const result = await runPipeline({
-      channels: [loud], sampleRate: 44100, extension: 'wav', baseName: 'x', originalBytes: 1, sourceFormat: FLOAT32,
+      channels: [loud],
+      sampleRate: 44100,
+      extension: 'wav',
+      baseName: 'x',
+      originalBytes: 1,
+      sourceFormat: FLOAT32,
       settings: DEFAULT_SETTINGS,
     });
     expect(formatOf(result.bytes)).toEqual(FLOAT32);
@@ -176,7 +205,12 @@ describe('bit depth in estimate + pipeline', () => {
   it('pipeline converts float to 16-bit when nothing would clip', async () => {
     const quiet = Float32Array.from({ length: 4410 }, (_, i) => 0.5 * Math.sin(i / 5));
     const result = await runPipeline({
-      channels: [quiet], sampleRate: 44100, extension: 'wav', baseName: 'x', originalBytes: 1, sourceFormat: FLOAT32,
+      channels: [quiet],
+      sampleRate: 44100,
+      extension: 'wav',
+      baseName: 'x',
+      originalBytes: 1,
+      sourceFormat: FLOAT32,
       settings: DEFAULT_SETTINGS,
     });
     expect(result.stats.sourceFormat).toEqual(FLOAT32);

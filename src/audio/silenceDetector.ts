@@ -39,12 +39,7 @@ export function detectSilenceRegions(
   return regions;
 }
 
-function pushIfLongEnough(
-  regions: SilenceRegion[],
-  start: number,
-  end: number,
-  minDurationSamples: number,
-): void {
+function pushIfLongEnough(regions: SilenceRegion[], start: number, end: number, minDurationSamples: number): void {
   const duration = end - start + 1;
   if (duration >= minDurationSamples) {
     regions.push({ start, end, duration });

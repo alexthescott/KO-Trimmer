@@ -1,7 +1,18 @@
 import { extensionOf } from '../app/fileNames';
 
 /** Audio files picked up from drops and folder walks; everything else is ignored. */
-export const SUPPORTED_EXTENSIONS = ['wav', 'wave', 'mp3', 'flac', 'aif', 'aiff', 'aifc', 'm4a', 'ogg', 'opus'] as const;
+export const SUPPORTED_EXTENSIONS = [
+  'wav',
+  'wave',
+  'mp3',
+  'flac',
+  'aif',
+  'aiff',
+  'aifc',
+  'm4a',
+  'ogg',
+  'opus',
+] as const;
 
 /** Suffix of the output folder; folders ending in it are skipped so a re-scan never reprocesses output. */
 export const TRIMMED_SUFFIX = '_trimmed';
@@ -61,8 +72,7 @@ export async function resolveDroppedItems(items: DataTransferItemList): Promise<
   const directoryHandles = topLevel.filter(
     (item): item is FileSystemDirectoryHandle => 'kind' in item && item.kind === 'directory',
   );
-  const rootHandle =
-    topLevel.length === 1 && directoryHandles.length === 1 ? directoryHandles[0] : undefined;
+  const rootHandle = topLevel.length === 1 && directoryHandles.length === 1 ? directoryHandles[0] : undefined;
 
   return { entries, rootHandle };
 }
@@ -116,17 +126,14 @@ function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEn
   return new Promise((resolve, reject) => {
     const all: FileSystemEntry[] = [];
     const readBatch = () => {
-      reader.readEntries(
-        (entries) => {
-          if (entries.length === 0) {
-            resolve(all);
-          } else {
-            all.push(...entries);
-            readBatch();
-          }
-        },
-        reject,
-      );
+      reader.readEntries((entries) => {
+        if (entries.length === 0) {
+          resolve(all);
+        } else {
+          all.push(...entries);
+          readBatch();
+        }
+      }, reject);
     };
     readBatch();
   });
