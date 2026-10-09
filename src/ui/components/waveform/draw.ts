@@ -115,6 +115,46 @@ export function prepareCanvas(canvas: HTMLCanvasElement): { ctx: CanvasRendering
   return { ctx, dpr };
 }
 
+/**
+ * A visible canvas plus an offscreen copy of its static content (waveform,
+ * dimming, handles), so the per-frame playhead during playback is one blit
+ * instead of a full waveform repaint.
+ */
+export class LayeredCanvas {
+  private base = document.createElement('canvas');
+  private dpr = 1;
+
+  constructor(readonly canvas: HTMLCanvasElement) {}
+
+  /** Repaints the static layer and shows it alone; false while the canvas is hidden. */
+  paint(paintStatic: (ctx: CanvasRenderingContext2D, dpr: number) => void): boolean {
+    const prepared = prepareCanvas(this.canvas);
+    const baseCtx = prepared && this.resizeBase();
+    if (!prepared || !baseCtx) return false;
+    this.dpr = prepared.dpr;
+    paintStatic(baseCtx, prepared.dpr);
+    prepared.ctx.drawImage(this.base, 0, 0);
+    return true;
+  }
+
+  /** Shows the static layer with `paintOverlay` on top; false if the layer is stale and needs paint(). */
+  overlay(paintOverlay: (ctx: CanvasRenderingContext2D, dpr: number) => void): boolean {
+    const ctx = this.canvas.getContext('2d');
+    if (!ctx || this.base.width !== this.canvas.width || this.base.height !== this.canvas.height) return false;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.drawImage(this.base, 0, 0);
+    paintOverlay(ctx, this.dpr);
+    return true;
+  }
+
+  /** Matches the base layer to the visible canvas; assigning width/height also clears it. */
+  private resizeBase(): CanvasRenderingContext2D | null {
+    this.base.width = this.canvas.width;
+    this.base.height = this.canvas.height;
+    return this.base.getContext('2d');
+  }
+}
+
 export function readColors(el: HTMLElement): WaveColors {
   const style = getComputedStyle(el);
   const v = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;

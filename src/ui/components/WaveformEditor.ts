@@ -18,9 +18,10 @@ import {
   drawHandle,
   drawPlayhead,
   drawWave,
-  prepareCanvas,
+  LayeredCanvas,
   readColors,
   waveformOf,
+  type WaveColors,
   type Waveform,
 } from './waveform/draw';
 
@@ -59,7 +60,9 @@ export class WaveformEditor {
       this.updateButtons();
       this.draw();
     },
-    onFrame: () => this.draw(),
+    onFrame: () => {
+      if (!this.drawPlayheads()) this.draw();
+    },
   });
 
   private titleEl: HTMLElement;
@@ -69,6 +72,9 @@ export class WaveformEditor {
   private bodyEl: HTMLElement;
   private originalCanvas: HTMLCanvasElement;
   private processedCanvas: HTMLCanvasElement;
+  private originalLayer: LayeredCanvas;
+  private processedLayer: LayeredCanvas;
+  private colors?: WaveColors;
   private playOriginalButton: HTMLButtonElement;
   private playProcessedButton: HTMLButtonElement;
   private resizeObserver: ResizeObserver;
@@ -82,6 +88,8 @@ export class WaveformEditor {
 
     this.originalCanvas = h('canvas', { class: 'wave-canvas wave-original' });
     this.processedCanvas = h('canvas', { class: 'wave-canvas wave-processed' });
+    this.originalLayer = new LayeredCanvas(this.originalCanvas);
+    this.processedLayer = new LayeredCanvas(this.processedCanvas);
 
     this.playOriginalButton = h('button', { onclick: () => void this.togglePlay('original') }, ['Play Original']);
     this.playProcessedButton = h('button', { onclick: () => void this.togglePlay('processed') }, ['Play Processed']);
@@ -363,15 +371,14 @@ export class WaveformEditor {
 
   // ---- drawing ------------------------------------------------------------
 
+  /** Full repaint: both static layers (waveforms, trim dimming, handles), then the playheads. */
   private draw(): void {
     if (!this.loaded) return;
     const { original, trim } = this.loaded;
     const { start, end } = trim.range;
-    const colors = readColors(this.element);
+    const colors = (this.colors = readColors(this.element));
 
-    const top = prepareCanvas(this.originalCanvas);
-    if (top) {
-      const { ctx, dpr } = top;
+    this.originalLayer.paint((ctx, dpr) => {
       const width = ctx.canvas.width;
       drawWave(ctx, original, this.viewport, colors.wave);
       const xStart = this.viewport.proportionOf(start) * width;
@@ -379,19 +386,28 @@ export class WaveformEditor {
       dimOutside(ctx, xStart, xEnd, colors.dim);
       drawHandle(ctx, xStart, dpr, colors.success);
       drawHandle(ctx, xEnd, dpr, colors.danger);
-      if (this.playback.target === 'original') {
-        const playheadSample = this.playback.progress * trim.frames;
-        drawPlayhead(ctx, this.viewport.proportionOf(playheadSample) * width, dpr, colors.accent);
-      }
-    }
+    });
+    const processed = this.processed;
+    this.processedLayer.paint((ctx) => {
+      if (processed) drawWave(ctx, processed.wave, { start: 0, end: frameCount(processed.channels) }, colors.wave);
+    });
+    this.drawPlayheads();
+  }
 
-    const bottom = prepareCanvas(this.processedCanvas);
-    if (bottom && this.processed) {
-      const { ctx, dpr } = bottom;
-      drawWave(ctx, this.processed.wave, { start: 0, end: frameCount(this.processed.channels) }, colors.wave);
-      if (this.playback.target === 'processed') {
-        drawPlayhead(ctx, this.playback.progress * ctx.canvas.width, dpr, colors.accent);
-      }
-    }
+  /** Per-frame update while playing: blits the cached layers and draws the playhead; false if a layer is stale. */
+  private drawPlayheads(): boolean {
+    if (!this.loaded || !this.colors) return false;
+    const { accent } = this.colors;
+    const { trim } = this.loaded;
+    const target = this.playback.target;
+    const progress = this.playback.progress;
+    const top = this.originalLayer.overlay((ctx, dpr) => {
+      if (target !== 'original') return;
+      drawPlayhead(ctx, this.viewport.proportionOf(progress * trim.frames) * ctx.canvas.width, dpr, accent);
+    });
+    const bottom = this.processedLayer.overlay((ctx, dpr) => {
+      if (target === 'processed' && this.processed) drawPlayhead(ctx, progress * ctx.canvas.width, dpr, accent);
+    });
+    return top && bottom;
   }
 }
