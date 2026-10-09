@@ -48,6 +48,7 @@ export function computeTrimBounds(
   return { start: finalStart, end: finalEnd };
 }
 
+/** Views (not copies) of each channel within `bounds` — later stages never write to their input. */
 export function sliceChannels(channels: Float32Array[], bounds: SampleRange): Float32Array[] {
-  return channels.map((channel) => channel.slice(bounds.start, bounds.end));
+  return channels.map((channel) => channel.subarray(bounds.start, bounds.end));
 }

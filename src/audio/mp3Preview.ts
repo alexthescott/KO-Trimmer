@@ -22,14 +22,18 @@ function getWorker(): Worker {
 /**
  * Encodes audio to MP3 at `kbps` (in a worker) and decodes it back, so the
  * editor's "Play Processed" preview carries the real compression artifacts
- * the batch output will have. Channels are copied, never transferred — they
- * may be views of the editor's source audio.
+ * the batch output will have. Channels may be views of the editor's source
+ * audio, so each is copied into its own buffer and that copy transferred —
+ * posting a view would structured-clone its whole backing buffer.
  */
 export async function mp3RoundTrip(channels: Float32Array[], sampleRate: number, kbps: number): Promise<PcmAudio> {
   const id = nextId++;
   const bytes = await new Promise<Uint8Array>((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    getWorker().postMessage({ id, channels, sampleRate, kbps } satisfies Mp3PreviewRequest);
+    const copies = channels.map((channel) => channel.slice());
+    getWorker().postMessage({ id, channels: copies, sampleRate, kbps } satisfies Mp3PreviewRequest, {
+      transfer: copies.map((c) => c.buffer),
+    });
   });
   // Decode at the encoded rate so the preview isn't resampled to the device rate.
   return decodeAudioFile(bytes.buffer as ArrayBuffer, sampleRate);

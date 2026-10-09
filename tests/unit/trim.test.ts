@@ -66,5 +66,6 @@ describe('sliceChannels', () => {
     const [slicedLeft, slicedRight] = sliceChannels([left, right], { start: 1, end: 4 });
     expect(Array.from(slicedLeft)).toEqual([2, 3, 4]);
     expect(Array.from(slicedRight)).toEqual([4, 3, 2]);
+    expect(slicedLeft.buffer).toBe(left.buffer); // a view, not a copy
   });
 });
