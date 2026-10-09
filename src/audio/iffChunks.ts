@@ -69,3 +69,11 @@ export function readExtended80(view: DataView, offset: number): number {
   const lo = view.getUint32(offset + 6, false);
   return hi * 2 ** (exponent - 31) + lo * 2 ** (exponent - 63);
 }
+
+/** Writes an integer sample rate as IEEE 754 80-bit extended (AIFF COMM); the inverse of readExtended80. */
+export function writeExtended80(view: DataView, offset: number, value: number): void {
+  const exponent = Math.floor(Math.log2(value));
+  view.setUint16(offset, exponent + 16383, false);
+  view.setUint32(offset + 2, value * 2 ** (31 - exponent), false);
+  view.setUint32(offset + 6, 0, false);
+}

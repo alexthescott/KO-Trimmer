@@ -3,6 +3,7 @@ import { resampledFrames, resolveWavSampleRate } from './sampleRateResample';
 import { speedUpFrames } from './speedResample';
 import type { SampleFormat } from './sampleFormat';
 import { wavHeaderBytes } from './wavEncoder';
+import { aiffHeaderBytes } from './aiffEncoder';
 import { chooseWavFormat, outputContainerFor } from './outputContainer';
 
 export interface EstimateInput {
@@ -22,7 +23,7 @@ export interface EstimateInput {
 /**
  * Predicts output bytes with the same rules runPipeline applies after the
  * trim: mono downmix, speed-up length rounding, WAV sample-rate reduction,
- * then WAV at the resolved output bit depth or CBR MP3.
+ * then WAV/AIFF at the resolved output bit depth or CBR MP3.
  * Ported from the JUCE KOTrimmer's estimateOutputSize.
  */
 export function estimateOutputBytes(input: EstimateInput): number {
@@ -31,7 +32,8 @@ export function estimateOutputBytes(input: EstimateInput): number {
 
   let frames = speedUpFrames(input.trimmedFrames, settings.speedMultiplier);
 
-  if (outputContainerFor(input.extension) === 'mp3') {
+  const container = outputContainerFor(input.extension);
+  if (container === 'mp3') {
     const durationSec = frames / input.sourceSampleRate;
     return Math.round((durationSec * settings.bitrateKbps * 1000) / 8);
   }
@@ -40,7 +42,9 @@ export function estimateOutputBytes(input: EstimateInput): number {
   if (target !== undefined) frames = resampledFrames(frames, input.sourceSampleRate, target);
 
   const { format } = chooseWavFormat(input.sourceFormat, settings.preserveBitDepth ?? false, input.peak);
-  return wavHeaderBytes(format) + frames * channels * (format.bits / 8);
+  const headerBytes = container === 'aiff' ? aiffHeaderBytes(format) : wavHeaderBytes(format);
+  const dataBytes = frames * channels * (format.bits / 8);
+  return headerBytes + dataBytes + (container === 'aiff' ? dataBytes % 2 : 0);
 }
 
 export interface BatchEstimateSample {

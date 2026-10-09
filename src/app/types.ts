@@ -8,11 +8,11 @@ export interface ProcessingSettings {
   minDurationMs: number;
   paddingMs: number;
   preserveStereo: boolean;
-  /** Keep the source's bit depth (e.g. 32-bit float) instead of writing 16-bit WAV. */
+  /** Keep the source's bit depth (e.g. 32-bit float) instead of writing 16-bit WAV/AIFF. */
   preserveBitDepth: boolean;
   /** MP3 output only. */
   bitrateKbps: BitrateKbps;
-  /** WAV output only: max sample rate (only ever lowers it); null = keep original. */
+  /** WAV/AIFF output only: max sample rate (only ever lowers it); null = keep original. */
   wavSampleRateHz: number | null;
   speedMultiplier: number;
   /** Fade length at each trimmed edge (an untrimmed edge is left alone); 0 = off. */

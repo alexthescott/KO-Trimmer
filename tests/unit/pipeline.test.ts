@@ -3,6 +3,7 @@ import { renderAudible, runPipeline } from '../../src/audio/pipeline';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 import { NORMALIZE_PEAK } from '../../src/audio/gain';
 import { peakAbs } from '../../src/audio/sampleFormat';
+import { decodeAiff } from '../../src/audio/aiffDecoder';
 
 const ramp = (n: number) => Float32Array.from({ length: n }, (_, i) => i / n);
 const base = { sampleRate: 44100, container: 'wav' as const, settings: DEFAULT_SETTINGS };
@@ -77,6 +78,19 @@ describe('runPipeline', () => {
     const result = await runPipeline({ ...input, channels: [new Float32Array(1000).fill(0.5)] });
     expect(result.outputExtension).toBe('wav');
     expect(result.outputName).toBe('loop_trimmed_stereo.wav');
+  });
+
+  it('keeps AIFF sources as AIFF under their own extension, with the sample-rate suffix rule', async () => {
+    const settings = { ...DEFAULT_SETTINGS, wavSampleRateHz: 500 };
+    const result = await runPipeline({
+      ...input,
+      extension: 'aif',
+      settings,
+      channels: [new Float32Array(1000).fill(0.5)],
+    });
+    expect(result.outputExtension).toBe('aif');
+    expect(result.outputName).toBe('loop_trimmed_stereo_500Hz.aif');
+    expect(decodeAiff(result.bytes)).toMatchObject({ sampleRate: 500 });
   });
 
   it('flags and prefixes outputs over the KO II length limit', async () => {

@@ -1,6 +1,6 @@
 import type { FileEntry } from '../app/types';
 import { extensionOf } from '../app/fileNames';
-import { outputContainerFor } from '../audio/outputContainer';
+import { outputExtensionFor } from '../audio/outputContainer';
 import { ensureReadWrite } from './permissions';
 import { writeFile } from './writeFile';
 
@@ -22,5 +22,5 @@ export async function overwriteSourceFile(fileHandle: FileSystemFileHandle, byte
  */
 export function canOverwrite(file: FileEntry): file is FileEntry & { fileHandle: FileSystemFileHandle } {
   const extension = extensionOf(file.name);
-  return file.fileHandle !== undefined && outputContainerFor(extension) === extension;
+  return file.fileHandle !== undefined && outputExtensionFor(extension) === extension;
 }

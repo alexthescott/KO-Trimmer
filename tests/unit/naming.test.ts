@@ -6,6 +6,7 @@ describe('buildOutputFilename', () => {
     expect(
       buildOutputFilename({
         baseName: 'kick',
+        container: 'wav',
         extension: 'wav',
         preserveStereo: true,
         bitrateKbps: 320,
@@ -18,6 +19,7 @@ describe('buildOutputFilename', () => {
     expect(
       buildOutputFilename({
         baseName: 'snare',
+        container: 'mp3',
         extension: 'mp3',
         preserveStereo: false,
         bitrateKbps: 128,
@@ -30,6 +32,7 @@ describe('buildOutputFilename', () => {
     expect(
       buildOutputFilename({
         baseName: 'hat',
+        container: 'mp3',
         extension: 'mp3',
         preserveStereo: true,
         bitrateKbps: 320,
@@ -42,6 +45,7 @@ describe('buildOutputFilename', () => {
     expect(
       buildOutputFilename({
         baseName: 'loop',
+        container: 'wav',
         extension: 'wav',
         preserveStereo: true,
         bitrateKbps: 96,
@@ -55,6 +59,7 @@ describe('buildOutputFilename', () => {
     expect(
       buildOutputFilename({
         baseName: 'loop',
+        container: 'wav',
         extension: 'wav',
         preserveStereo: true,
         bitrateKbps: 320,
@@ -68,6 +73,7 @@ describe('buildOutputFilename', () => {
     expect(
       buildOutputFilename({
         baseName: 'longloop',
+        container: 'wav',
         extension: 'wav',
         preserveStereo: true,
         bitrateKbps: 320,
@@ -80,6 +86,7 @@ describe('buildOutputFilename', () => {
     expect(
       buildOutputFilename({
         baseName: 'exact',
+        container: 'wav',
         extension: 'wav',
         preserveStereo: true,
         bitrateKbps: 320,

@@ -1,13 +1,15 @@
 import type { BitrateKbps } from '../app/types';
-import type { OutputContainer } from './outputContainer';
+import { isPcmContainer, type OutputContainer } from './outputContainer';
 import { FULL_MP3_BITRATE } from './formats';
 
 export interface NamingInput {
   baseName: string; // filename without extension
-  extension: OutputContainer;
+  container: OutputContainer;
+  /** Output file extension (outputExtensionFor), e.g. "aif" for an AIFF container. */
+  extension: string;
   preserveStereo: boolean;
   bitrateKbps: BitrateKbps;
-  targetSampleRate?: number; // only relevant for wav
+  targetSampleRate?: number; // only relevant for WAV/AIFF
   finalDurationSec: number;
 }
 
@@ -28,10 +30,10 @@ export function exceedsKoIILength(durationSec: number): boolean {
 export function buildOutputFilename(input: NamingInput): string {
   const parts = ['trimmed', input.preserveStereo ? 'stereo' : 'mono'];
 
-  if (input.extension === 'mp3' && input.bitrateKbps < FULL_MP3_BITRATE) {
+  if (input.container === 'mp3' && input.bitrateKbps < FULL_MP3_BITRATE) {
     parts.push(`${input.bitrateKbps}k`);
   } else if (
-    input.extension === 'wav' &&
+    isPcmContainer(input.container) &&
     input.targetSampleRate !== undefined &&
     input.targetSampleRate < CD_SAMPLE_RATE
   ) {

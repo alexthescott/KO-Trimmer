@@ -1,13 +1,33 @@
 import { clipNote, FLOAT32, resolveOutputFormat, type SampleFormat } from './sampleFormat';
 
-export type OutputContainer = 'wav' | 'mp3';
+export type OutputContainer = 'wav' | 'aiff' | 'mp3';
+
+const AIFF_SOURCE_EXTENSIONS: ReadonlySet<string> = new Set(['aif', 'aiff', 'aifc']);
 
 /**
- * MP3 inputs stay MP3; everything else is written as WAV — there's no
- * browser encoder for flac/aiff/m4a/ogg, and every target sampler reads WAV.
+ * MP3 stays MP3 and AIFF stays AIFF (the OP-1's format); everything else is
+ * written as WAV — there's no browser encoder for flac/m4a/ogg, and every
+ * target sampler reads WAV.
  */
 export function outputContainerFor(sourceExtension: string): OutputContainer {
-  return sourceExtension === 'mp3' ? 'mp3' : 'wav';
+  if (sourceExtension === 'mp3') return 'mp3';
+  return AIFF_SOURCE_EXTENSIONS.has(sourceExtension) ? 'aiff' : 'wav';
+}
+
+/** Uncompressed output, where sample rate, bit depth and clipping apply. */
+export function isPcmContainer(container: OutputContainer): boolean {
+  return container !== 'mp3';
+}
+
+/**
+ * The output file's extension: the source's own for .aif/.aiff (so a kit
+ * keeps its naming, and Overwrite can replace it), .aif for .aifc (the
+ * output is plain AIFF unless float), otherwise the container's.
+ */
+export function outputExtensionFor(sourceExtension: string): string {
+  const container = outputContainerFor(sourceExtension);
+  if (container !== 'aiff') return container;
+  return sourceExtension === 'aiff' ? 'aiff' : 'aif';
 }
 
 export interface WavFormat {
@@ -34,7 +54,7 @@ export function chooseOutputFormat(
   preserveBitDepth: boolean,
   peak?: number,
 ): OutputFormat {
-  return container === 'mp3' ? {} : chooseWavFormat(source, preserveBitDepth, peak);
+  return isPcmContainer(container) ? chooseWavFormat(source, preserveBitDepth, peak) : {};
 }
 
 /** chooseOutputFormat for WAV, where there is always a sample format. */

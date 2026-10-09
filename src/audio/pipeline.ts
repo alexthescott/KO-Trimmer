@@ -10,7 +10,14 @@ import { buildOutputFilename, exceedsKoIILength } from './naming';
 import { peakAbs, type SampleFormat } from './sampleFormat';
 import { frameCount, type PcmAudio } from './channels';
 import { fadeEdges, normalizePeak } from './gain';
-import { chooseOutputFormat, outputContainerFor, type OutputContainer } from './outputContainer';
+import {
+  chooseOutputFormat,
+  isPcmContainer,
+  outputContainerFor,
+  outputExtensionFor,
+  type OutputContainer,
+} from './outputContainer';
+import { encodeAiff } from './aiffEncoder';
 
 /** Everything the pipeline needs about one file — serializable, so it can cross to the worker. */
 export interface PipelineRequest {
@@ -34,7 +41,8 @@ export interface PipelineInput extends PipelineRequest {
 export interface PipelineOutput {
   bytes: Uint8Array;
   outputName: string;
-  outputExtension: OutputContainer;
+  /** The output file's extension (outputExtensionFor). */
+  outputExtension: string;
   stats: ProcessStats;
   warning?: string;
 }
@@ -77,8 +85,9 @@ export async function renderAudible(input: RenderInput): Promise<PcmAudio> {
   onStage?.('speedup');
   if (settings.speedMultiplier > 1.0) channels = speedUp(channels, settings.speedMultiplier);
 
-  const targetSampleRate =
-    input.container === 'wav' ? resolveWavSampleRate(input.sampleRate, settings.wavSampleRateHz) : undefined;
+  const targetSampleRate = isPcmContainer(input.container)
+    ? resolveWavSampleRate(input.sampleRate, settings.wavSampleRateHz)
+    : undefined;
   let sampleRate = input.sampleRate;
   if (targetSampleRate !== undefined && frameCount(channels) > 0) {
     onStage?.('resample');
@@ -98,6 +107,7 @@ export async function renderAudible(input: RenderInput): Promise<PcmAudio> {
 export async function runPipeline(input: PipelineInput): Promise<PipelineOutput> {
   const { settings } = input;
   const container = outputContainerFor(input.extension);
+  const outputExtension = outputExtensionFor(input.extension);
 
   input.onStage?.('trim');
   const bounds = input.manualTrim
@@ -110,17 +120,18 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     container,
     input.sourceFormat,
     settings.preserveBitDepth,
-    container === 'wav' ? peakAbs(rendered.channels) : undefined,
+    isPcmContainer(container) ? peakAbs(rendered.channels) : undefined,
   );
   const bytes =
     container === 'mp3'
       ? encodeMp3(rendered.channels, rendered.sampleRate, settings.bitrateKbps, input.isCancelled)
-      : encodeWav(rendered.channels, rendered.sampleRate, outputFormat);
+      : (container === 'aiff' ? encodeAiff : encodeWav)(rendered.channels, rendered.sampleRate, outputFormat);
 
   const finalDurationSec = frameCount(rendered.channels) / rendered.sampleRate;
   const outputName = buildOutputFilename({
     baseName: input.baseName,
-    extension: container,
+    container,
+    extension: outputExtension,
     preserveStereo: settings.preserveStereo,
     bitrateKbps: settings.bitrateKbps,
     targetSampleRate: rendered.sampleRate !== input.sampleRate ? rendered.sampleRate : undefined,
@@ -134,10 +145,10 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     outputDurationSec: finalDurationSec,
     exceedsKoIILength: exceedsKoIILength(finalDurationSec),
     keptFloatToAvoidClipping: clipNote !== undefined,
-    sourceFormat: container === 'wav' ? input.sourceFormat : undefined,
+    sourceFormat: isPcmContainer(container) ? input.sourceFormat : undefined,
     outputFormat,
   };
 
   const warning = [bounds.warning, clipNote].filter(Boolean).join(' · ') || undefined;
-  return { bytes, outputName, outputExtension: container, stats, warning };
+  return { bytes, outputName, outputExtension, stats, warning };
 }

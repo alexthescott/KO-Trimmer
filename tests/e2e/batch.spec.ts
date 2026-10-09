@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { unzipSync } from 'fflate';
 import { decodeWav } from '../../src/audio/wavDecoder';
+import { decodeAiff } from '../../src/audio/aiffDecoder';
 import { parseSourceInfo } from '../../src/audio/sourceHeader';
 import { kitFixtures, writeKit } from './fixtures';
 
@@ -39,12 +40,12 @@ async function processToZip(page: Page): Promise<Record<string, Uint8Array>> {
   return unzipSync(new Uint8Array(readFileSync((await file.path())!)));
 }
 
-/** The trimmed kit: WAV stays WAV, AIFF becomes WAV at its own rate, MP3 stays MP3; silence is gone from all. */
+/** The trimmed kit: every format keeps its container (AIFF at its own rate); silence is gone from all. */
 function expectTrimmedKit(entries: Record<string, Uint8Array>): void {
   expect(Object.keys(entries).sort()).toEqual([
     'kick_trimmed_stereo.wav',
     'loop_trimmed_stereo.mp3',
-    'sub/snare_trimmed_stereo.wav',
+    'sub/snare_trimmed_stereo.aif',
   ]);
 
   const kick = decodeWav(entries['kick_trimmed_stereo.wav'])!;
@@ -53,7 +54,7 @@ function expectTrimmedKit(entries: Record<string, Uint8Array>): void {
   expect(kick.channels[0].length / 44100).toBeGreaterThan(TONE_SEC);
   expect(kick.channels[0].length / 44100).toBeLessThan(MAX_KEPT_SEC);
 
-  const snare = decodeWav(entries['sub/snare_trimmed_stereo.wav'])!;
+  const snare = decodeAiff(entries['sub/snare_trimmed_stereo.aif'])!; // AIFF stays AIFF
   expect(snare.sampleRate).toBe(48000); // native rate kept, not the device's
   expect(snare.channels).toHaveLength(1);
   expect(snare.channels[0].length / 48000).toBeLessThan(MAX_KEPT_SEC);
@@ -167,12 +168,12 @@ test.describe('File System Access (Chromium)', () => {
     expect(Object.keys(await listOpfs(page, 'kit/kit_trimmed')).sort()).toEqual([
       'kick_trimmed_stereo.wav',
       'loop_trimmed_stereo.mp3',
-      'sub/snare_trimmed_stereo.wav',
+      'sub/snare_trimmed_stereo.aif',
     ]);
     expect(errors).toEqual([]);
   });
 
-  test('Overwrite replaces WAV/MP3 sources in place and writes AIFF as a new file', async ({ page }) => {
+  test('Overwrite replaces WAV, AIFF and MP3 sources in place', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page);
     await useOpfsKit(page);
@@ -189,8 +190,8 @@ test.describe('File System Access (Chromium)', () => {
     expect(after['kick.wav']).toBeLessThan(before['kick.wav']);
     expect(after['loop.mp3']).not.toBe(before['loop.mp3']);
     expect(mp3OutputSec(after['loop.mp3'])).toBeLessThan(MAX_KEPT_SEC + 0.1); // the source is 1.5 s
-    expect(after['sub/snare.aif']).toBe(before['sub/snare.aif']); // can't overwrite .aif with WAV bytes
-    expect(after['kit_trimmed/sub/snare_trimmed_stereo.wav']).toBeGreaterThan(0);
+    expect(after['sub/snare.aif']).toBeLessThan(before['sub/snare.aif']);
+    expect(Object.keys(after).filter((name) => name.startsWith('kit_trimmed/'))).toEqual([]); // nothing written beside
     expect(errors).toEqual([]);
   });
 });

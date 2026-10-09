@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { estimateOutputBytes, extrapolateBatchEstimate } from '../../src/audio/estimate';
 import { encodeWav } from '../../src/audio/wavEncoder';
+import { encodeAiff } from '../../src/audio/aiffEncoder';
 import { speedUp } from '../../src/audio/speedResample';
 import { runPipeline } from '../../src/audio/pipeline';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
@@ -18,6 +19,24 @@ describe('estimateOutputBytes', () => {
     });
     const actual = encodeWav([new Float32Array(44100), new Float32Array(44100)], 44100).length;
     expect(est).toBe(actual);
+  });
+
+  it('matches encodeAiff byte counts exactly, including AIFC float and the odd-size pad', () => {
+    for (const [format, frames] of [
+      [{ bits: 16, float: false }, 1000],
+      [{ bits: 8, float: false }, 1001],
+      [{ bits: 32, float: true }, 1000],
+    ] as const) {
+      const est = estimateOutputBytes({
+        trimmedFrames: frames,
+        sourceChannels: 1,
+        sourceSampleRate: 44100,
+        extension: 'aif',
+        sourceFormat: format,
+        settings: { ...base, preserveBitDepth: true },
+      });
+      expect(est).toBe(encodeAiff([new Float32Array(frames)], 44100, format).length);
+    }
   });
 
   it('halves channels when downmixing to mono', () => {

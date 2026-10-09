@@ -55,7 +55,7 @@ interface BatchRun {
 
 type FileOutcome = { kind: 'done'; result: JobResult } | { kind: 'skipped' } | { kind: 'error'; message: string };
 
-const NOT_OVERWRITTEN_WARNING = 'Not overwritten — re-encoded as WAV, written as a new file';
+const NOT_OVERWRITTEN_WARNING = 'Not overwritten — re-encoded in another format, written as a new file';
 
 export async function processBatch(request: BatchRequest): Promise<BatchSummary> {
   const { files, settings, outputSink, signal, onFileUpdate } = request;

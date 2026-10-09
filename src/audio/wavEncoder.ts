@@ -46,38 +46,62 @@ export function encodeWav(channels: Float32Array[], sampleRate: number, format: 
   view.setUint32(offset + 4, dataSize, true);
   offset += 8;
 
-  const writeSample = sampleWriter(view, format);
-  for (let i = 0; i < numFrames; i++) {
-    for (let c = 0; c < numChannels; c++) {
-      writeSample(offset, channels[c][i]);
-      offset += bytesPerSample;
-    }
-  }
-
+  writeInterleaved(view, offset, channels, format, { littleEndian: true, unsigned8: true });
   return new Uint8Array(buffer);
 }
 
-function sampleWriter(view: DataView, format: SampleFormat): (offset: number, sample: number) => void {
-  // Float output keeps over-full-scale values; integer output clamps to [-1, 1].
-  if (format.float) return (offset, s) => view.setFloat32(offset, s, true);
-  switch (format.bits) {
-    case 8: // unsigned, 128 = silence
-      return (offset, s) => view.setUint8(offset, floatToInt(s, 0x80, 0x7f) + 128);
-    case 24:
-      return (offset, s) => {
-        const v = floatToInt(s, 0x800000, 0x7fffff);
-        view.setUint8(offset, v & 0xff);
-        view.setUint8(offset + 1, (v >> 8) & 0xff);
-        view.setUint8(offset + 2, (v >> 16) & 0xff);
-      };
-    case 32:
-      return (offset, s) => view.setInt32(offset, floatToInt(s, 0x80000000, 0x7fffffff), true);
-    default:
-      return (offset, s) => view.setInt16(offset, floatToInt(s, 0x8000, 0x7fff), true);
+/** Byte order and 8-bit encoding of a container's samples (WAV: little-endian, unsigned 8-bit; AIFF: neither). */
+export interface SampleLayout {
+  littleEndian: boolean;
+  unsigned8: boolean;
+}
+
+/** Interleaves planar float channels into `view` from byte `offset` in `format`; the inverse of decodeInterleaved. */
+export function writeInterleaved(
+  view: DataView,
+  offset: number,
+  channels: Float32Array[],
+  format: SampleFormat,
+  layout: SampleLayout,
+): void {
+  const writeSample = sampleWriter(view, format, layout);
+  const bytesPerSample = format.bits / 8;
+  const numFrames = frameCount(channels);
+  for (let i = 0; i < numFrames; i++) {
+    for (const channel of channels) {
+      writeSample(offset, channel[i]);
+      offset += bytesPerSample;
+    }
   }
 }
 
-function writeString(view: DataView, offset: number, value: string): void {
+function sampleWriter(
+  view: DataView,
+  format: SampleFormat,
+  { littleEndian: le, unsigned8 }: SampleLayout,
+): (offset: number, sample: number) => void {
+  // Float output keeps over-full-scale values; integer output clamps to [-1, 1].
+  if (format.float) return (offset, s) => view.setFloat32(offset, s, le);
+  switch (format.bits) {
+    case 8:
+      return unsigned8
+        ? (offset, s) => view.setUint8(offset, floatToInt(s, 0x80, 0x7f) + 128) // 128 = silence
+        : (offset, s) => view.setInt8(offset, floatToInt(s, 0x80, 0x7f));
+    case 24:
+      return (offset, s) => {
+        const v = floatToInt(s, 0x800000, 0x7fffff);
+        view.setUint8(offset + (le ? 0 : 2), v & 0xff);
+        view.setUint8(offset + 1, (v >> 8) & 0xff);
+        view.setUint8(offset + (le ? 2 : 0), (v >> 16) & 0xff);
+      };
+    case 32:
+      return (offset, s) => view.setInt32(offset, floatToInt(s, 0x80000000, 0x7fffffff), le);
+    default:
+      return (offset, s) => view.setInt16(offset, floatToInt(s, 0x8000, 0x7fff), le);
+  }
+}
+
+export function writeString(view: DataView, offset: number, value: string): void {
   for (let i = 0; i < value.length; i++) {
     view.setUint8(offset + i, value.charCodeAt(i));
   }

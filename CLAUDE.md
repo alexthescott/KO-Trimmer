@@ -52,12 +52,12 @@ src/
               name/extension splitter), errors.ts (errorMessage), fileEntries.ts,
               types.ts (incl. SampleRange)
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
-              sampleRateResample, gain (normalize/fades; predictedOutputPeak for
+              sampleRateResample, aiffEncoder (shares wavEncoder's sample writer), gain (normalize/fades; predictedOutputPeak for
               the estimate's clip prediction), wavEncoder, mp3Encoder, naming (filename + KO II
               length rule), channels.ts (PcmAudio type, frameCount/sampleAt/floatToInt),
               audioBuffer.ts (AudioBuffer copies; main thread only), iffChunks.ts (RIFF/AIFF chunk walk + WAV format
               tags, shared by sourceHeader/wav+aiff decoders/wavEncoder),
-              outputContainer.ts (the one "mp3 stays mp3, else wav" rule + output
+              outputContainer.ts (the one "mp3 stays mp3, aiff stays aiff, else wav" rule + output
               sample format), formats.ts (MP3 bitrate / WAV rate options),
               sourceHeader.ts (header parsing: bit depth + native
               sample rate), sampleFormat.ts (SampleFormat, output bit-depth policy,
@@ -123,9 +123,11 @@ pool size + 2 files in flight (`app/concurrency.ts`) so memory stays flat on
 thousand-file batches; the pool is `min(8, cores − 1)` workers. Per-file status changes
 emit `file-updated` (not `files-changed`), and tables patch that one row in place.
 
-**Output container:** always `.wav` or `.mp3`, matching input when the input is mp3,
-else `.wav` — there's no browser encoder for flac/aiff/m4a/ogg, so anything else decodes
-fine but re-encodes as lossless WAV.
+**Output container:** MP3 stays MP3, AIFF stays AIFF (`audio/aiffEncoder.ts`; `.aif`/
+`.aiff` keep their extension, `.aifc` becomes `.aif`; float output is AIFC `fl32`), and
+everything else becomes `.wav` — there's no browser encoder for flac/m4a/ogg, so those
+decode fine but re-encode as lossless WAV. The sample-rate cap and bit-depth rules apply
+to WAV and AIFF alike (`isPcmContainer`); `outputExtensionFor` names the file.
 
 **Native-rate decode** (non-WAV, and the editor/estimate): `decodeAudioData` resamples to its context's rate, and a live
 `AudioContext` runs at the output device's rate (often 48 kHz) — so decoding through it
@@ -178,8 +180,9 @@ walk skips any directory named `*_trimmed` to avoid reprocessing its own output.
 2. **"Overwrite" actually overwrites** the source file: `fs/overwriteWriter.ts` writes
    directly back to the source `FileSystemFileHandle` when enabled and supported
    (disabled with a tooltip otherwise). Only when the output keeps the source's
-   container (WAV/MP3) — a FLAC/AIFF/M4A/OGG source is re-encoded as WAV, so it's
-   written as a new file with a warning rather than putting WAV bytes in a `.flac`.
+   extension (WAV/AIFF/MP3, `outputExtensionFor(ext) === ext`) — a FLAC/M4A/OGG source
+   is re-encoded as WAV (and `.aifc` written as `.aif`), so it's written as a new file
+   with a warning rather than putting WAV bytes in a `.flac`.
 3. **KO-II >20s check uses final processed duration** (after trim + speed-up), since
    that's what ends up on the hardware (`audio/pipeline.ts` → `audio/naming.ts`).
 4. **Speed-up**: tape-style resample (`audio/speedResample.ts`, 1.0x–3.0x, default off)
@@ -235,7 +238,7 @@ Canonical source: `src/settings/defaults.ts` (MP3 bitrate / WAV rate option list
 | Speed-up | 1.0x–3.0x | 1.0x (off) |
 | Fade at cuts (only edges that were trimmed) | 0–50 ms | 0 (off) |
 | Normalize (peak to −0.3 dBFS, `audio/gain.ts`) | — | off |
-| WAV sample rate (max; never upsamples) | Original/44.1/22.05/16/11.025/8 kHz | Original |
+| WAV/AIFF sample rate (max; never upsamples) | Original/44.1/22.05/16/11.025/8 kHz | Original |
 | MP3 bitrate (MP3 inputs only) | 320/192/160/128/96/64 kbps | 320 |
 | Preserve stereo | — | on |
 | Preserve bit depth | — | off (16-bit WAV) |

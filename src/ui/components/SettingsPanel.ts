@@ -78,7 +78,7 @@ export class SettingsPanel {
         'Short fade wherever audio was trimmed away, so a cut mid-waveform doesn’t click. 0 = off.',
       ),
       field(
-        'WAV Sample Rate',
+        'Sample Rate (WAV/AIFF)',
         sampleRateSelect(s.wavSampleRateHz, (v) => appState.updateSettings({ wavSampleRateHz: v })),
         'Lower = smaller and duller: removes everything above half the rate. Never raises the rate.',
       ),
@@ -96,7 +96,7 @@ export class SettingsPanel {
       checkboxRow(
         'Preserve Bit Depth',
         s.preserveBitDepth,
-        'Unchecked writes 16-bit WAV (smallest), except files that would clip, which stay 32-bit float. Checked keeps the source format, e.g. 32-bit float — check your device supports it.',
+        'Unchecked writes 16-bit WAV/AIFF (smallest), except files that would clip, which stay 32-bit float. Checked keeps the source format, e.g. 32-bit float — check your device supports it.',
         (checked) => appState.updateSettings({ preserveBitDepth: checked }),
       ),
       checkboxRow(
@@ -232,9 +232,9 @@ function disableRow(row: HTMLElement, reason: string): HTMLElement {
 function renderOverwriteRow(): HTMLElement {
   const anyOverwritable = appState.files.some(canOverwrite);
   const helpText = anyOverwritable
-    ? 'Replaces WAV/MP3 sources in place. Other formats are re-encoded as WAV, so they are written as new files.'
+    ? 'Replaces WAV, AIFF and MP3 sources in place. Other formats are re-encoded as WAV, so they are written as new files.'
     : isFileSystemAccessSupported()
-      ? 'Only WAV and MP3 sources can be overwritten; other formats are re-encoded as WAV and written as new files.'
+      ? 'Only WAV, AIFF and MP3 sources can be overwritten; other formats are re-encoded as WAV and written as new files.'
       : 'Not available in this browser, which can’t write to files in place — use Chrome or Edge.';
   const row = checkboxRow('Overwrite original', appState.settings.overwrite, helpText, (checked) =>
     appState.updateSettings({ overwrite: checked }),
