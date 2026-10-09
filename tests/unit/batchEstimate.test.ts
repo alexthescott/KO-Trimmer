@@ -1,15 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { FileEntry } from '../../src/app/types';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
-import { computeAutoTrimBounds } from '../../src/audio/pipeline';
+import { computeAutoTrimBounds, type DetectionSettings } from '../../src/audio/autoTrim';
+import { analyseAudio } from '../../src/audio/analysis';
+import { BatchEstimator } from '../../src/app/batchEstimate';
 
-const decodeEntry = vi.fn();
-vi.mock('../../src/app/decodedCache', () => ({
-  decodeEntry: (file: FileEntry) => decodeEntry(file),
-  peekDecoded: () => undefined,
-}));
-
-const { BatchEstimator } = await import('../../src/app/batchEstimate');
+/** Stands in for the analysis worker: the same pure analysis, on a fixed decode. */
+const analyse = vi.fn<(file: FileEntry, detection: DetectionSettings) => Promise<ReturnType<typeof analyseAudio>>>();
 
 /** 1 s of silence, 1 s of tone, 1 s of silence at 8 kHz. */
 function paddedTone() {
@@ -36,54 +33,60 @@ const noop = () => {};
 
 describe('BatchEstimator', () => {
   beforeEach(() => {
-    decodeEntry.mockReset();
-    decodeEntry.mockImplementation(async () => paddedTone());
+    analyse.mockReset();
+    analyse.mockImplementation(async (_file, detection) => analyseAudio(paddedTone(), detection));
   });
 
   it('estimates with the pipeline auto-trim and reports each file as it lands', async () => {
     const { channels, sampleRate } = paddedTone();
     const { start, end } = computeAutoTrimBounds(channels, sampleRate, DEFAULT_SETTINGS);
     const perFile = vi.fn();
-    const result = await new BatchEstimator().estimate([entry('a')], DEFAULT_SETTINGS, perFile, noop);
+    const result = await new BatchEstimator(analyse).estimate([entry('a')], DEFAULT_SETTINGS, perFile, noop);
     expect(perFile).toHaveBeenCalledWith('a', { bytes: 44 + (end - start) * 2, peak: expect.any(Number) });
     expect(end - start).toBeLessThan(channels[0].length);
     expect(result).toMatchObject({ analysed: 1, total: 1, estimatedBytes: 44 + (end - start) * 2 });
   });
 
-  it('re-decodes only when detection settings change', async () => {
-    const estimator = new BatchEstimator();
+  it('re-analyses only when detection settings change, passing just the detection settings', async () => {
+    const estimator = new BatchEstimator(analyse);
     const files = [entry('a')];
     await estimator.estimate(files, DEFAULT_SETTINGS, noop, noop);
     await estimator.estimate(files, { ...DEFAULT_SETTINGS, speedMultiplier: 2, preserveStereo: false }, noop, noop);
-    expect(decodeEntry).toHaveBeenCalledTimes(1);
+    expect(analyse).toHaveBeenCalledTimes(1);
     await estimator.estimate(files, { ...DEFAULT_SETTINGS, thresholdDb: -30 }, noop, noop);
-    expect(decodeEntry).toHaveBeenCalledTimes(2);
+    expect(analyse).toHaveBeenCalledTimes(2);
+    expect(analyse.mock.calls[1][1]).toEqual({ thresholdDb: -30, minDurationMs: 10, paddingMs: 20 });
   });
 
   it('uses a manual trim without re-detecting', async () => {
-    const estimator = new BatchEstimator();
+    const estimator = new BatchEstimator(analyse);
     await estimator.estimate([entry('a')], DEFAULT_SETTINGS, noop, noop);
     const perFile = vi.fn();
     const manual = entry('a', { manualTrim: { start: 0, end: 8000 } });
     await estimator.estimate([manual], { ...DEFAULT_SETTINGS, thresholdDb: -20 }, perFile, noop);
-    expect(decodeEntry).toHaveBeenCalledTimes(1);
+    expect(analyse).toHaveBeenCalledTimes(1);
     expect(perFile.mock.calls[0][1].bytes).toBe(44 + 8000 * 2);
   });
 
   it('extrapolates over files that fail to decode', async () => {
-    decodeEntry.mockImplementation(async (file: FileEntry) => {
+    analyse.mockImplementation(async (file, detection) => {
       if (file.id === 'bad') throw new Error('unsupported');
-      return paddedTone();
+      return analyseAudio(paddedTone(), detection);
     });
     const perFile = vi.fn();
-    const result = await new BatchEstimator().estimate([entry('good'), entry('bad')], DEFAULT_SETTINGS, perFile, noop);
+    const result = await new BatchEstimator(analyse).estimate(
+      [entry('good'), entry('bad')],
+      DEFAULT_SETTINGS,
+      perFile,
+      noop,
+    );
     const goodBytes = perFile.mock.calls[0][1].bytes;
     // Same-sized sources, so the undecodable one is assumed to shrink by the same ratio.
     expect(result).toMatchObject({ analysed: 1, total: 2, estimatedBytes: 2 * goodBytes });
   });
 
   it('resolves null when superseded by cancel()', async () => {
-    const estimator = new BatchEstimator();
+    const estimator = new BatchEstimator(analyse);
     const pending = estimator.estimate([entry('a')], DEFAULT_SETTINGS, noop, noop);
     estimator.cancel();
     expect(await pending).toBeNull();

@@ -1,10 +1,9 @@
-import type { ProcessingSettings, SampleRange } from '../../../app/types';
+import type { SampleRange } from '../../../app/types';
 import type { PcmAudio } from '../../../audio/channels';
 import { frameCount } from '../../../audio/channels';
-import { computeAutoTrimBounds } from '../../../audio/pipeline';
+import { computeAutoTrimBounds, type DetectionSettings } from '../../../audio/autoTrim';
 import type { TrimBounds } from '../../../audio/trim';
 
-type DetectionSettings = Pick<ProcessingSettings, 'thresholdDb' | 'minDurationMs' | 'paddingMs'>;
 export type TrimHandle = 'start' | 'end';
 
 /**

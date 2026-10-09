@@ -1,7 +1,6 @@
 import type { ProcessingSettings, ProcessingStage, ProcessStats, SampleRange } from '../app/types';
-import { computeEnergyEnvelope } from './energyEnvelope';
-import { detectSilenceRegions } from './silenceDetector';
-import { computeTrimBounds, sliceChannels, type TrimBounds } from './trim';
+import { sliceChannels, type TrimBounds } from './trim';
+import { computeAutoTrimBounds } from './autoTrim';
 import { downmixToMono } from './mono';
 import { speedUp } from './speedResample';
 import { resolveWavSampleRate, resampleToRate } from './sampleRateResample';
@@ -44,20 +43,6 @@ export interface RenderInput extends PcmAudio {
   container: OutputContainer;
   settings: ProcessingSettings;
   onStage?: (stage: ProcessingStage) => void;
-}
-
-/**
- * Auto-detected trim bounds — the single code path shared by the worker
- * pipeline, the waveform editor's handles, and the batch size estimate.
- */
-export function computeAutoTrimBounds(
-  channels: Float32Array[],
-  sampleRate: number,
-  settings: Pick<ProcessingSettings, 'thresholdDb' | 'minDurationMs' | 'paddingMs'>,
-): TrimBounds {
-  const energy = computeEnergyEnvelope(channels);
-  const regions = detectSilenceRegions(energy, sampleRate, settings.thresholdDb, settings.minDurationMs);
-  return computeTrimBounds(frameCount(channels), regions, sampleRate, settings.paddingMs);
 }
 
 export function clampManualTrim(trim: SampleRange, totalFrames: number): TrimBounds {

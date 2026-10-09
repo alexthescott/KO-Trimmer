@@ -1,15 +1,8 @@
 import { runPipeline } from '../audio/pipeline';
-import { decodePcmFile } from '../audio/pcmFileDecoder';
-import type { PcmAudio } from '../audio/channels';
 import type { ProcessingStage } from '../app/types';
 import { errorMessage } from '../app/errors';
-import {
-  postFromWorker,
-  UnsupportedFileError,
-  type JobSource,
-  type WorkerInMessage,
-  type WorkerOutMessage,
-} from './protocol';
+import { postFromWorker, UnsupportedFileError, type WorkerInMessage, type WorkerOutMessage } from './protocol';
+import { resolveSource } from './resolveSource';
 
 const cancelledJobIds = new Set<string>();
 
@@ -46,10 +39,3 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
     cancelledJobIds.delete(jobId);
   }
 };
-
-async function resolveSource(source: JobSource): Promise<PcmAudio> {
-  if (source.kind === 'pcm') return source;
-  const decoded = decodePcmFile(new Uint8Array(await source.file.arrayBuffer()));
-  if (!decoded) throw new UnsupportedFileError();
-  return decoded;
-}

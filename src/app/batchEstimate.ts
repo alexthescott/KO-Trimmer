@@ -1,10 +1,12 @@
 import type { FileEntry, ProcessingSettings } from './types';
-import { decodeEntry, peekDecoded } from './decodedCache';
-import { computeAutoTrimBounds } from '../audio/pipeline';
+import type { AudioAnalysis } from '../audio/analysis';
+import type { DetectionSettings } from '../audio/autoTrim';
 import { estimateOutputBytes, extrapolateBatchEstimate, type BatchEstimateSample } from '../audio/estimate';
-import { frameCount, type PcmAudio } from '../audio/channels';
-import { peakAbs } from '../audio/sampleFormat';
 import { extensionOf } from './fileNames';
+import { analyseEntry } from './analysisClient';
+
+/** Decodes + auto-trims one file for the estimate; the analysis worker in the app, a fake in tests. */
+export type Analyser = (file: FileEntry, detection: DetectionSettings) => Promise<AudioAnalysis>;
 
 /** What the estimate needs from one decode, kept instead of the PCM itself. */
 interface DecodeSummary {
@@ -32,15 +34,17 @@ export interface BatchEstimate {
 }
 
 /**
- * Whole-batch output size estimate: decodes every file (one at a time), runs
- * the same auto-trim the pipeline uses, and reports each file's estimate as
- * it lands via `onFile`, plus a running total via `onProgress`. Per-file
- * decode results are reduced to a few numbers and cached, so changing
+ * Whole-batch output size estimate: analyses every file (one at a time, in
+ * a worker), running the same auto-trim the pipeline uses, and reports each
+ * file's estimate as it lands via `onFile`, plus a running total via
+ * `onProgress`. Per-file results are a few numbers, cached, so changing
  * speed/bitrate/stereo never re-decodes; only detection-setting changes do.
  */
 export class BatchEstimator {
   private summaries = new Map<string, DecodeSummary>();
   private generation = 0;
+
+  constructor(private readonly analyse: Analyser = analyseEntry) {}
 
   /** Resolves with the final total, or null if superseded by a newer call / cancel(). */
   async estimate(
@@ -50,7 +54,9 @@ export class BatchEstimator {
     onProgress: (progress: BatchEstimate) => void,
   ): Promise<BatchEstimate | null> {
     const generation = ++this.generation;
-    const detectKey = `${settings.thresholdDb}|${settings.minDurationMs}|${settings.paddingMs}`;
+    const { thresholdDb, minDurationMs, paddingMs } = settings;
+    const detection: DetectionSettings = { thresholdDb, minDurationMs, paddingMs };
+    const detectKey = `${thresholdDb}|${minDurationMs}|${paddingMs}`;
     const originalBytes = files.reduce((sum, f) => sum + f.size, 0);
     const samples: BatchEstimateSample[] = [];
     const summarize = (): BatchEstimate => ({
@@ -64,22 +70,16 @@ export class BatchEstimator {
       let info = this.summaries.get(file.id);
       const needsAuto = !file.manualTrim && !info?.autoFrames.has(detectKey);
       if (!info || needsAuto) {
-        let decoded;
+        let analysis;
         try {
-          decoded = await decodeForEstimate(file);
+          analysis = await this.analyse(file, detection);
         } catch {
           continue;
         }
         if (generation !== this.generation) return null;
-        info ??= {
-          channels: decoded.channels.length,
-          sampleRate: decoded.sampleRate,
-          frames: frameCount(decoded.channels),
-          peak: peakAbs(decoded.channels),
-          autoFrames: new Map(),
-        };
-        const bounds = computeAutoTrimBounds(decoded.channels, decoded.sampleRate, settings);
-        info.autoFrames.set(detectKey, bounds.end - bounds.start);
+        const { autoFrames, ...source } = analysis;
+        info ??= { ...source, autoFrames: new Map() };
+        info.autoFrames.set(detectKey, autoFrames);
         this.summaries.set(file.id, info);
       }
 
@@ -111,9 +111,4 @@ export class BatchEstimator {
   cancel(): void {
     this.generation++;
   }
-}
-
-/** Reuses the editor's decoded audio when it's already in memory. */
-function decodeForEstimate(file: FileEntry): Promise<PcmAudio> {
-  return peekDecoded(file.id) ?? decodeEntry(file);
 }

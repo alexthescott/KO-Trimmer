@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TrimState } from '../../src/ui/components/waveform/TrimState';
-import { computeAutoTrimBounds } from '../../src/audio/pipeline';
+import { computeAutoTrimBounds } from '../../src/audio/autoTrim';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
 /** 1 s silence, 1 s tone at -20 dBFS-ish, 1 s silence, at 8 kHz. */

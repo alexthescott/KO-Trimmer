@@ -1,6 +1,8 @@
 import type { PipelineOutput, PipelineRequest } from '../audio/pipeline';
 import type { ProcessingStage } from '../app/types';
 import type { PcmAudio } from '../audio/channels';
+import type { DetectionSettings } from '../audio/autoTrim';
+import type { AudioAnalysis } from '../audio/analysis';
 
 /**
  * Where the job's audio comes from: PCM already decoded on the main thread,
@@ -49,6 +51,16 @@ export interface ErrorMessage {
 }
 
 export type WorkerOutMessage = ProgressMessage | DoneMessage | ErrorMessage;
+
+/** Size-estimate analysis of one file (analysis.worker.ts). */
+export interface AnalysisRequest {
+  id: number;
+  source: JobSource;
+  detection: DetectionSettings;
+}
+
+export type AnalysisResponse =
+  { id: number; analysis: AudioAnalysis } | { id: number; error: string; unsupportedFile: boolean };
 
 /** Typed postMessage from inside a worker (the DOM lib types `self` as Window). */
 export function postFromWorker<T>(message: T, transfer: Transferable[] = []): void {

@@ -44,7 +44,9 @@ src/
               run: processFile -> outcomePatch -> tally; takes an onFileUpdate callback
               + injectable pool, never touches appState), decodedCache.ts (3-entry LRU
               of decoded audio for the editor; decodeEntry), batchEstimate.ts
-              (progressive per-file + whole-batch size estimate), estimateScheduler.ts
+              (progressive per-file + whole-batch size estimate; injectable Analyser),
+              analysisClient.ts (runs each estimate analysis in analysis.worker.ts),
+              estimateScheduler.ts
               (debounces/cancels estimate runs for MainView), fileNames.ts (the one
               name/extension splitter), errors.ts (errorMessage), fileEntries.ts,
               types.ts (incl. SampleRange)
@@ -60,8 +62,10 @@ src/
               labels, clip warning), estimate.ts (output-size prediction; reuses
               speedUpFrames/resampledFrames so it can't drift from the pipeline),
               pipeline.ts (renderAudible = trim/mono/speed/resample, shared by
-              runPipeline and the editor preview; computeAutoTrimBounds shared with
-              the estimator), audioContext.ts + player.ts (preview playback, main
+              runPipeline and the editor preview), autoTrim.ts (computeAutoTrimBounds
+              — shared by pipeline, editor and estimator; kept apart from pipeline.ts
+              so the analysis worker doesn't bundle the MP3 encoder), analysis.ts
+              (estimate's per-file numbers), audioContext.ts + player.ts (preview playback, main
               thread only), wavDecoder.ts + aiffDecoder.ts (pure-JS PCM decode;
               pcmFileDecoder.ts sniffs which), decode.ts (main-thread
               decodeAudioData)
@@ -75,7 +79,9 @@ src/
               overwriteWriter (true in-place overwrite; canOverwrite)
   workers/    protocol.ts (message types built on PipelineRequest/PipelineOutput),
               processing.worker.ts (runs pipeline.ts off-thread) + workerPool.ts
-              (pooled, AbortController-based cancellation)
+              (pooled, AbortController-based cancellation), analysis.worker.ts
+              (estimate decode + auto-trim), resolveSource.ts (worker-side decode
+              of a `file` job source)
   ui/         views/ (Welcome, Main, Processing) + components/ (DropZone, FileTable,
               WaveformEditor + waveform/ [Viewport, TrimState (trim rules, no DOM),
               PreviewPlayback, PreviewRenderer, readouts, draw],
@@ -194,9 +200,10 @@ folded into the web app rather than maintained separately:
   selected file (with confirm).
 - **Size estimates**: per-file in the editor and in the file table's Size column
   (`old → ~new`, actual size once processed), whole-batch next to Process.
-  `app/batchEstimate.ts` decodes every file one at a time, streaming each row's estimate
-  and a running total (extrapolated by bytes over files not yet analysed); decode
-  results are cached so only detection-setting changes re-decode.
+  `app/batchEstimate.ts` analyses every file one at a time in `analysis.worker.ts` (WAV/
+  AIFF decoded there; other formats decoded on the main thread and the PCM transferred),
+  streaming each row's estimate and a running total (extrapolated by bytes over files
+  not yet analysed); results are cached so only detection-setting changes re-analyse.
 - **Overwrite confirmation** dialog before any in-place overwrite.
 - **KO II visual theme** (cream `#F5F0E8` / orange `#FF6B2B`, flat hairline chrome,
   uppercase labels, monospace readouts) — tokens in `ui/styles/app.css` `:root`.
