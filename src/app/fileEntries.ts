@@ -1,14 +1,20 @@
 import type { DroppedEntry } from '../fs/dragDropEntries';
 import type { FileEntry } from './types';
 import { extensionOf } from './fileNames';
+import { forEachConcurrent } from './concurrency';
 import { FORMAT_PROBE_BYTES, id3v2Length, parseSourceInfo, type SourceInfo } from '../audio/sourceHeader';
 
+/** Header probes in flight at once: each is a small read, so a big drop is latency-bound, not memory-bound. */
+const PROBE_CONCURRENCY = 16;
+
+/** Resolves dropped entries to FileEntries (header probed), in the order given. */
 export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[]> {
-  const result: FileEntry[] = [];
-  for (const entry of entries) {
+  const result: Array<FileEntry | undefined> = new Array(entries.length);
+  await forEachConcurrent([...entries.keys()], PROBE_CONCURRENCY, async (i) => {
+    const entry = entries[i];
     const file = entry.file ?? (entry.fileHandle ? await entry.fileHandle.getFile() : undefined);
-    if (!file) continue;
-    result.push({
+    if (!file) return;
+    result[i] = {
       id: crypto.randomUUID(),
       name: entry.name,
       relativePath: entry.relativePath,
@@ -17,9 +23,9 @@ export async function toFileEntries(entries: DroppedEntry[]): Promise<FileEntry[
       file,
       status: 'queued',
       ...(await probeSource(file)),
-    });
-  }
-  return result;
+    };
+  });
+  return result.filter((f): f is FileEntry => f !== undefined);
 }
 
 /** Root folder name for a batch, used to name the `<root>_trimmed.zip` download. */
