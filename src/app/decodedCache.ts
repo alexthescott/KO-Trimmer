@@ -3,6 +3,7 @@ import { decodeAudioFile } from '../audio/decode';
 import type { PcmAudio } from '../audio/channels';
 import { AIFF_EXTENSIONS, decodePcmFile } from '../audio/pcmFileDecoder';
 import { extensionOf } from './fileNames';
+import { errorMessage } from './errors';
 
 const MAX_ENTRIES = 3;
 const cache = new Map<string, Promise<PcmAudio>>();
@@ -44,9 +45,25 @@ export function evictDecoded(id: string): void {
  */
 export async function decodeEntry(file: FileEntry): Promise<PcmAudio> {
   const bytes = await file.file.arrayBuffer();
-  if (AIFF_EXTENSIONS.has(extensionOf(file.name))) {
+  const extension = extensionOf(file.name);
+  if (AIFF_EXTENSIONS.has(extension)) {
     const decoded = decodePcmFile(new Uint8Array(bytes));
     if (decoded) return decoded;
   }
-  return decodeAudioFile(bytes, file.sourceSampleRate);
+  try {
+    return await decodeAudioFile(bytes, file.sourceSampleRate);
+  } catch (err) {
+    throw new Error(unsupportedDecodeMessage(extension, err), { cause: err });
+  }
+}
+
+/**
+ * decodeAudioData's own errors ("EncodingError: Unable to decode audio
+ * data") don't say what to do. Codec support differs by browser — e.g.
+ * Ogg Vorbis/Opus in older Safari, compressed AIFC everywhere but Safari —
+ * so say that, and keep the browser's reason for bug reports.
+ */
+export function unsupportedDecodeMessage(extension: string, err: unknown): string {
+  const what = extension ? `this .${extension} file` : 'this file';
+  return `This browser couldn’t decode ${what} — it may use a codec this browser lacks, or be damaged. Try another browser, or convert it to WAV. (${errorMessage(err)})`;
 }
