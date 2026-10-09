@@ -7,6 +7,7 @@ import { canOverwrite } from '../../fs/overwriteWriter';
 import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import type { BitrateKbps } from '../../app/types';
 import { NORMALIZE_PEAK_DB } from '../../audio/gain';
+import { semitonesToSpeed } from '../../audio/speedResample';
 import { matchingPreset, PRESETS, type Preset } from '../../settings/presets';
 
 export class SettingsPanel {
@@ -63,14 +64,15 @@ export class SettingsPanel {
         ),
       ),
       field(
-        'Speed-up (tape-style — raises pitch)',
+        'Speed-up (tape-style pitch, semitones)',
         sliderInput(
           'speed',
-          s.speedMultiplier,
-          SETTINGS_RANGES.speedMultiplier,
-          (v) => `${v.toFixed(2)}x`,
-          (v) => appState.updateSettings({ speedMultiplier: v }),
+          s.speedSemitones,
+          SETTINGS_RANGES.speedSemitones,
+          (v) => (v === 0 ? 'Off' : `+${v} st · ${semitonesToSpeed(v).toFixed(2)}x`),
+          (v) => appState.updateSettings({ speedSemitones: v }),
         ),
+        'Plays faster and higher, like a sped-up tape: +12 = an octave up at double speed, half the length.',
       ),
       field(
         'Fade at Cuts (ms)',

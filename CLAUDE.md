@@ -188,7 +188,7 @@ walk skips any directory named `*_trimmed` to avoid reprocessing its own output.
    with a warning rather than putting WAV bytes in a `.flac`.
 3. **KO-II >20s check uses final processed duration** (after trim + speed-up), since
    that's what ends up on the hardware (`audio/pipeline.ts` → `audio/naming.ts`).
-4. **Speed-up**: tape-style resample (`audio/speedResample.ts`, 1.0x–3.0x, default off)
+4. **Speed-up**: tape-style resample (`audio/speedResample.ts`, set in semitones 0–24 → speed 2^(st/12) = 1.0x–4.0x, default off)
    that shortens duration and raises pitch. It reads the source at `speed` samples per
    output sample through the same Kaiser-windowed sinc as WAV rate reduction
    (`sampleRateResample.ts::resampleByStep`), cutoff at 1/speed of Nyquist, so nothing
@@ -238,7 +238,7 @@ Canonical source: `src/settings/defaults.ts` (MP3 bitrate / WAV rate option list
 | Silence threshold | -60 to 0 dB | -50 dB |
 | Min silence duration | 10–10000 ms | 10 ms |
 | Padding | 0–1000 ms | 20 ms |
-| Speed-up | 1.0x–3.0x | 1.0x (off) |
+| Speed-up (semitones) | 0–24 st (1.0x–4.0x) | 0 (off) |
 | Fade at cuts (only edges that were trimmed) | 0–50 ms | 0 (off) |
 | Normalize (peak to −0.3 dBFS, `audio/gain.ts`) | — | off |
 | WAV/AIFF sample rate (max; never upsamples) | Original/44.1/22.05/16/11.025/8 kHz | Original |

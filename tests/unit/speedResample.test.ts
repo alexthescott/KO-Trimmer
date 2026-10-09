@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { speedUp, speedUpFrames } from '../../src/audio/speedResample';
+import { semitonesToSpeed, speedToSemitones, speedUp, speedUpFrames } from '../../src/audio/speedResample';
 
 describe('speedUp', () => {
   it('is a no-op at 1.0x', () => {
@@ -20,6 +20,13 @@ describe('speedUp', () => {
       const [out] = speedUp([ramp], speed);
       for (let i = 200; i < out.length - 200; i++) expect(out[i]).toBeCloseTo((i * speed) / 2000, 4);
     }
+  });
+
+  it('supports 4x (two octaves)', () => {
+    const channel = new Float32Array(1200).fill(0.5);
+    const [out] = speedUp([channel], semitonesToSpeed(24));
+    expect(out.length).toBe(300);
+    for (const sample of out) expect(sample).toBeCloseTo(0.5, 5);
   });
 
   it('supports 3x', () => {
@@ -68,5 +75,21 @@ describe('speedUpFrames', () => {
     expect(speedUpFrames(0, 2)).toBe(0);
     const [out] = speedUp([new Float32Array(0)], 2);
     expect(out.length).toBe(0);
+  });
+});
+
+describe('semitone speeds', () => {
+  it('doubles speed per octave', () => {
+    expect(semitonesToSpeed(0)).toBe(1);
+    expect(semitonesToSpeed(12)).toBe(2);
+    expect(semitonesToSpeed(7)).toBeCloseTo(1.4983, 4);
+    expect(semitonesToSpeed(19)).toBeCloseTo(3, 2);
+  });
+
+  it('rounds a multiplier to the nearest semitone', () => {
+    expect(speedToSemitones(1)).toBe(0);
+    expect(speedToSemitones(1.5)).toBe(7);
+    expect(speedToSemitones(2)).toBe(12);
+    expect(speedToSemitones(3)).toBe(19);
   });
 });

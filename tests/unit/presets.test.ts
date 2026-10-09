@@ -10,7 +10,7 @@ describe('presets', () => {
 
   it('recognises each preset once applied, and only its own fields matter', () => {
     for (const preset of PRESETS) {
-      const applied = { ...DEFAULT_SETTINGS, thresholdDb: -30, speedMultiplier: 2, ...preset.settings };
+      const applied = { ...DEFAULT_SETTINGS, thresholdDb: -30, speedSemitones: 12, ...preset.settings };
       expect(matchingPreset(applied)?.id).toBe(preset.id);
     }
   });

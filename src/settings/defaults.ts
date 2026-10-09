@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: ProcessingSettings = {
   preserveBitDepth: false,
   bitrateKbps: 320,
   wavSampleRateHz: null,
-  speedMultiplier: 1.0,
+  speedSemitones: 0,
   fadeMs: 0,
   normalize: false,
   overwrite: false,
@@ -19,6 +19,7 @@ export const SETTINGS_RANGES = {
   thresholdDb: { min: -60, max: 0, step: 1 },
   minDurationMs: { min: 10, max: 10000, step: 10 },
   paddingMs: { min: 0, max: 1000, step: 10 },
-  speedMultiplier: { min: 1.0, max: 3.0, step: 0.05 },
+  // Two octaves: +24 semitones = 4x.
+  speedSemitones: { min: 0, max: 24, step: 1 },
   fadeMs: { min: 0, max: 50, step: 1 },
 } as const;

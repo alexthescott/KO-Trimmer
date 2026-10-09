@@ -142,7 +142,7 @@ describe('bit depth in estimate + pipeline', () => {
           sourceSampleRate: 44100,
           extension: 'wav',
           sourceFormat,
-          settings: { speedMultiplier: 1, preserveStereo: true, bitrateKbps: 320, preserveBitDepth },
+          settings: { speedSemitones: 0, preserveStereo: true, bitrateKbps: 320, preserveBitDepth },
         });
         const format = resolveOutputFormat(sourceFormat, preserveBitDepth);
         expect(est).toBe(encodeWav([new Float32Array(1000), new Float32Array(1000)], 44100, format).length);
@@ -164,7 +164,7 @@ describe('bit depth in estimate + pipeline', () => {
       extension: 'wav',
       sourceFormat: FLOAT32,
       peak: 1.5,
-      settings: { speedMultiplier: 1, preserveStereo: true, bitrateKbps: 320, preserveBitDepth: false },
+      settings: { speedSemitones: 0, preserveStereo: true, bitrateKbps: 320, preserveBitDepth: false },
     });
     expect(est).toBe(encodeWav([new Float32Array(1000)], 44100, FLOAT32).length);
   });

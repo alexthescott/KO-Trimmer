@@ -5,7 +5,7 @@ import type { BatchSummary } from '../../app/processBatch';
 
 /**
  * A single consolidated "done" surface: results, errors, and KO-II
- * warnings in one place.
+ * warnings in one place. Shown inside the results dialog.
  */
 export function renderResultsSummary(summary: BatchSummary, outputDescription: string): HTMLElement {
   const rows: HTMLElement[] = [h('p', {}, [`Processed: ${summary.processedCount}`])];
@@ -53,5 +53,5 @@ export function renderResultsSummary(summary: BatchSummary, outputDescription: s
     rows.unshift(h('p', { style: 'color:var(--warning)' }, ['Processing was stopped before all files finished.']));
   }
 
-  return h('div', { class: 'panel' }, [h('h3', {}, ['Results']), ...rows]);
+  return h('div', {}, rows);
 }

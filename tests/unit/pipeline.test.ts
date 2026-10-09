@@ -42,7 +42,7 @@ describe('renderAudible', () => {
       ...base,
       channels: [ramp(1000), ramp(1000)],
       bounds: { start: 0, end: 1000 },
-      settings: { ...DEFAULT_SETTINGS, preserveStereo: false, speedMultiplier: 2 },
+      settings: { ...DEFAULT_SETTINGS, preserveStereo: false, speedSemitones: 12 },
     });
     expect(out.channels).toHaveLength(1);
     expect(out.channels[0].length).toBe(500);

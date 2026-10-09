@@ -52,7 +52,7 @@ describe('BatchEstimator', () => {
     const estimator = new BatchEstimator(analyse);
     const files = [entry('a')];
     await estimator.estimate(files, DEFAULT_SETTINGS, noop, noop);
-    await estimator.estimate(files, { ...DEFAULT_SETTINGS, speedMultiplier: 2, preserveStereo: false }, noop, noop);
+    await estimator.estimate(files, { ...DEFAULT_SETTINGS, speedSemitones: 12, preserveStereo: false }, noop, noop);
     expect(analyse).toHaveBeenCalledTimes(1);
     await estimator.estimate(files, { ...DEFAULT_SETTINGS, thresholdDb: -30 }, noop, noop);
     expect(analyse).toHaveBeenCalledTimes(2);

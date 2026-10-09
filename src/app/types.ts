@@ -14,7 +14,8 @@ export interface ProcessingSettings {
   bitrateKbps: BitrateKbps;
   /** WAV/AIFF output only: max sample rate (only ever lowers it); null = keep original. */
   wavSampleRateHz: number | null;
-  speedMultiplier: number;
+  /** Tape-style speed-up as a pitch rise in semitones; 0 = off. Speed = 2^(semitones/12). */
+  speedSemitones: number;
   /** Fade length at each trimmed edge (an untrimmed edge is left alone); 0 = off. */
   fadeMs: number;
   /** Scale each file's peak to NORMALIZE_PEAK_DB. */

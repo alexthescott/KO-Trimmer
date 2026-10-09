@@ -1,6 +1,6 @@
 import type { ProcessingSettings } from '../app/types';
 import { resampledFrames, resolveWavSampleRate } from './sampleRateResample';
-import { speedUpFrames } from './speedResample';
+import { semitonesToSpeed, speedUpFrames } from './speedResample';
 import type { SampleFormat } from './sampleFormat';
 import { wavHeaderBytes } from './wavEncoder';
 import { aiffHeaderBytes } from './aiffEncoder';
@@ -16,7 +16,7 @@ export interface EstimateInput {
   sourceFormat?: SampleFormat;
   /** Absolute peak, if known: integer output that would clip is estimated as 32-bit float. */
   peak?: number;
-  settings: Pick<ProcessingSettings, 'speedMultiplier' | 'preserveStereo' | 'bitrateKbps'> &
+  settings: Pick<ProcessingSettings, 'speedSemitones' | 'preserveStereo' | 'bitrateKbps'> &
     Partial<Pick<ProcessingSettings, 'preserveBitDepth' | 'wavSampleRateHz'>>;
 }
 
@@ -30,7 +30,7 @@ export function estimateOutputBytes(input: EstimateInput): number {
   const { settings } = input;
   const channels = settings.preserveStereo ? input.sourceChannels : Math.min(1, input.sourceChannels);
 
-  let frames = speedUpFrames(input.trimmedFrames, settings.speedMultiplier);
+  let frames = speedUpFrames(input.trimmedFrames, semitonesToSpeed(settings.speedSemitones));
 
   const container = outputContainerFor(input.extension);
   if (container === 'mp3') {

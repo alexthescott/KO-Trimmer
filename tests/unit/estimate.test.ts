@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { estimateOutputBytes, extrapolateBatchEstimate } from '../../src/audio/estimate';
 import { encodeWav } from '../../src/audio/wavEncoder';
 import { encodeAiff } from '../../src/audio/aiffEncoder';
-import { speedUp } from '../../src/audio/speedResample';
+import { semitonesToSpeed, speedUp } from '../../src/audio/speedResample';
 import { runPipeline } from '../../src/audio/pipeline';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 
-const base = { speedMultiplier: 1.0, preserveStereo: true, bitrateKbps: 320 as const };
+const base = { speedSemitones: 0, preserveStereo: true, bitrateKbps: 320 as const };
 
 describe('estimateOutputBytes', () => {
   it('matches a 16-bit stereo WAV byte count exactly', () => {
@@ -51,15 +51,15 @@ describe('estimateOutputBytes', () => {
   });
 
   it('matches speedUp output length', () => {
-    for (const speed of [1.3, 2.0, 2.7, 3.0]) {
+    for (const semitones of [5, 12, 17, 19]) {
       const frames = 12345;
-      const [sped] = speedUp([new Float32Array(frames)], speed);
+      const [sped] = speedUp([new Float32Array(frames)], semitonesToSpeed(semitones));
       const est = estimateOutputBytes({
         trimmedFrames: frames,
         sourceChannels: 1,
         sourceSampleRate: 48000,
         extension: 'wav',
-        settings: { ...base, speedMultiplier: speed },
+        settings: { ...base, speedSemitones: semitones },
       });
       expect(est).toBe(44 + sped.length * 2);
     }

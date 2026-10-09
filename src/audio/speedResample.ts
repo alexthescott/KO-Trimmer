@@ -1,5 +1,5 @@
 /**
- * Tape-style speed-up (1.0x–3.0x): shortens duration and raises pitch,
+ * Tape-style speed-up (set in semitones, 0–24 = 1.0x–4.0x): shortens duration and raises pitch,
  * same effect as playing audio back faster. Pure JS/no Web Audio
  * dependency so it's unit-testable in Node and runs identically on the
  * main thread or in a worker.
@@ -12,6 +12,16 @@
  */
 import { frameCount } from './channels';
 import { resampleByStep } from './sampleRateResample';
+
+/** Tape speed that raises pitch by `semitones` (12 per octave = 2x). */
+export function semitonesToSpeed(semitones: number): number {
+  return 2 ** (semitones / 12);
+}
+
+/** Nearest whole-semitone pitch shift for a tape speed (migrates old multiplier settings). */
+export function speedToSemitones(speedMultiplier: number): number {
+  return speedMultiplier > 1 ? Math.round(12 * Math.log2(speedMultiplier)) : 0;
+}
 
 /** Frames left after speeding `frames` up by `speedMultiplier` — shared with the size estimate. */
 export function speedUpFrames(frames: number, speedMultiplier: number): number {

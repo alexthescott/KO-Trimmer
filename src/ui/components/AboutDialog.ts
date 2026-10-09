@@ -1,4 +1,5 @@
 import { h } from '../dom';
+import { loadWelcomeOptIn, saveShowWelcome } from '../../settings/settingsManager';
 
 /** Opens the About modal; closes on the Close button, Escape, or a backdrop click. */
 export function openAboutDialog(): void {
@@ -11,6 +12,12 @@ export function openAboutDialog(): void {
   };
 
   const closeButton = h('button', { class: 'primary', onclick: close }, ['Close']);
+  const showWelcomeCheckbox = h('input', {
+    type: 'checkbox',
+    id: 'about-show-welcome',
+    checked: loadWelcomeOptIn(),
+    onchange: () => saveShowWelcome(showWelcomeCheckbox.checked),
+  });
 
   const overlay = h(
     'div',
@@ -40,6 +47,10 @@ export function openAboutDialog(): void {
             'unless a float source peaks over full scale, which stays 32-bit float rather than clipping. ' +
             'Files longer than 20 seconds after ' +
             'processing get a "_" prefix for KO II compatibility.',
+        ]),
+        h('div', { class: 'checkbox-row' }, [
+          showWelcomeCheckbox,
+          h('label', { for: 'about-show-welcome' }, ['Show the welcome screen every time the app opens']),
         ]),
         h('div', { style: 'display:flex; justify-content:flex-end; margin-top:16px' }, [closeButton]),
       ]),

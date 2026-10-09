@@ -3,7 +3,7 @@ import { appState } from '../../app/state';
 import { appEvents } from '../../app/events';
 import { errorMessage } from '../../app/errors';
 import { FileTable } from '../components/FileTable';
-import { renderResultsSummary } from '../components/ResultsSummary';
+import { openResultsDialog } from '../components/ResultsDialog';
 import { processBatch, type BatchSummary } from '../../app/processBatch';
 import {
   DiskZipOutputSink,
@@ -23,7 +23,6 @@ export class ProcessingView {
   private logEl: HTMLElement;
   private stopButton: HTMLButtonElement;
   private closeButton: HTMLButtonElement;
-  private resultsContainer: HTMLElement;
   private controller = new AbortController();
   private total: number;
   private finishedCount = 0;
@@ -40,7 +39,6 @@ export class ProcessingView {
     this.overallFill = h('div', { class: 'progress-bar-fill' });
     this.statusLabel = h('p', {}, ['Processing files…']);
     this.logEl = h('div', { class: 'log' });
-    this.resultsContainer = h('div');
 
     this.stopButton = h('button', { class: 'danger', onclick: () => this.handleStop() }, ['Stop Processing']);
     this.closeButton = h('button', { disabled: true, onclick: () => this.onDone() }, ['Close']);
@@ -54,7 +52,6 @@ export class ProcessingView {
         this.logEl,
         h('div', { style: 'display:flex; gap:8px; margin-top:8px' }, [this.stopButton, this.closeButton]),
       ]),
-      this.resultsContainer,
     ]);
 
     this.fileTable.render(files);
@@ -130,7 +127,12 @@ export class ProcessingView {
     }
 
     this.finish(summary.aborted ? 'Stopped.' : 'Processing complete!');
-    this.resultsContainer.replaceChildren(renderResultsSummary(summary, this.describeOutput()));
+    // A completed batch empties the sample bucket on dismissal; a stopped one keeps
+    // its files so the remainder can be run again.
+    openResultsDialog(summary, this.describeOutput(), () => {
+      if (!summary.aborted) appState.clearFiles();
+      this.onDone();
+    });
   }
 
   private finish(status: string): void {

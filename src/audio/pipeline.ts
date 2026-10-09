@@ -2,7 +2,7 @@ import type { ProcessingSettings, ProcessingStage, ProcessStats, SampleRange } f
 import { sliceChannels, type TrimBounds } from './trim';
 import { computeAutoTrimBounds } from './autoTrim';
 import { downmixToMono } from './mono';
-import { speedUp } from './speedResample';
+import { semitonesToSpeed, speedUp } from './speedResample';
 import { resolveWavSampleRate, resampleToRate } from './sampleRateResample';
 import { encodeWav } from './wavEncoder';
 import { encodeMp3 } from './mp3Encoder';
@@ -83,7 +83,7 @@ export async function renderAudible(input: RenderInput): Promise<PcmAudio> {
   if (!settings.preserveStereo) channels = downmixToMono(channels);
 
   onStage?.('speedup');
-  if (settings.speedMultiplier > 1.0) channels = speedUp(channels, settings.speedMultiplier);
+  if (settings.speedSemitones > 0) channels = speedUp(channels, semitonesToSpeed(settings.speedSemitones));
 
   const targetSampleRate = isPcmContainer(input.container)
     ? resolveWavSampleRate(input.sampleRate, settings.wavSampleRateHz)

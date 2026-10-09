@@ -1,16 +1,20 @@
 import { h } from '../dom';
-import { saveShowWelcome } from '../../settings/settingsManager';
+import { loadWelcomeOptIn, saveShowWelcome } from '../../settings/settingsManager';
 
 export class WelcomeView {
   element: HTMLElement;
 
   constructor(onDone: () => void) {
-    const showOnStartupCheckbox = h('input', { type: 'checkbox', checked: true });
+    // Shown once: marked seen as soon as it appears, unless the user opts in to seeing it every time.
+    const showOnStartupCheckbox = h('input', {
+      type: 'checkbox',
+      id: 'welcome-show-on-startup',
+      checked: loadWelcomeOptIn(),
+      onchange: () => saveShowWelcome(showOnStartupCheckbox.checked),
+    });
+    saveShowWelcome(showOnStartupCheckbox.checked);
 
-    const finish = () => {
-      saveShowWelcome(showOnStartupCheckbox.checked);
-      onDone();
-    };
+    const finish = onDone;
 
     this.element = h('div', { class: 'modal-overlay' }, [
       h('div', { class: 'modal' }, [
@@ -24,7 +28,10 @@ export class WelcomeView {
           h('li', {}, ['Click Process Files and watch live progress.']),
           h('li', {}, ['Preview the original vs. trimmed result before you use it.']),
         ]),
-        h('div', { class: 'checkbox-row' }, [showOnStartupCheckbox, h('label', {}, ['Show this on startup'])]),
+        h('div', { class: 'checkbox-row' }, [
+          showOnStartupCheckbox,
+          h('label', { for: 'welcome-show-on-startup' }, ['Show this every time the app opens']),
+        ]),
         h('div', { style: 'display:flex; justify-content:flex-end; gap:8px; margin-top:16px' }, [
           h('button', { onclick: finish }, ['Skip for now']),
           h('button', { class: 'primary', onclick: finish }, ['Get Started!']),
