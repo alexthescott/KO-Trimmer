@@ -36,7 +36,7 @@ export function openAboutDialog(): void {
           ' Decoding, trimming, and encoding all happen on your device, and the app works offline once installed.',
         ]),
         h('p', { class: 'muted' }, [
-          'MP3 inputs stay MP3; everything else is written as WAV — 16-bit unless Preserve Bit Depth is on, or ' +
+          'MP3 inputs stay MP3 and AIFF stays AIFF; everything else is written as WAV — 16-bit unless Preserve Bit Depth is on, or ' +
             'unless a float source peaks over full scale, which stays 32-bit float rather than clipping. ' +
             'Files longer than 20 seconds after ' +
             'processing get a "_" prefix for KO II compatibility.',
