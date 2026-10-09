@@ -118,6 +118,7 @@ export class SettingsPanel {
       'Sets channels, bit depth, WAV rate and MP3 bitrate; trim and speed stay as they are.',
     );
 
+    preset.classList.add('preset-field');
     this.element.replaceChildren(h('h3', {}, ['Settings']), preset, el, checkboxes);
   }
 }

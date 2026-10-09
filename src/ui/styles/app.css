@@ -227,6 +227,10 @@ button.icon-button:hover {
   color: var(--text);
 }
 
+.preset-field {
+  margin-bottom: 16px;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

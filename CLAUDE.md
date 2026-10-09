@@ -22,6 +22,7 @@ npm run lint       # ESLint (typescript-eslint, type-aware no-floating-promises)
 npm run format     # Prettier
 npm run build      # typecheck && vite build -> dist/
 npm run preview    # serve the production build locally
+npm run test:e2e   # Playwright E2E in Chromium/Firefox/WebKit against the build
 npm run icons      # regenerate PWA icons from assets/Knockout.svg
 ```
 
@@ -246,11 +247,12 @@ Canonical source: `src/settings/defaults.ts` (MP3 bitrate / WAV rate option list
   lands on `main` vs. a branch.
 - When touching any `src/audio/*` module, run `npm test` first — the unit suite encodes
   the exact algorithms (including the key behaviors above) and is fast (<1s).
-- `src/fs/`, service worker behavior, and actual playback are **not** covered by the
-  unit suite (they need a real browser / File System Access API). No browser automation
-  tool has been available in this environment to date — manual Chrome QA is still owed
-  before trusting changes there blind. Checklist: install flow, offline reload,
-  drag-drop folder recursion, large-batch Stop behavior, preview playback, waveform
-  editor handles/zoom and manual-trim reaching batch output, output
-  byte-correctness (`ffprobe` for actual sample rate / MP3 bitrate), overwrite
-  correctness, ZIP fallback.
+- `npm run test:e2e` (Playwright, `tests/e2e/`) runs the production build in Chromium,
+  Firefox and WebKit (`npx playwright install` once): folder input → ZIP for WAV/AIFF/MP3
+  with output headers/lengths checked, each ZIP sink forced via init scripts (OPFS
+  writable, worker sync-access, in-memory), size estimates and the preview worker for
+  every format, and — Chromium, with `showDirectoryPicker` stubbed to an OPFS folder —
+  `<root>_trimmed` output and true Overwrite. CI runs it in `ci.yml`.
+- Still manual (needs a human or a real device): install flow, offline reload, real
+  drag-drop from the OS, large-batch Stop behaviour, audible playback, pointer
+  dragging of handles, iOS file picking.
