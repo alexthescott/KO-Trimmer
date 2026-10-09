@@ -15,6 +15,10 @@ export interface ProcessingSettings {
   /** WAV output only: max sample rate (only ever lowers it); null = keep original. */
   wavSampleRateHz: number | null;
   speedMultiplier: number;
+  /** Fade length at each trimmed edge (an untrimmed edge is left alone); 0 = off. */
+  fadeMs: number;
+  /** Scale each file's peak to NORMALIZE_PEAK_DB. */
+  normalize: boolean;
   overwrite: boolean;
 }
 

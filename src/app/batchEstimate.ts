@@ -4,6 +4,7 @@ import type { DetectionSettings } from '../audio/autoTrim';
 import { estimateOutputBytes, extrapolateBatchEstimate, type BatchEstimateSample } from '../audio/estimate';
 import { extensionOf } from './fileNames';
 import { analyseEntry } from './analysisClient';
+import { predictedOutputPeak } from '../audio/gain';
 
 /** Decodes + auto-trims one file for the estimate; the analysis worker in the app, a fake in tests. */
 export type Analyser = (file: FileEntry, detection: DetectionSettings) => Promise<AudioAnalysis>;
@@ -86,17 +87,18 @@ export class BatchEstimator {
       const trimmedFrames = file.manualTrim
         ? file.manualTrim.end - file.manualTrim.start
         : (info.autoFrames.get(detectKey) ?? info.frames);
+      const peak = predictedOutputPeak(info.peak, settings.normalize);
       const estimatedBytes = estimateOutputBytes({
         trimmedFrames,
         sourceChannels: info.channels,
         sourceSampleRate: info.sampleRate,
         extension: extensionOf(file.name),
         sourceFormat: file.sourceFormat,
-        peak: info.peak,
+        peak,
         settings,
       });
       samples.push({ originalBytes: file.size, estimatedBytes });
-      onFile(file.id, { bytes: estimatedBytes, peak: info.peak });
+      onFile(file.id, { bytes: estimatedBytes, peak });
       onProgress(summarize());
     }
 

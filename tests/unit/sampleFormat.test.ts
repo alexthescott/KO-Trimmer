@@ -169,6 +169,21 @@ describe('bit depth in estimate + pipeline', () => {
     expect(est).toBe(encodeWav([new Float32Array(1000)], 44100, FLOAT32).length);
   });
 
+  it('normalize brings an over-full-scale float source down, so 16-bit output needs no float fallback', async () => {
+    const loud = Float32Array.from({ length: 4410 }, (_, i) => 1.5 * Math.sin(i / 5));
+    const out = await runPipeline({
+      channels: [loud],
+      sampleRate: 44100,
+      extension: 'wav',
+      baseName: 'x',
+      originalBytes: 1,
+      sourceFormat: FLOAT32,
+      settings: { ...DEFAULT_SETTINGS, normalize: true },
+    });
+    expect(formatOf(out.bytes)).toEqual(PCM16);
+    expect(out.stats.keptFloatToAvoidClipping).toBe(false);
+  });
+
   it('pipeline keeps float when preserving, silently', async () => {
     const loud = Float32Array.from({ length: 4410 }, (_, i) => 1.5 * Math.sin(i / 5));
     const kept = await runPipeline({

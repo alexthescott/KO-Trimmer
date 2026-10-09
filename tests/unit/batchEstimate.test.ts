@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
 import { computeAutoTrimBounds, type DetectionSettings } from '../../src/audio/autoTrim';
 import { analyseAudio } from '../../src/audio/analysis';
 import { BatchEstimator } from '../../src/app/batchEstimate';
+import { NORMALIZE_PEAK } from '../../src/audio/gain';
 
 /** Stands in for the analysis worker: the same pure analysis, on a fixed decode. */
 const analyse = vi.fn<(file: FileEntry, detection: DetectionSettings) => Promise<ReturnType<typeof analyseAudio>>>();
@@ -83,6 +84,12 @@ describe('BatchEstimator', () => {
     const goodBytes = perFile.mock.calls[0][1].bytes;
     // Same-sized sources, so the undecodable one is assumed to shrink by the same ratio.
     expect(result).toMatchObject({ analysed: 1, total: 2, estimatedBytes: 2 * goodBytes });
+  });
+
+  it('predicts the normalized peak (for the clip tag and float-size estimate) when Normalize is on', async () => {
+    const perFile = vi.fn();
+    await new BatchEstimator(analyse).estimate([entry('a')], { ...DEFAULT_SETTINGS, normalize: true }, perFile, noop);
+    expect(perFile.mock.calls[0][1].peak).toBe(NORMALIZE_PEAK);
   });
 
   it('resolves null when superseded by cancel()', async () => {

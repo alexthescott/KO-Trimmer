@@ -5,6 +5,7 @@ import { SETTINGS_RANGES } from '../../settings/defaults';
 import { canOverwrite } from '../../fs/overwriteWriter';
 import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import type { BitrateKbps } from '../../app/types';
+import { NORMALIZE_PEAK_DB } from '../../audio/gain';
 
 export class SettingsPanel {
   element: HTMLElement;
@@ -60,6 +61,11 @@ export class SettingsPanel {
         ),
       ),
       field(
+        'Fade at Cuts (ms)',
+        numberInput('fade', s.fadeMs, SETTINGS_RANGES.fadeMs, (v) => appState.updateSettings({ fadeMs: v })),
+        'Short fade wherever audio was trimmed away, so a cut mid-waveform doesn’t click. 0 = off.',
+      ),
+      field(
         'WAV Sample Rate',
         sampleRateSelect(s.wavSampleRateHz, (v) => appState.updateSettings({ wavSampleRateHz: v })),
         'Lower = smaller and duller: removes everything above half the rate. Never raises the rate.',
@@ -80,6 +86,12 @@ export class SettingsPanel {
         s.preserveBitDepth,
         'Unchecked writes 16-bit WAV (smallest), except files that would clip, which stay 32-bit float. Checked keeps the source format, e.g. 32-bit float — check your device supports it.',
         (checked) => appState.updateSettings({ preserveBitDepth: checked }),
+      ),
+      checkboxRow(
+        'Normalize',
+        s.normalize,
+        `Scales each file so its loudest peak sits at ${NORMALIZE_PEAK_DB} dBFS — louder quiet samples, and float sources that peak over full scale come back down.`,
+        (checked) => appState.updateSettings({ normalize: checked }),
       ),
       this.overwriteRow,
     ]);

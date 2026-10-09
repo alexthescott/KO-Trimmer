@@ -51,7 +51,8 @@ src/
               name/extension splitter), errors.ts (errorMessage), fileEntries.ts,
               types.ts (incl. SampleRange)
   audio/      pure DSP: energyEnvelope, silenceDetector, trim, mono, speedResample,
-              sampleRateResample, wavEncoder, mp3Encoder, naming (filename + KO II
+              sampleRateResample, gain (normalize/fades; predictedOutputPeak for
+              the estimate's clip prediction), wavEncoder, mp3Encoder, naming (filename + KO II
               length rule), channels.ts (PcmAudio type, frameCount/sampleAt/floatToInt),
               audioBuffer.ts (AudioBuffer copies; main thread only), iffChunks.ts (RIFF/AIFF chunk walk + WAV format
               tags, shared by sourceHeader/wav+aiff decoders/wavEncoder),
@@ -104,8 +105,8 @@ scripts/          generate-icons.ts (renders public/icons/ from assets/Knockout.
 ```
 
 **Processing pipeline (fixed order, `audio/pipeline.ts`):**
-decode → trim → mono/stereo → speed-up → WAV sample-rate reduction → encode at bit
-depth / MP3 bitrate (worker thread). WAV and AIFF are decoded in the worker by the
+decode → trim → fade at trimmed edges → mono/stereo → speed-up → WAV sample-rate
+reduction → normalize → encode at bit depth / MP3 bitrate (worker thread). WAV and AIFF are decoded in the worker by the
 pure-JS `audio/wavDecoder.ts` / `audio/aiffDecoder.ts` (PCM 8–32-bit int / 32–64-bit
 float; scaling matches `decodeAudioData`). AIFF (the OP-1's format) must stay pure-JS:
 only Safari's `decodeAudioData` reads it, so the editor/estimate decode it that way
@@ -229,6 +230,8 @@ Canonical source: `src/settings/defaults.ts` (MP3 bitrate / WAV rate option list
 | Min silence duration | 10–10000 ms | 10 ms |
 | Padding | 0–1000 ms | 20 ms |
 | Speed-up | 1.0x–3.0x | 1.0x (off) |
+| Fade at cuts (only edges that were trimmed) | 0–50 ms | 0 (off) |
+| Normalize (peak to −0.3 dBFS, `audio/gain.ts`) | — | off |
 | WAV sample rate (max; never upsamples) | Original/44.1/22.05/16/11.025/8 kHz | Original |
 | MP3 bitrate (MP3 inputs only) | 320/192/160/128/96/64 kbps | 320 |
 | Preserve stereo | — | on |

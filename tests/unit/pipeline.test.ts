@@ -1,11 +1,35 @@
 import { describe, it, expect } from 'vitest';
 import { renderAudible, runPipeline } from '../../src/audio/pipeline';
 import { DEFAULT_SETTINGS } from '../../src/settings/defaults';
+import { NORMALIZE_PEAK } from '../../src/audio/gain';
+import { peakAbs } from '../../src/audio/sampleFormat';
 
 const ramp = (n: number) => Float32Array.from({ length: n }, (_, i) => i / n);
 const base = { sampleRate: 44100, container: 'wav' as const, settings: DEFAULT_SETTINGS };
 
 describe('renderAudible', () => {
+  it('fades only the edges that were trimmed', async () => {
+    const settings = { ...DEFAULT_SETTINGS, fadeMs: 1 }; // 44 frames at 44.1 kHz
+    const flat = () => [new Float32Array(1000).fill(0.5)];
+    const startTrimmed = await renderAudible({
+      ...base,
+      settings,
+      channels: flat(),
+      bounds: { start: 100, end: 1000 },
+    });
+    expect(startTrimmed.channels[0][0]).toBe(0);
+    expect(startTrimmed.channels[0].at(-1)).toBe(0.5); // end untouched: nothing was cut there
+    const untrimmed = await renderAudible({ ...base, settings, channels: flat(), bounds: { start: 0, end: 1000 } });
+    expect(untrimmed.channels[0][0]).toBe(0.5);
+  });
+
+  it('normalizes last, after resampling', async () => {
+    const settings = { ...DEFAULT_SETTINGS, normalize: true, wavSampleRateHz: 22050 };
+    const quiet = [Float32Array.from({ length: 4410 }, (_, i) => 0.1 * Math.sin(i / 8))];
+    const out = await renderAudible({ ...base, settings, channels: quiet, bounds: { start: 0, end: 4410 } });
+    expect(peakAbs(out.channels)).toBeCloseTo(NORMALIZE_PEAK, 6);
+  });
+
   it('slices to the bounds', async () => {
     const out = await renderAudible({ ...base, channels: [ramp(1000)], bounds: { start: 100, end: 400 } });
     expect(out.channels[0].length).toBe(300);

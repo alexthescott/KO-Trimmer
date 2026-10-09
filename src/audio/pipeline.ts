@@ -9,6 +9,7 @@ import { encodeMp3 } from './mp3Encoder';
 import { buildOutputFilename, exceedsKoIILength } from './naming';
 import { peakAbs, type SampleFormat } from './sampleFormat';
 import { frameCount, type PcmAudio } from './channels';
+import { fadeEdges, normalizePeak } from './gain';
 import { chooseOutputFormat, outputContainerFor, type OutputContainer } from './outputContainer';
 
 /** Everything the pipeline needs about one file — serializable, so it can cross to the worker. */
@@ -55,14 +56,20 @@ export function clampManualTrim(trim: SampleRange, totalFrames: number): TrimBou
 }
 
 /**
- * The audible stages (trim -> mono -> speed-up -> WAV sample-rate reduction)
- * without encoding. runPipeline encodes its result, and the waveform editor
+ * The audible stages (trim -> fade -> mono -> speed-up -> WAV sample-rate
+ * reduction -> normalize) without encoding. runPipeline encodes its result, and the waveform editor
  * plays it as the live "Play Processed" preview — one code path, so the
  * preview can't drift from the batch output.
  */
 export async function renderAudible(input: RenderInput): Promise<PcmAudio> {
-  const { settings, onStage } = input;
-  let channels = sliceChannels(input.channels, input.bounds);
+  const { settings, onStage, bounds } = input;
+  let channels = sliceChannels(input.channels, bounds);
+  if (settings.fadeMs > 0) {
+    const fadeFrames = (settings.fadeMs * input.sampleRate) / 1000;
+    const trimmedStart = bounds.start > 0;
+    const trimmedEnd = bounds.end < frameCount(input.channels);
+    channels = fadeEdges(channels, trimmedStart ? fadeFrames : 0, trimmedEnd ? fadeFrames : 0);
+  }
 
   onStage?.('downmix');
   if (!settings.preserveStereo) channels = downmixToMono(channels);
@@ -72,11 +79,16 @@ export async function renderAudible(input: RenderInput): Promise<PcmAudio> {
 
   const targetSampleRate =
     input.container === 'wav' ? resolveWavSampleRate(input.sampleRate, settings.wavSampleRateHz) : undefined;
-  if (targetSampleRate === undefined || frameCount(channels) === 0) {
-    return { channels, sampleRate: input.sampleRate };
+  let sampleRate = input.sampleRate;
+  if (targetSampleRate !== undefined && frameCount(channels) > 0) {
+    onStage?.('resample');
+    channels = resampleToRate(channels, input.sampleRate, targetSampleRate);
+    sampleRate = targetSampleRate;
   }
-  onStage?.('resample');
-  return { channels: resampleToRate(channels, input.sampleRate, targetSampleRate), sampleRate: targetSampleRate };
+
+  // Last, so resampling can't push the normalized peak back over.
+  if (settings.normalize) channels = normalizePeak(channels);
+  return { channels, sampleRate };
 }
 
 /**
