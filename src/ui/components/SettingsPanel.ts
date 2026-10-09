@@ -3,6 +3,7 @@ import { appState } from '../../app/state';
 import { BITRATE_OPTIONS, WAV_SAMPLE_RATE_OPTIONS } from '../../audio/formats';
 import { SETTINGS_RANGES } from '../../settings/defaults';
 import { canOverwrite } from '../../fs/overwriteWriter';
+import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import type { BitrateKbps } from '../../app/types';
 
 export class SettingsPanel {
@@ -184,7 +185,9 @@ function renderOverwriteRow(): HTMLElement {
   const anyOverwritable = appState.files.some(canOverwrite);
   const helpText = anyOverwritable
     ? 'Replaces WAV/MP3 sources in place. Other formats are re-encoded as WAV, so they are written as new files.'
-    : 'Requires WAV or MP3 files added via a folder picker or drag-drop, not individual file picking.';
+    : isFileSystemAccessSupported()
+      ? 'Only WAV and MP3 sources can be overwritten; other formats are re-encoded as WAV and written as new files.'
+      : 'Not available in this browser, which can’t write to files in place — use Chrome or Edge.';
   const row = checkboxRow('Overwrite original', appState.settings.overwrite, helpText, (checked) =>
     appState.updateSettings({ overwrite: checked }),
   );

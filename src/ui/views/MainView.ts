@@ -11,6 +11,7 @@ import { FileTable } from '../components/FileTable';
 import { WaveformEditor } from '../components/WaveformEditor';
 import { pickWritableDirectory } from '../../fs/directoryPicker';
 import { canOverwrite } from '../../fs/overwriteWriter';
+import { isFileSystemAccessSupported } from '../../fs/capabilities';
 import type { FileEntry } from '../../app/types';
 
 export class MainView {
@@ -57,9 +58,16 @@ export class MainView {
     );
 
     const clearButton = h('button', { onclick: () => this.handleClear() }, ['Clear All']);
-    const chooseOutputButton = h('button', { onclick: () => void this.handleChooseOutputDirectory() }, [
-      'Choose output folder…',
-    ]);
+    const canPickFolder = isFileSystemAccessSupported();
+    const chooseOutputButton = h(
+      'button',
+      {
+        disabled: !canPickFolder,
+        title: canPickFolder ? undefined : 'This browser can’t write to folders, so output downloads as a ZIP.',
+        onclick: () => void this.handleChooseOutputDirectory(),
+      },
+      ['Choose output folder…'],
+    );
 
     const filePanel = h('div', { class: 'panel' }, [
       h('h3', {}, ['Files']),
@@ -198,7 +206,9 @@ export class MainView {
     if (folder) {
       this.outputLocationEl.textContent = `Output: ${folder}/`;
     } else {
-      this.outputLocationEl.textContent = 'Output: will download as a ZIP';
+      this.outputLocationEl.textContent = isFileSystemAccessSupported()
+        ? 'Output: will download as a ZIP (or choose an output folder)'
+        : 'Output: will download as a ZIP — this browser can’t write to folders (Chrome and Edge can)';
     }
   }
 
