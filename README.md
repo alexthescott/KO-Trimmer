@@ -5,7 +5,7 @@ Batch silence-trimmer for beatmakers with limited sample storage on hardware dev
 start and end of every sample in a folder, with optional mono downmix, bitrate/sample-rate
 reduction, and tape-style speed-up to squeeze samples into tight device memory.
 
-**Use it at [alexthescott.github.io/KO-Trimmer](https://alexthescott.github.io/KO-Trimmer/)** —
+**Use it at [sampletrimmer.com](https://sampletrimmer.com)** —
 installable from Chrome, works offline, no download or FFmpeg required. All audio
 processing and file reading/writing happens locally in your browser.
 
@@ -50,7 +50,7 @@ npm test           # unit tests (Vitest)
 npm run check      # typecheck + lint + format check + unit tests (what CI runs)
 npm run test:e2e   # Playwright end-to-end tests in Chromium, Firefox and WebKit
 npm run build      # typecheck + production build to dist/
-npm run preview    # serve dist/ locally at the /KO-Trimmer/ base path
+npm run preview    # serve dist/ locally
 npm run icons      # regenerate PWA icons from assets/Knockout.svg
 npm run screenshots # regenerate docs/screenshots/ from the production build
 ```
@@ -66,8 +66,8 @@ Run `npm test` before changing anything under `src/audio/`.
 
 Pushing to `main` triggers `.github/workflows/deploy-pwa.yml`, which tests, builds, and
 deploys `dist/` to GitHub Pages. One-time setup: Settings → Pages → source = "GitHub
-Actions". The production base path is `/KO-Trimmer/` (`vite.config.ts`); change `base` to
-`/` if moving to a custom domain.
+Actions". The site is served from the custom domain `sampletrimmer.com` (`public/CNAME`), so the
+Vite `base` is `/`.
 
 ### Browser support
 

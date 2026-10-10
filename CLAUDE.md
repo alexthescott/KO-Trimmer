@@ -35,7 +35,8 @@ alone (`tsconfig.worker.json`), so main-thread-only APIs (Web Audio, DOM) can't 
 into worker code — keep such helpers in modules the workers don't import
 (e.g. `audio/audioBuffer.ts`). One-time
 repo setting required: Settings → Pages → source = "GitHub Actions". Production base
-path is `/KO-Trimmer/` (`vite.config.ts`), matching this repo's Pages project-page URL.
+path is `/` (`vite.config.ts`) because the site is served from the custom domain
+`sampletrimmer.com` (`public/CNAME`, which must stay or deploys drop the domain).
 
 ### Architecture
 

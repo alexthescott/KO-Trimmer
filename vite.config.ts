@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: '/KO-Trimmer/',
+  base: '/',
   worker: {
     format: 'es',
   },
