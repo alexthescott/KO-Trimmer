@@ -15,7 +15,7 @@ export function renderResultsSummary(summary: BatchSummary, outputDescription: s
   }
   if (summary.originalBytes > 0) {
     rows.push(
-      h('p', {}, [
+      h('p', { class: 'readout' }, [
         `${formatBytes(summary.originalBytes)} → ${formatBytes(summary.outputBytes)} ` +
           `(${formatSizeChange(summary.originalBytes, summary.outputBytes)})`,
       ]),

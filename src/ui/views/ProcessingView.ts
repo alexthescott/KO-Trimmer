@@ -73,7 +73,7 @@ export class ProcessingView {
       // Each file reaches a final status exactly once (recordOutcome), so no dedupe needed.
       if (!isFinished(file)) continue;
       this.finishedCount++;
-      const icon = file.status === 'done' ? '✅' : file.status === 'error' ? '❌' : '⏭️';
+      const icon = file.status === 'done' ? '✓' : file.status === 'error' ? '✕' : '–';
       logLines.push(h('div', {}, [`${icon} ${file.relativePath}${file.error ? ' — ' + file.error : ''}`]));
     }
     this.pendingUpdates.clear();
